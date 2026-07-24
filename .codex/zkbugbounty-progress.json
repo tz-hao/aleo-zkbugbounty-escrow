@@ -1,0 +1,330 @@
+{
+  "project": "zkBugBounty",
+  "programId": "zkbugbounty_7f3c92.aleo",
+  "network": "testnet",
+  "currentIteration": 19,
+  "iterations": {
+    "1": { "name": "Baseline and architecture audit", "status": "COMPLETED" },
+    "2": { "name": "Canonical Leo program and secure commitments", "status": "COMPLETED" },
+    "3": { "name": "On-chain Nullifier Registry", "status": "COMPLETED" },
+    "4": { "name": "On-chain Claim Receipt", "status": "COMPLETED" },
+    "5": { "name": "Wallet-signed create_bounty", "status": "COMPLETED" },
+    "6": { "name": "create_bounty Testnet acceptance", "status": "COMPLETED" },
+    "7": { "name": "Wallet-signed submit_claim", "status": "COMPLETED" },
+    "8": { "name": "Duplicate Nullifier rejection", "status": "COMPLETED" },
+    "9": { "name": "Device-side Private Proof", "status": "COMPLETED" },
+    "10": { "name": "Real Public Registry and Indexing", "status": "COMPLETED" },
+    "11": { "name": "Wallet compatibility and network handling", "status": "COMPLETED" },
+    "12": { "name": "Reward Escrow", "status": "BLOCKED_MANUAL_ACTION" },
+    "13": { "name": "Encrypted Disclosure", "status": "BLOCKED_EXTERNAL_SERVICE" },
+    "14": { "name": "On-chain Triage State Machine", "status": "BLOCKED_BY_DEPENDENCY" },
+    "15": { "name": "Four-rule Aleo support", "status": "COMPLETED" },
+    "16": { "name": "Real AI Triage Copilot", "status": "BLOCKED_EXTERNAL_SERVICE" },
+    "17": { "name": "Security privacy and supply-chain hardening", "status": "COMPLETED" },
+    "18": { "name": "Vercel E2E and productization", "status": "BLOCKED_MANUAL_ACTION" },
+    "19": { "name": "Final protocol regression and acceptance", "status": "BLOCKED_BY_DEPENDENCY" }
+  },
+  "blockedItems": [
+    {
+      "iteration": 12,
+      "status": "BLOCKED_MANUAL_ACTION",
+      "problem": "Reward Escrow upgrade code and tests are complete, but the upgraded Program has not been manually broadcast.",
+      "evidence": "Local Leo 4.0.2 build now exposes fund_bounty, lock_reward, release_reward, refund_bounty, bounty_escrows, claim_payouts, bounty_claim_counts, and claim_reporters; deployed Testnet Program still requires a manual upgrade before wallet escrow actions are enabled.",
+      "attemptsMade": [
+        "Inspected the deployed-compatible ABI and canonical Leo source.",
+        "Implemented a read-only capability boundary that disables wallet actions and refuses API writes without parsing a body.",
+        "Implemented Credits escrow upgrade code in the canonical Leo Program without changing existing public entry signatures.",
+        "Added local ABI, source guard, valid flow, invalid actor, rejected claim, overdraft, duplicate payout, and malicious refund tests."
+      ],
+      "whyItCannotContinue": "A compatible Program upgrade, user wallet signature, Testnet fee, and Testnet Credits are required; Codex must not broadcast the upgrade or handle private keys.",
+      "dependencyImpact": "Blocks real RewardLocked/Paid acceptance, on-chain triage, Testnet payout, and final P1 acceptance.",
+      "safeWorkThatCanContinue": "Compatibility design, Leo code, local ABI tests, disabled-action UI, and public capability reporting are complete.",
+      "requiredManualAction": "Explicitly approve a Program upgrade design, then sign the upgrade and subsequent escrow transactions in Leo Wallet.",
+      "resumeCondition": "An upgraded Program is confirmed on Testnet and its escrow mappings are verified."
+    },
+    {
+      "iteration": 13,
+      "status": "BLOCKED_EXTERNAL_SERVICE",
+      "problem": "No ciphertext object storage or delivery provider is configured.",
+      "evidence": "Local ECDH/HKDF/AES-GCM export/import, package hashing, wrong-key rejection, tamper rejection, and public-only store attestation all pass tests.",
+      "attemptsMade": [
+        "Implemented local owner-key generation and Whitehat encryption.",
+        "Implemented local package export/import and integrity-checked decryption without browser persistence or network transport."
+      ],
+      "whyItCannotContinue": "Cloud ciphertext delivery requires an external storage service and access policy.",
+      "dependencyImpact": "The local encrypted disclosure workflow works, but cross-device ciphertext delivery is not accepted.",
+      "safeWorkThatCanContinue": "Local cryptographic workflow and public package-hash state are complete.",
+      "requiredManualAction": "Choose and configure a ciphertext storage/delivery provider with owner-only read access.",
+      "resumeCondition": "A configured provider passes upload, owner download, integrity, wrong-key, and plaintext-log tests."
+    },
+    {
+      "iteration": 14,
+      "status": "BLOCKED_BY_DEPENDENCY",
+      "problem": "The deployed Program has no on-chain triage entries or mappings.",
+      "evidence": "The triage capability reports BlockedByRewardEscrowUpgrade, refuses writes, and treats Role Switcher as Demo-only.",
+      "attemptsMade": [
+        "Defined the required Program entries and mapping boundary.",
+        "Added authority and UI tests requiring self.signer, confirmed transactions, and verified mappings."
+      ],
+      "whyItCannotContinue": "On-chain triage depends on the Iteration 12 Program upgrade and escrow state.",
+      "dependencyImpact": "RewardLocked, disclosure, patched, paid, and rejected states remain local Demo workflow states.",
+      "safeWorkThatCanContinue": "The disabled Real Mode boundary and authorization tests are complete.",
+      "requiredManualAction": "Complete and confirm the compatible Reward Escrow and triage Program upgrade.",
+      "resumeCondition": "Iteration 12 is completed and triage entries/mappings are deployed and queryable."
+    },
+    {
+      "iteration": 16,
+      "status": "BLOCKED_EXTERNAL_SERVICE",
+      "problem": "No real AI model provider is configured.",
+      "evidence": "The API accepts only the strict public metadata allowlist and returns 503 instead of silently using a local rules response.",
+      "attemptsMade": [
+        "Implemented a provider interface and strict input/output sanitizer.",
+        "Added rate limits, bounded JSON parsing, immutable public-only scope text, and non-authoritative recommendation tests."
+      ],
+      "whyItCannotContinue": "A real model endpoint and external provider configuration are required.",
+      "dependencyImpact": "Real AI recommendations are unavailable; the local policy engine remains explicitly labeled Mock.",
+      "safeWorkThatCanContinue": "Privacy, schema, rate-limit, and authority boundaries are complete.",
+      "requiredManualAction": "Select and configure an external model provider without exposing private fields.",
+      "resumeCondition": "A real provider passes public-only payload, output-scope, failure, and rate-limit acceptance."
+    },
+    {
+      "iteration": 18,
+      "status": "BLOCKED_MANUAL_ACTION",
+      "problem": "Production deployment is live, but Leo Wallet extension connection, reject, wrong-network, locked-wallet, and cancel-signature states still require manual browser acceptance.",
+      "evidence": "Production deployment dpl_HTKyFiXTZwT83qBz73ji9Ghzp1nW is READY at https://aleo-gilt.vercel.app; deployment API is verified, registries read real Aleo mappings, /api/aleo/prove returns 410, escrow is gated, and 390px CDP checks show no overflow, runtime exception, or console error.",
+      "attemptsMade": [
+        "Verified the linked Vercel project and existing deployments.",
+        "Deployed the current workspace to Vercel Production after explicit user approval.",
+        "Fixed deployment API status handling for real Program and deployment transaction endpoints.",
+        "Added public wallet diagnostic labels for adapter, address, expected network, error categories, and transaction preview readiness."
+      ],
+      "whyItCannotContinue": "Leo Wallet extension states require the user to operate a real Chrome or Edge extension session; Codex must not approve wallet prompts or broadcast transactions.",
+      "dependencyImpact": "Iteration 18 cannot be marked completed until normal connect, reject, locked, wrong network, reconnect, preview, and cancel-signature flows pass in a real wallet browser.",
+      "safeWorkThatCanContinue": "Production APIs, registry reads, 390px layout, console checks, and disabled escrow gate are accepted.",
+      "requiredManualAction": "Run the provided online wallet acceptance checklist in Chrome or Edge with Leo Wallet installed.",
+      "resumeCondition": "The user reports all wallet checklist items passed without broadcasting any new transaction."
+    },
+    {
+      "iteration": 19,
+      "status": "BLOCKED_BY_DEPENDENCY",
+      "problem": "Final protocol acceptance cannot pass while P0 submit_claim/replay acceptance and P1 escrow/triage/payout remain incomplete.",
+      "evidence": "The live Testnet public index contains one Mapping Verified create_bounty and zero submit_claim transactions; the deployed ABI has no escrow or triage mappings.",
+      "attemptsMade": [
+        "Re-ran the full 176-test, lint, build, browser, privacy, secret, dependency, and live Testnet registry checks.",
+        "Revisited every P0 and P1 blocker and confirmed each manual or upgrade dependency."
+      ],
+      "whyItCannotContinue": "Wallet signatures, Testnet fees, a Program upgrade, Credits funding, and external ciphertext delivery cannot be performed by Codex.",
+      "dependencyImpact": "The project cannot be described as a complete privacy-preserving bounty protocol yet.",
+      "safeWorkThatCanContinue": "The existing Testnet bounty registry, device wallet boundary, Mock demo, local disclosure crypto, security hardening, and UI remain runnable.",
+      "requiredManualAction": "Resume Iteration 7 first, then approve Iteration 8 and the compatible Iteration 12/14 Program upgrade workflow.",
+      "resumeCondition": "All P0 and P1 public transactions and mappings are confirmed and independently verified."
+    }
+  ],
+  "publicTransactions": [
+    {
+      "type": "deployment",
+      "transactionId": "at1m392ux58vwqlclcrqklh0693n8pfktsegpkw69rtpfhgj0jxsyzs3xdtxv",
+      "status": "confirmed"
+    },
+    {
+      "type": "create_bounty",
+      "transactionId": "at1wrneyusjwqe0wgca4pp20clw55e68ftsllgud9eemjrjllpy4qrsy5rrvp",
+      "status": "confirmed",
+      "blockHeight": 18045285,
+      "bountyId": "257640041950318553814753415615134947371field"
+    },
+    {
+      "type": "submit_claim",
+      "transactionId": "at1puye4qk3ldnr5cpw9620xs28c96ajus2cdnnxeg0sqagdephwcysfy35ns",
+      "status": "accepted",
+      "blockHeight": 18135210,
+      "blockHash": "ab1l0mjctqhw4gxxy5jne0ysprasd99kzuuvv4ym7h44e6vftzxls8ss36rm7",
+      "bountyId": "257640041950318553814753415615134947371field",
+      "claimHash": "1087378873489580906536450830281932234071260924522761468855169349133385843760field",
+      "nullifier": "2087883924318103230970265935164167589866211151371780449307466307889863923137field",
+      "mappingStatus": "Verified"
+    },
+    {
+      "type": "submit_claim_controlled_duplicate_pair_first",
+      "transactionId": "at1rr280efwuhyed5jepq687vm7m27tjt2qqq659c0rpys0qqstgcysjssngu",
+      "status": "accepted",
+      "blockHeight": 18137083,
+      "blockHash": "ab1c3668e2kq2uj2rnsqvzkr0lmm3zclge3ha2az3vvuards8pak5xs20zu7w",
+      "bountyId": "257640041950318553814753415615134947371field",
+      "claimHash": "4950888461585098134292682974513592867704186703432861593079938832340863836108field",
+      "nullifier": "43001239010982667359056940308599159854211339523745281394136644355935576010field",
+      "mappingStatus": "Verified"
+    },
+    {
+      "type": "submit_claim_controlled_duplicate_pair_second",
+      "transactionId": "at17we9zx6q25r5lfrwk6fpr65x2h9lngf5vayvtp2nr247twh5eg9qpxpclc",
+      "status": "rejected",
+      "blockHeight": 18137234,
+      "blockHash": "ab1nfurfl48d2ck65mahu39pvezsu50g5cuzu4l2p2xmhu296w7qspsg6t8c5",
+      "bountyId": "257640041950318553814753415615134947371field",
+      "claimHash": "4950888461585098134292682974513592867704186703432861593079938832340863836108field",
+      "nullifier": "43001239010982667359056940308599159854211339523745281394136644355935576010field",
+      "expectedRejectionGuard": "assert(!Mapping::contains(nullifiers, nullifier))",
+      "mappingStatus": "RejectedNoNewMapping"
+    }
+  ],
+  "iteration8Acceptance": {
+    "controlledPair": true,
+    "firstTransactionStatus": "accepted",
+    "firstTransactionId": "at1rr280efwuhyed5jepq687vm7m27tjt2qqq659c0rpys0qqstgcysjssngu",
+    "firstBlockHeight": 18137083,
+    "firstBlockHash": "ab1c3668e2kq2uj2rnsqvzkr0lmm3zclge3ha2az3vvuards8pak5xs20zu7w",
+    "duplicateTransactionStatus": "rejected",
+    "duplicateTransactionId": "at17we9zx6q25r5lfrwk6fpr65x2h9lngf5vayvtp2nr247twh5eg9qpxpclc",
+    "duplicateBlockHeight": 18137234,
+    "duplicateBlockHash": "ab1nfurfl48d2ck65mahu39pvezsu50g5cuzu4l2p2xmhu296w7qspsg6t8c5",
+    "sameNullifier": "43001239010982667359056940308599159854211339523745281394136644355935576010field",
+    "sameClaimHash": "4950888461585098134292682974513592867704186703432861593079938832340863836108field",
+    "duplicateReachedSubmitClaimExecution": true,
+    "duplicatePublicProofVerified": true,
+    "nullifierMappingUnchanged": true,
+    "receiptMappingUnchanged": true,
+    "publicClaimCountBeforePair": 1,
+    "publicClaimCountAfterFirst": 2,
+    "publicClaimCountAfterDuplicate": 2,
+    "browserStorageCleared": true,
+    "mockFallbackUsed": false
+  },
+  "iteration9Acceptance": {
+    "serverProofPostStatus": 410,
+    "realModeTransport": "leo-wallet-device",
+    "serverProofEnabled": false,
+    "privateInputsAcceptedByApi": false,
+    "mockFallbackAllowed": false,
+    "standaloneBrowserWasmProver": "not integrated; wallet execution is the device boundary"
+  },
+  "iteration10Acceptance": {
+    "discoverySource": "https://testnetbeta.aleorpc.com",
+    "authority": "AleoMappings",
+    "bountyTransactionsFound": 1,
+    "bountyMappingsVerified": 1,
+    "claimTransactionsFound": 2,
+    "claimMappingsVerified": 2,
+    "demoFallback": false,
+    "pagination": true
+  },
+  "iteration11Acceptance": {
+    "verifiedWallet": "Leo Wallet desktop extension",
+    "verifiedNetwork": "Aleo Testnet testnetbeta",
+    "otherWallets": "NotVerified",
+    "mobileWallet": "NotVerified",
+    "disconnectIsolation": true,
+    "requestIdSeparatedFromTransactionId": true,
+    "rawWalletErrorsExposed": false
+  },
+  "iteration12Boundary": {
+    "deployedStatus": "ProgramUpgradeRequired",
+    "requiredEntries": ["fund_bounty", "lock_reward", "release_reward", "refund_bounty"],
+    "requiredMappings": ["bounty_escrows", "claim_payouts", "bounty_claim_counts", "claim_reporters"],
+    "localUpgradeAbiReady": true,
+    "localLeoBuildPassed": true,
+    "existingEntrySignaturesPreserved": true,
+    "creditsEscrowTransfers": true,
+    "refundForLegacyBountiesWithoutClaimCount": "disabled",
+    "walletActionsEnabled": false,
+    "demoCanClaimPaid": false
+  },
+  "iteration13Acceptance": {
+    "localEncryption": "ECDH-P256+HKDF-SHA256+A256GCM",
+    "localRoundTrip": true,
+    "wrongKeyRejected": true,
+    "tamperRejected": true,
+    "plaintextPersisted": false,
+    "ciphertextPersisted": false,
+    "publicAttestationOnly": true,
+    "cloudDelivery": "BlockedExternalService"
+  },
+  "iteration14Boundary": {
+    "deployedStatus": "BlockedByRewardEscrowUpgrade",
+    "authority": "self.signer and Aleo mappings",
+    "roleSwitcherAuthoritative": false,
+    "walletActionsEnabled": false,
+    "mockFallbackAllowed": false
+  },
+  "iteration15Acceptance": {
+    "rulesInCanonicalSource": 4,
+    "deployedCompiledSourceEquivalent": true,
+    "typescriptVectorCases": 16,
+    "typescriptVectorsPassed": true,
+    "deployedRule1": true,
+    "deployedRule2": true,
+    "deployedRule3": true,
+    "deployedRule4": true,
+    "localBuildRule1": true,
+    "localBuildRule2": true,
+    "localBuildRule3": true,
+    "localBuildRule4": true,
+    "deployedProgramLength": 9945,
+    "localBuildProgramLength": 9945,
+    "leoCliRuleMatrix": "16 of 16 passed"
+  },
+  "iteration16Boundary": {
+    "strictPublicMetadataAllowlist": true,
+    "unknownOrPrivateShapedFieldsRejected": true,
+    "modelCanMutateProtocolState": false,
+    "externalProvider": "Unavailable",
+    "apiStatusWithoutProvider": 503
+  },
+  "iteration17Acceptance": {
+    "npmAuditVulnerabilities": 0,
+    "dependencyCount": 440,
+    "privateKeyLiteralFiles": 0,
+    "envFiles": 0,
+    "csp": true,
+    "boundedApiJson": true,
+    "ephemeralRateLimits": true,
+    "safeErrorBoundary": true
+  },
+  "iteration18Acceptance": {
+    "localPageStatuses": "5 of 5 returned HTTP 200",
+    "mobileViewport": "390x844",
+    "horizontalOverflow": false,
+    "runtimeExceptions": 0,
+    "nextErrorDialog": false,
+    "exactCoreSloganVisible": true,
+    "serverProofPostStatus": 410,
+    "escrowWriteStatus": 409,
+    "triageWriteStatus": 409,
+    "registryUnavailableFallback": "None",
+    "latestVercelSourceDeployed": true,
+    "productionUrl": "https://aleo-gilt.vercel.app",
+    "deploymentId": "dpl_HTKyFiXTZwT83qBz73ji9Ghzp1nW",
+    "deploymentApiStatus": "verified",
+    "walletManualAcceptance": "BLOCKED_MANUAL_ACTION",
+    "deploymentPreflight": "passed",
+    "vercelIgnoreAdded": true,
+    "blockedReason": "Online Leo Wallet extension connection, rejection, wrong-network, locked-wallet, reconnect, preview, and cancel-signature flows still require manual browser acceptance."
+  },
+  "iteration19Acceptance": {
+    "liveBountyTransactions": 1,
+    "liveVerifiedBountyMappings": 1,
+    "liveClaimTransactions": 2,
+    "liveVerifiedClaimMappings": 2,
+    "p0Accepted": true,
+    "p1Accepted": false,
+    "finalProtocolAccepted": false,
+    "accurateDescription": "zkBugBounty is an Aleo Testnet bug bounty protocol prototype with wallet-signed bounty creation, wallet-signed submit_claim, on-chain nullifier and claim receipt registries, and accepted duplicate-nullifier rejection; escrow, triage, and payout acceptance remain incomplete."
+  },
+  "environmentLimitations": [
+    {
+      "status": "RESOLVED",
+      "problem": "The workspace .git directory was missing before the upgrade recovery point.",
+      "resumeCondition": "Git was initialized locally without overwriting current files."
+    }
+  ],
+  "lastTestResult": "196 of 196 tests passed",
+  "lastLintResult": "passed",
+  "lastBuildResult": "Next.js 16.2.10 production build passed",
+  "lastLeoResult": "npm.cmd run leo:build passed through WSL Leo; Reward Escrow upgrade ABI generated successfully",
+  "lastAuditResult": "0 vulnerabilities across 440 dependencies",
+  "lastBrowserResult": "Production 390px CDP checks passed for home, create-bounty, submit-proof, public-claims, and bounty detail; no overflow, runtime exception, console error, or Next error dialog",
+  "lastTestnetResult": "one create_bounty transaction with Mapping Verified; two submit_claim transactions discovered: one controlled claim accepted and one duplicate-nullifier transaction rejected; nullifier and claim_receipt mappings verified unchanged after rejection",
+  "nextRunnableIteration": null,
+  "nextResumeTargets": [18, 12],
+  "updatedAt": "2026-07-24T12:20:00+08:00"
+}

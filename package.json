@@ -1,0 +1,49 @@
+{
+  "name": "zkbugbounty-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "lint": "eslint .",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "leo:version": "node --experimental-strip-types scripts/leo-cli.ts version",
+    "leo:build": "node --experimental-strip-types scripts/leo-cli.ts build",
+    "leo:run:valid": "node --experimental-strip-types scripts/leo-cli.ts run-valid",
+    "leo:run:invalid": "node --experimental-strip-types scripts/leo-cli.ts run-invalid",
+    "leo:run:low-impact": "node --experimental-strip-types scripts/leo-cli.ts run-low-impact",
+    "leo:run:claims-valid": "node --experimental-strip-types scripts/leo-cli.ts run-claims-valid",
+    "leo:run:reserve-valid": "node --experimental-strip-types scripts/leo-cli.ts run-reserve-valid",
+    "leo:run:withdraw-valid": "node --experimental-strip-types scripts/leo-cli.ts run-withdraw-valid",
+    "leo:run:rule-matrix": "node --experimental-strip-types scripts/leo-cli.ts run-rule-matrix",
+    "leo:run:create-bounty": "node --experimental-strip-types scripts/leo-cli.ts run-create-bounty",
+    "leo:run:submit-claim": "node --experimental-strip-types scripts/leo-cli.ts run-submit-claim"
+  },
+  "dependencies": {
+    "@demox-labs/aleo-wallet-adapter-base": "^0.0.23",
+    "@demox-labs/aleo-wallet-adapter-leo": "^0.0.25",
+    "lucide-react": "^0.475.0",
+    "next": "16.2.10",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.17",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "16.2.10",
+    "tailwindcss": "^4.1.17",
+    "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "@demox-labs/aleo-wallet-adapter-leo": {
+      "nanoid": "5.1.6"
+    },
+    "next": {
+      "postcss": "8.5.20"
+    }
+  }
+}

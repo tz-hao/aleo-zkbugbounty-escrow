@@ -1,0 +1,16 @@
+{
+  "program": "zkbugbounty_7f3c92.aleo",
+  "version": "0.1.0",
+  "description": "zkBugBounty vault invariant proof program",
+  "license": "MIT",
+  "leo": "4.0.2",
+  "dependencies": [
+    {
+      "name": "credits.aleo",
+      "location": "network",
+      "path": null,
+      "edition": null
+    }
+  ],
+  "dev_dependencies": null
+}

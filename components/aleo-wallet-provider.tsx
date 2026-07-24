@@ -1,0 +1,406 @@
+"use client";
+
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+
+import {
+  ALEO_WALLET_TESTNET_CHAIN_ID,
+  type CreateBountyTransactionPreview,
+} from "@/lib/aleo-create-bounty";
+import { CANONICAL_ALEO_PROGRAM_ID } from "@/lib/aleo-program";
+import {
+  assertSubmitClaimRawInputs,
+  buildTransientSubmitClaimInputs,
+  SUBMIT_CLAIM_FUNCTION,
+  type TransientSubmitClaimRequest,
+} from "@/lib/aleo-submit-claim";
+import {
+  diagnoseLeoWalletConnectionError,
+  diagnoseLeoWalletTransactionError,
+  getInjectedLeoWallet,
+  inspectLeoWalletProvider,
+} from "@/lib/leo-wallet-diagnostics";
+import {
+  classifyWalletResponseId,
+  normalizeWalletTransactionStatus,
+} from "@/lib/wallet-compatibility";
+
+type LeoAdapter = import("@demox-labs/aleo-wallet-adapter-leo").LeoWalletAdapter;
+
+export type WalletConnectionState =
+  | "Initializing"
+  | "NotInstalled"
+  | "Disconnected"
+  | "Connecting"
+  | "Connected"
+  | "Error";
+
+export type WalletCreateBountySubmission = {
+  walletRequestId: string;
+  publicTransactionId: string | null;
+  bountyId: string;
+  status: "Submitted" | "Processing" | "Finalized" | "Failed";
+  statusText: string;
+};
+
+export type WalletClaimSubmission = {
+  walletRequestId: string;
+  publicTransactionId: string | null;
+  bountyId: string;
+  status: "Submitted" | "Processing" | "Finalized" | "Failed";
+  statusText: string;
+};
+
+type AleoWalletContextValue = {
+  address: string | null;
+  connectionState: WalletConnectionState;
+  errorMessage: string | null;
+  submission: WalletCreateBountySubmission | null;
+  claimSubmission: WalletClaimSubmission | null;
+  connect: () => Promise<void>;
+  disconnect: () => Promise<void>;
+  submitCreateBounty: (preview: CreateBountyTransactionPreview) => Promise<string>;
+  submitWalletClaim: (request: TransientSubmitClaimRequest) => Promise<string>;
+  refreshSubmission: () => Promise<void>;
+  refreshClaimSubmission: () => Promise<void>;
+  submitControlledDuplicateClaimInputs: (request: {
+    bountyId: string;
+    feeMicrocredits: number;
+    inputs: readonly string[];
+  }) => Promise<string>;
+};
+
+const AleoWalletContext = createContext<AleoWalletContextValue | null>(null);
+const ALEO_ADDRESS_PATTERN = /^aleo1[0-9a-z]{58}$/;
+const LEO_WALLET_NOT_DETECTED_MESSAGE =
+  "当前浏览器未检测到 Leo Wallet 扩展。请使用已安装该扩展的 Chrome 或 Edge 打开本站。";
+
+export function AleoWalletProvider({ children }: { children: ReactNode }) {
+  const adapterRef = useRef<LeoAdapter | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
+  const [connectionState, setConnectionState] = useState<WalletConnectionState>("Initializing");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [submission, setSubmission] = useState<WalletCreateBountySubmission | null>(null);
+  const [claimSubmission, setClaimSubmission] = useState<WalletClaimSubmission | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    let adapter: LeoAdapter | null = null;
+    const handleReadyState = (readyState: string) => {
+      if (!active || adapter?.connected) return;
+      if (readyState === "Installed") {
+        setConnectionState("Disconnected");
+        setErrorMessage(null);
+        return;
+      }
+      setConnectionState("NotInstalled");
+      setErrorMessage(LEO_WALLET_NOT_DETECTED_MESSAGE);
+    };
+    const handleDisconnect = () => {
+      if (!active) return;
+      setAddress(null);
+      setSubmission(null);
+      setClaimSubmission(null);
+      setErrorMessage(null);
+      setConnectionState(adapter?.readyState === "Installed" ? "Disconnected" : "NotInstalled");
+    };
+
+    void import("@demox-labs/aleo-wallet-adapter-leo")
+      .then(({ LeoWalletAdapter }) => {
+        if (!active) return;
+        adapter = new LeoWalletAdapter({ appName: "zkBugBounty" });
+        adapterRef.current = adapter;
+        adapter.on("readyStateChange", handleReadyState);
+        adapter.on("disconnect", handleDisconnect);
+        handleReadyState(adapter.readyState);
+      })
+      .catch(() => {
+        if (!active) return;
+        setConnectionState("Error");
+        setErrorMessage("Leo Wallet Adapter 无法初始化。");
+      });
+
+    return () => {
+      active = false;
+      adapter?.off("readyStateChange", handleReadyState);
+      adapter?.off("disconnect", handleDisconnect);
+      adapterRef.current = null;
+    };
+  }, []);
+
+  async function connect() {
+    const adapter = adapterRef.current;
+    const providerEnvironment = inspectLeoWalletProvider(getInjectedLeoWallet(window));
+
+    if (providerEnvironment === "Missing") {
+      setConnectionState("NotInstalled");
+      setErrorMessage(LEO_WALLET_NOT_DETECTED_MESSAGE);
+      return;
+    }
+    if (providerEnvironment === "Incompatible") {
+      setConnectionState("Error");
+      setErrorMessage("检测到 Leo Wallet，但扩展接口不可用。请更新扩展、解锁钱包并刷新页面。");
+      return;
+    }
+    if (!adapter || adapter.readyState !== "Installed") {
+      setConnectionState("Error");
+      setErrorMessage("Leo Wallet 已注入，但 Adapter 尚未就绪。请刷新页面后重新连接。");
+      return;
+    }
+    setConnectionState("Connecting");
+    setErrorMessage(null);
+    try {
+      const { DecryptPermission, WalletAdapterNetwork } = await import(
+        "@demox-labs/aleo-wallet-adapter-base"
+      );
+      await adapter.connect(DecryptPermission.NoDecrypt, WalletAdapterNetwork.TestnetBeta, [
+        CANONICAL_ALEO_PROGRAM_ID,
+      ]);
+      const publicKey = adapter.publicKey;
+      if (!ALEO_ADDRESS_PATTERN.test(publicKey)) {
+        throw new Error("INVALID_ALEO_PUBLIC_ADDRESS");
+      }
+      setAddress(publicKey);
+      setConnectionState("Connected");
+    } catch (error) {
+      setAddress(null);
+      setConnectionState("Error");
+      setErrorMessage(diagnoseLeoWalletConnectionError(error).message);
+    }
+  }
+
+  async function disconnect() {
+    const adapter = adapterRef.current;
+    setErrorMessage(null);
+    if (adapter) {
+      try {
+        await adapter.disconnect();
+      } catch {
+        setErrorMessage("钱包断开请求失败，请在扩展中检查连接状态。");
+      }
+    }
+    setAddress(null);
+    setSubmission(null);
+    setClaimSubmission(null);
+    setConnectionState(adapter?.readyState === "Installed" ? "Disconnected" : "NotInstalled");
+  }
+
+  async function submitCreateBounty(preview: CreateBountyTransactionPreview) {
+    const adapter = adapterRef.current;
+    if (!adapter?.connected || !address) {
+      throw new Error("Connect Leo Wallet before requesting a transaction");
+    }
+    if (
+      preview.network !== "testnet" ||
+      preview.walletChainId !== ALEO_WALLET_TESTNET_CHAIN_ID ||
+      preview.programId !== CANONICAL_ALEO_PROGRAM_ID ||
+      preview.functionName !== "create_bounty"
+    ) {
+      throw new Error("Transaction preview does not match the canonical Testnet program");
+    }
+    const { Transaction, WalletAdapterNetwork } = await import(
+      "@demox-labs/aleo-wallet-adapter-base"
+    );
+    const transaction = Transaction.createTransaction(
+      address,
+      WalletAdapterNetwork.TestnetBeta,
+      preview.programId,
+      preview.functionName,
+      [...preview.inputs],
+      preview.feeMicrocredits,
+      false,
+    );
+    let response;
+    try {
+      response = classifyWalletResponseId(await adapter.requestTransaction(transaction));
+    } catch (error) {
+      throw new Error(diagnoseLeoWalletTransactionError(error).message);
+    }
+    if (!response) throw new Error("Leo Wallet 未返回有效的 Wallet Request ID。");
+    const { walletRequestId, publicTransactionId } = response;
+    setSubmission({
+      walletRequestId,
+      publicTransactionId,
+      bountyId: preview.publicInputs.bountyId,
+      status: "Submitted",
+      statusText: publicTransactionId
+        ? "钱包已返回 Public Transaction ID；仍需等待链上 Confirmed。"
+        : "钱包已接收请求；返回值尚不能作为公开 Transaction ID，这不等于链上 Confirmed。",
+    });
+    return walletRequestId;
+  }
+
+  async function submitWalletClaim(request: TransientSubmitClaimRequest) {
+    const adapter = adapterRef.current;
+    if (!adapter?.connected || !address) {
+      throw new Error("Connect Leo Wallet before requesting submit_claim");
+    }
+    const { Transaction, WalletAdapterNetwork } = await import(
+      "@demox-labs/aleo-wallet-adapter-base"
+    );
+    const inputs = buildTransientSubmitClaimInputs(request);
+    try {
+      const transaction = Transaction.createTransaction(
+        address,
+        WalletAdapterNetwork.TestnetBeta,
+        CANONICAL_ALEO_PROGRAM_ID,
+        SUBMIT_CLAIM_FUNCTION,
+        inputs,
+        request.feeMicrocredits,
+        false,
+      );
+      let response;
+      try {
+        response = classifyWalletResponseId(await adapter.requestTransaction(transaction));
+      } catch (error) {
+        throw new Error(diagnoseLeoWalletTransactionError(error).message);
+      }
+      if (!response) throw new Error("Leo Wallet 未返回有效的 Wallet Request ID。");
+      const { walletRequestId, publicTransactionId } = response;
+      setClaimSubmission({
+        walletRequestId,
+        publicTransactionId,
+        bountyId: request.bounty.bountyId,
+        status: "Submitted",
+        statusText: publicTransactionId
+          ? "钱包已返回 Public Transaction ID；仍需等待链上 Confirmed 与 claim_receipts mapping 验证。"
+          : "钱包已接收 submit_claim；返回值目前只是 Wallet Request ID，不代表链上 Confirmed。",
+      });
+      return walletRequestId;
+    } finally {
+      inputs.fill("");
+      for (const key of Object.keys(request.witness) as Array<keyof typeof request.witness>) {
+        request.witness[key] = "";
+      }
+    }
+  }
+
+  async function submitControlledDuplicateClaimInputs(request: {
+    bountyId: string;
+    feeMicrocredits: number;
+    inputs: readonly string[];
+  }) {
+    const adapter = adapterRef.current;
+    if (!adapter?.connected || !address) {
+      throw new Error("Connect Leo Wallet before requesting submit_claim");
+    }
+    if (!Number.isSafeInteger(request.feeMicrocredits) || request.feeMicrocredits <= 0) {
+      throw new Error("submit_claim fee must be positive microcredits");
+    }
+    assertSubmitClaimRawInputs(request.inputs);
+    const { Transaction, WalletAdapterNetwork } = await import(
+      "@demox-labs/aleo-wallet-adapter-base"
+    );
+    const transientInputs = [...request.inputs];
+    try {
+      const transaction = Transaction.createTransaction(
+        address,
+        WalletAdapterNetwork.TestnetBeta,
+        CANONICAL_ALEO_PROGRAM_ID,
+        SUBMIT_CLAIM_FUNCTION,
+        transientInputs,
+        request.feeMicrocredits,
+        false,
+      );
+      let response;
+      try {
+        response = classifyWalletResponseId(await adapter.requestTransaction(transaction));
+      } catch (error) {
+        throw new Error(diagnoseLeoWalletTransactionError(error).message);
+      }
+      if (!response) throw new Error("Leo Wallet 未返回有效的 Wallet Request ID。");
+      const { walletRequestId, publicTransactionId } = response;
+      setClaimSubmission({
+        walletRequestId,
+        publicTransactionId,
+        bountyId: request.bountyId,
+        status: "Submitted",
+        statusText: publicTransactionId
+          ? "钱包已返回 Public Transaction ID；仍需等待链上 Confirmed 与 duplicate nullifier 验证。"
+          : "钱包已接收受控 submit_claim；返回值目前只是 Wallet Request ID，不代表链上 Confirmed。",
+      });
+      return walletRequestId;
+    } finally {
+      transientInputs.fill("");
+    }
+  }
+
+  async function refreshSubmission() {
+    const adapter = adapterRef.current;
+    if (!adapter?.connected || !submission) return;
+    try {
+      const walletStatus = await adapter.transactionStatus(submission.walletRequestId);
+      const status = normalizeWalletTransactionStatus(walletStatus);
+      setSubmission({
+        ...submission,
+        status,
+        statusText:
+          status === "Finalized"
+            ? "钱包处理已 Finalized；仍需使用公开 Transaction ID 验证链上交易与 mapping。"
+            : status === "Failed"
+              ? "钱包报告交易失败或拒绝。"
+              : `钱包状态：${walletStatus}`,
+      });
+    } catch {
+      setSubmission({
+        ...submission,
+        status: "Processing",
+        statusText: "暂时无法读取钱包请求状态，请稍后重试。",
+      });
+    }
+  }
+
+  async function refreshClaimSubmission() {
+    const adapter = adapterRef.current;
+    if (!adapter?.connected || !claimSubmission) return;
+    try {
+      const walletStatus = await adapter.transactionStatus(claimSubmission.walletRequestId);
+      const status = normalizeWalletTransactionStatus(walletStatus);
+      setClaimSubmission({
+        ...claimSubmission,
+        status,
+        statusText:
+          status === "Finalized"
+            ? "钱包处理已 Finalized；仍需用公开 Transaction ID 验证 claim receipt 与 nullifier mapping。"
+            : status === "Failed"
+              ? "钱包报告 submit_claim 失败或拒绝；没有生成链上 Claim Receipt。"
+              : `钱包状态：${walletStatus}`,
+      });
+    } catch {
+      setClaimSubmission({
+        ...claimSubmission,
+        status: "Processing",
+        statusText: "暂时无法读取 Wallet Request 状态，请稍后重试。",
+      });
+    }
+  }
+
+  const value: AleoWalletContextValue = {
+    address,
+    connectionState,
+    errorMessage,
+    submission,
+    claimSubmission,
+    connect,
+    disconnect,
+    submitCreateBounty,
+    submitWalletClaim,
+    submitControlledDuplicateClaimInputs,
+    refreshSubmission,
+    refreshClaimSubmission,
+  };
+
+  return <AleoWalletContext.Provider value={value}>{children}</AleoWalletContext.Provider>;
+}
+
+export function useAleoWallet() {
+  const context = useContext(AleoWalletContext);
+  if (!context) throw new Error("useAleoWallet must be used inside AleoWalletProvider");
+  return context;
+}

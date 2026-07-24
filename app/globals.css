@@ -1,0 +1,263 @@
+/*
+ * Keep Tailwind's source scanner inside application code. The built-in browser
+ * stores a live Chromium profile under artifacts/, whose SQLite cache files can
+ * be locked while the browser is open. Scanning the whole repository makes
+ * Turbopack try to read those files and can crash the dev server.
+ */
+@import "tailwindcss" source(none);
+@source "../app";
+@source "../components";
+
+:root {
+  --background: #05070b;
+  --foreground: #e6f8ff;
+  --muted: #8aa6b3;
+  --panel: rgba(8, 15, 24, 0.76);
+  --panel-strong: rgba(12, 22, 34, 0.92);
+  --line: rgba(107, 244, 210, 0.16);
+  --cyan: #30d5ff;
+  --emerald: #37f2a5;
+  --violet: #9b7cff;
+  --danger: #ff4d6d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--background);
+  overflow-x: clip;
+}
+
+body {
+  min-width: 0;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    linear-gradient(115deg, rgba(48, 213, 255, 0.12), transparent 34rem),
+    linear-gradient(245deg, rgba(155, 124, 255, 0.14), transparent 32rem),
+    linear-gradient(180deg, rgba(55, 242, 165, 0.07), transparent 42rem),
+    var(--background);
+  color: var(--foreground);
+  font-family:
+    Inter, "Noto Sans SC", "Microsoft YaHei", "PingFang SC", ui-sans-serif, system-ui,
+    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+button,
+a,
+select {
+  touch-action: manipulation;
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  background-image:
+    linear-gradient(rgba(48, 213, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(48, 213, 255, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.85), transparent 82%);
+}
+
+body::after {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  background:
+    linear-gradient(90deg, transparent 0 31px, rgba(255, 255, 255, 0.035) 32px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 32px);
+  background-size: 32px 32px;
+  opacity: 0.22;
+  mask-image: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.78) 18%, transparent 90%);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.skip-link {
+  position: fixed;
+  left: 1rem;
+  top: 1rem;
+  z-index: 100;
+  transform: translateY(-200%);
+  border: 1px solid rgba(48, 213, 255, 0.5);
+  border-radius: 0.5rem;
+  background: #07111b;
+  padding: 0.75rem 1rem;
+  color: white;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.glass-panel {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(18px);
+}
+
+.professional-site-hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(125, 231, 255, 0.2);
+  background:
+    linear-gradient(135deg, rgba(10, 20, 32, 0.96), rgba(5, 7, 11, 0.78) 46%, rgba(15, 21, 38, 0.9)),
+    linear-gradient(90deg, rgba(48, 213, 255, 0.08), rgba(55, 242, 165, 0.05));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 28px 120px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(20px);
+}
+
+.professional-site-hero::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(48, 213, 255, 0.08), transparent 24%),
+    linear-gradient(180deg, transparent, rgba(55, 242, 165, 0.06));
+  opacity: 0.75;
+}
+
+.surface-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.022)),
+    rgba(7, 13, 22, 0.72);
+  box-shadow: 0 18px 70px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(18px);
+}
+
+.surface-card-strong {
+  border: 1px solid rgba(48, 213, 255, 0.18);
+  background:
+    linear-gradient(180deg, rgba(48, 213, 255, 0.08), rgba(155, 124, 255, 0.045)),
+    rgba(4, 10, 17, 0.88);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 22px 90px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(20px);
+}
+
+.page-kicker {
+  color: var(--cyan);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.muted-copy {
+  color: rgb(203 213 225 / 0.78);
+  line-height: 1.75;
+}
+
+.primary-action,
+.secondary-action {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  text-wrap: balance;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.primary-action {
+  border: 1px solid rgba(55, 242, 165, 0.42);
+  background: linear-gradient(135deg, rgba(55, 242, 165, 0.24), rgba(48, 213, 255, 0.14));
+  color: rgb(236 253 245);
+}
+
+.primary-action:hover {
+  transform: translateY(-1px);
+  border-color: rgba(55, 242, 165, 0.64);
+  background: linear-gradient(135deg, rgba(55, 242, 165, 0.3), rgba(48, 213, 255, 0.18));
+}
+
+.secondary-action {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.045);
+  color: rgb(226 232 240);
+}
+
+.secondary-action:hover {
+  transform: translateY(-1px);
+  border-color: rgba(48, 213, 255, 0.28);
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.input-surface {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.28);
+  color: white;
+}
+
+.input-surface:disabled {
+  color: rgb(100 116 139);
+}
+
+.soft-divider {
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+.terminal-panel {
+  border: 1px solid rgba(48, 213, 255, 0.22);
+  background:
+    linear-gradient(180deg, rgba(48, 213, 255, 0.08), transparent),
+    rgba(2, 8, 13, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 24px 80px rgba(0, 0, 0, 0.32);
+}
+
+.focus-ring {
+  outline: none;
+}
+
+.focus-ring:focus-visible {
+  box-shadow: 0 0 0 3px rgba(48, 213, 255, 0.28);
+}
