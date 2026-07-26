@@ -125,13 +125,14 @@ Claim 提交调用 `submit_claim`。先核验 Bounty，再生成公开承诺输�
 
 不要使用网页缓存、URL 参数或浏览器存储中的旧数据替代 Mapping 读取结果。
 
-### 6.2 填写可公开元数据
+### 6.2 填写可公开数据
 
 | 字段 | 填写方式 |
 | --- | --- |
-| Bug Type | 填写简短分类，例如 `Vault accounting invariant breach`；不要写 Exploit path、触发参数或 PoC |
 | Requested Fee | 填写本次钱包交易的公开费用，单位为 `microcredits` |
 | Bounty ID | 使用第 6.1 节已核验的 `field` 值 |
+
+Real Mode 的 Bug Type、Rule 与 Scope Hash 由已读取的 Bounty 和 Program 输入确定，页面不要求手动填写漏洞叙述。不要把 Exploit path、触发参数或 PoC 填入任何公开字段。
 
 ### 6.3 私密输入处理
 
@@ -258,3 +259,156 @@ Claim 提交调用 `submit_claim`。先核验 Bounty，再生成公开承诺输�
 - 链上 Escrow 与真实付款
 
 在这些功能完成 Program Upgrade、人工广播并通过 Testnet 验收之前，不能将网页中的奖励状态解释为链上资金状态。
+
+## 12. 逐页可填写示例
+
+以下是完全虚构的安全测试数据，用于理解每个输入框应该填写什么。它们不包含真实漏洞、真实合约状态或任何钱包凭据。
+
+重要规则：
+
+1. 自动生成的 `Bounty ID`、`Scope Hash`、`Claim Hash`、`Nullifier` 不要手改。
+2. `field` 示例仅在页面已经验证对应 Mapping 时才可用于链上流程。
+3. 点击“请求 Wallet 签名”可能产生 Testnet 交易和费用；只查看 Preview 时不要确认钱包弹窗。
+4. 每次准备实际提交新 Claim 时，必须替换 `reporterSecret`，避免生成重复 Nullifier。
+
+### 12.1 首页 `/`
+
+无需填写任何数据。
+
+| 操作控件 | 操作 | 预期结果 |
+| --- | --- | --- |
+| 进入协议 | 点击 | 进入 `/submit-proof`；不连接钱包、不发交易 |
+
+### 12.2 创建 Bounty `/create-bounty`
+
+选择 `Aleo Testnet`，使用下面这一组可直接填写的公开测试数据：
+
+| 页面字段 | 填写值 | 说明 |
+| --- | --- | --- |
+| 安全规则 | `Vault Accounting Safety` | 对应链上 `rule_id = 1field` |
+| Scope | `Test Vault Accounting QA` | 仅用于生成 Scope Hash；不要填漏洞步骤 |
+| Critical Reward | `5000000` | 单位 `microcredits` |
+| High Reward | `2000000` | 单位 `microcredits` |
+| Medium Reward | `1000000` | 单位 `microcredits` |
+| Low Reward | `500000` | 单位 `microcredits` |
+| 有效期（Blocks） | `100000` | 从当前 Testnet 高度起计算 |
+| 预计 Public Fee | `1000000` | 默认手续费；Wallet 仍会显示最终确认信息 |
+
+按顺序操作：
+
+1. 填完 Scope 和规则后，点击“生成公开标识”。
+2. 记录页面自动生成的 `Bounty ID` 与 `Scope Hash`，两者必须以 `field` 结尾。
+3. 点击“生成 Transaction Preview”。
+4. Preview 中必须看到：`create_bounty`、`zkbugbounty_7f3c92.aleo`、`1field`、四档奖励和 Deadline。
+5. 只做表单检查时，在钱包弹窗点击取消；需要真正创建时，再由本人确认。
+
+不要填写：Owner 地址、Private Key、Seed Phrase、View Key、真实项目合约地址或真实漏洞描述。
+
+### 12.3 创建结果 `/create-bounty/result`
+
+此页只填写自己刚刚创建交易得到的公开值。
+
+| 输入框 | 应填写的来源 | 示例格式 |
+| --- | --- | --- |
+| Public Transaction ID | 钱包或区块浏览器返回的真实交易 ID | `at1...` |
+| Bounty ID | 创建 Preview 中自动生成的值 | `123456789field` |
+
+不要把 Wallet Request ID 填入 Public Transaction ID。填写后依次确认：Transaction 为 `Confirmed`，随后 `bounties` Mapping 为 `found`，最后显示 `Mapping Verified`。
+
+### 12.4 公开 Bounty 详情 `/bounties/[bountyId]`
+
+将第 12.3 节的 Bounty ID 粘到 URL 中。示例格式：
+
+```text
+/bounties/123456789field
+```
+
+此页没有可编辑表单。应读取并显示 Owner、Scope Hash、Rule、四档奖励、Deadline 与 Status。若页面显示 not found，先回到创建结果页核验 Mapping，而不是改写 URL 里的数据。
+
+### 12.5 提交 Claim `/submit-proof`
+
+#### A. 先填写并验证 Bounty
+
+| 页面字段 | 填写值 | 操作说明 |
+| --- | --- | --- |
+| On-chain Bounty ID | 第 12.3 节通过 Mapping Verified 的 Bounty ID | 例如 `123456789field`，不能填写任意数字 |
+| 验证链上 Bounty | 点击按钮 | 等待出现 Status、Rule、Scope Hash、Owner、Deadline 和 Current Height |
+| Public Fee | `5000000` | 单位 `microcredits`；这是当前页面默认值 |
+
+只有在页面显示 Bounty 为 `Active` 且未过期后，才会显示对应 Rule 的 Private Witness 输入框。
+
+#### B. 截图中的 Vault Accounting Safety 填写方法
+
+当页面显示 Rule 为 `Vault Accounting Safety` 时，填写下表：
+
+| 输入框 | 填写值 | 计算含义 |
+| --- | --- | --- |
+| `vaultBalance` | `100` | 初始 Vault 余额 |
+| `totalClaims` | `80` | 初始总 Claim |
+| `hiddenDeltaBalance` | `90` | 只在当前设备侧使用的余额变化 |
+| `hiddenDeltaClaims` | `30` | 只在当前设备侧使用的 Claim 变化 |
+| `reporterSecret` | `zkbb-fixture-vault-001` | 一次性虚构字符串；不是钱包密钥 |
+| Public Fee | `5000000` | 公开手续费，单位 `microcredits` |
+
+这组数值的检查过程是：初始 `100 >= 80` 成立；变化后余额为 `100 - 90 = 10`，总 Claim 为 `80 + 30 = 110`；最终 `10 < 110`，影响值为 `100`，对应 Critical。`reporterSecret` 每次真实提交都要改成新字符串，例如将末尾改为 `002`、`003`，不能复用。
+
+#### C. 其它规则的可填写虚构值
+
+仅在页面读取到对应 Rule 后填写相应行；未显示的字段无需填写。
+
+| Rule | 输入字段与填写值 | 预期结果 |
+| --- | --- | --- |
+| Claims vs Deposits Safety | `totalDeposits=100`；`totalClaims=80`；`hiddenDeltaClaims=30`；`reporterSecret=zkbb-fixture-claims-001` | 变化后 `110 > 100`，影响值 `10`，Medium |
+| Reward Reserve Safety | `vaultBalance=100`；`reservedRewards=20`；`hiddenDeltaBalance=40`；`hiddenDeltaReservedRewards=90`；`reporterSecret=zkbb-fixture-reserve-001` | 变化后 Reserve `110 > 60`，影响值 `50`，High |
+| Withdrawal Limit Safety | `withdrawLimit=50`；`userBalance=40`；`requestedWithdrawAmount=20`；`hiddenDeltaWithdrawAmount=35`；`hiddenDeltaUserBalance=10`；`reporterSecret=zkbb-fixture-withdraw-001` | 变化后请求额 `55`、可用余额 `30`，影响值 `25`，Medium |
+
+提交前最后检查：
+
+1. 不要在任何字段输入真实漏洞复现步骤、PoC 或私钥。
+2. 确认 Preview 的 Program 为 `zkbugbounty_7f3c92.aleo`，Function 为 `submit_claim`。
+3. 确认 Bounty ID、Scope Hash、Rule 与页面刚读取的 Mapping 一致。
+4. 如只验证表单，在 Leo Wallet 弹窗取消。
+5. 如确认广播，保留真实 `at1...` Transaction ID，等待链上状态，而不是只看 Wallet Request ID。
+
+### 12.6 公开 Claims `/public-claims`
+
+页面有两类可输入查询框：
+
+| 查询区域 | 填写数据 | 正确格式 | 查询后核对 |
+| --- | --- | --- | --- |
+| 查询链上 Bounty 状态 | 创建成功后的 Bounty ID | `123456789field` | Owner、Scope Hash、Rule、Reward tiers、Deadline、Status |
+| 独立核验链上 Claim Receipt | 已确认 Claim 的 Claim Hash | `987654321field` | Bounty ID、Rule、Severity、Witness Commitment、Reporter Commitment、Nullifier、Protocol Version |
+
+不要填：Transaction ID、钱包地址、Scope 原文或任何 Private Witness。两个查询框只接受 Aleo `field` literal；错误格式不会得到 Mapping 结果。
+
+### 12.7 公开 Receipt 详情 `/public-claims/[registryKey]`
+
+此页没有可填写表单。点击公开 Registry 中的 Receipt 入口后，URL 会包含公开 `registryKey`。
+
+可核对的数据：Receipt ID、Claim Hash、Witness Commitment、Reporter Commitment、Nullifier、Severity、Rule、Scope Hash、Bounty ID、Proof Status 与 Protocol Version。
+
+不要手工拼接未知 `registryKey`，不要把 Private Witness 或报告内容添加到 URL。
+
+### 12.8 Triage `/triage`
+
+当前页面不能发起真实 Escrow、锁定奖励或付款。若出现公开备注输入，仅填写可公开、非技术细节的状态信息。
+
+可填写示例：
+
+```text
+已核验公开 Claim Receipt；等待项目方通过独立安全渠道确认修复范围。
+```
+
+不要填写：漏洞复现步骤、漏洞路径、触发参数、PoC、Private Witness、加密材料明文、任何钱包密钥。
+
+### 12.9 重复 Nullifier 验收 `/security-tests/duplicate-nullifier`
+
+此页没有可自由填写的漏洞参数。它应从第一个已确认 Claim 读取已有 Nullifier，并构造预期为 `Rejected` 的交易 Preview。
+
+操作时只核对：
+
+1. Existing Nullifier 与第一笔已确认 Claim 相同。
+2. New Claim Hash、Witness Commitment、Reporter Commitment 与第一笔不同。
+3. Bounty ID、Scope Hash、Rule、Deadline 仍来自有效 Bounty。
+4. 页面明确提示可能消耗 Testnet Fee。
+5. 只有希望实际验收重复保护时，才在 Wallet 弹窗确认；否则取消。
