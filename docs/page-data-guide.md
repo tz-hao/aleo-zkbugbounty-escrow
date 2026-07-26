@@ -1,158 +1,260 @@
-# zkBugBounty 页面数据填写说明
+# zkBugBounty Aleo Testnet 操作手册
 
-本文按当前版本的实际页面和数据边界编写。项目同时包含 Aleo Testnet Real Mode 与 Local Demo Mode；两者不能混用。
+本文只说明已部署的 Aleo Testnet 工作流：创建 Bounty、提交 Claim、读取公开 Registry 与核验重复 Nullifier 保护。未部署的 Escrow、奖励锁定、付款和退款不在本手册操作范围内。
 
-## 先区分三类数据
+Program ID：`zkbugbounty_7f3c92.aleo`
+网络：Aleo Testnet
+钱包：Leo Wallet
 
-| 分类 | 可以出现的位置 | 示例 | 是否上链 / 持久化 |
+## 1. 操作前检查
+
+开始前逐项确认：
+
+1. 在浏览器扩展中解锁 Leo Wallet。
+2. 将钱包网络切换到 Aleo Testnet。
+3. 钱包有足够的 Testnet Credits 支付交易费用。
+4. 仅使用公开地址和公开 `field` 数据操作网页。
+5. 不要在任何表单、配置文件、聊天窗口或 URL 中输入 Private Key、Seed Phrase、View Key。
+6. 不要上传真实 Exploit、PoC、触发参数、真实业务状态或私密漏洞报告。
+
+链上交易需要你本人在钱包弹窗中确认。网页只会请求签名，不能代替你确认，也不会读取任何私钥。
+
+## 2. 数据边界
+
+| 数据类别 | 允许出现的位置 | 示例 | 处理规则 |
 | --- | --- | --- | --- |
-| 公开协议数据 | Testnet 交易、Mapping、公开 Registry、Receipt | `bounty_id`、`scope_hash`、`rule_id`、奖励档位、`claim_hash`、`nullifier` | 可以公开查询 |
-| 设备端临时输入 | `/submit-proof`、加密披露工作台的当前组件内存 | DemoVault 数值、随机 `reporterSecret`、本地明文报告 | 不写入 Store、URL、localStorage、sessionStorage 或服务端日志 |
-| 永不填写 | 任何网页表单、脚本、配置文件 | Private Key、Seed Phrase、View Key、真实 Exploit、真实 PoC、生产触发参数 | 禁止 |
+| 公开链上数据 | 交易、Mapping、Receipt、公开 Registry | `bounty_id`、`scope_hash`、奖励档位、`claim_hash`、`nullifier` | 可公开查询与复制 |
+| 设备端私密输入 | 当前提交页面与钱包设备侧证明过程 | Witness 输入、报告者秘密承诺材料 | 仅用于当前操作；不得放入 URL、浏览器存储、公开备注或截图 |
+| 禁止输入 | 所有网页、脚本、环境文件 | Private Key、Seed Phrase、View Key、真实 Exploit、PoC | 不得提供或保存 |
 
-`Witness Commitment`、`Claim Hash`、`Nullifier` 是公开承诺值，不是 Private Witness 本身；它们可以出现在 Receipt 和 Mapping 中。
+`Claim Hash`、`Witness Commitment`、`Reporter Commitment` 与 `Nullifier` 是公开承诺值，不是 Private Witness 本身；它们可出现在交易和 Receipt 中。
 
-## 首页 `/`
+## 3. 首页 `/`
 
-无需填写数据。首页只提供协议入口和导航：
+首页只作为协议入口，无需填写数据。
 
-- `Aleo Testnet · Network confirmed`：公开网络状态，不是钱包地址，也不是连接凭据。
-- `进入协议`：前往 `/submit-proof`，不会创建交易。
+操作步骤：
 
-首页不显示钱包连接、安装钱包或钱包诊断。需要签名时，请在创建 Bounty 或提交 Claim 的实际流程中连接钱包。
+1. 打开首页。
+2. 点击“进入协议”。
+3. 页面进入 `/submit-proof`。
 
-## 创建 Bounty `/create-bounty`
+首页不会请求钱包连接，也不会发起交易。
 
-页面顶部可以选择两种模式。
+## 4. 创建链上 Bounty `/create-bounty`
 
-### Aleo Testnet：真实创建预览与钱包签名
+创建 Bounty 会调用已部署 Program 的 `create_bounty`。钱包签名者由 Program 的 `self.signer` 写入 Owner；不要填写 Owner 地址。
 
-只有该模式会构造 `create_bounty` 的链上交易。钱包地址由 `self.signer` 自动成为 Owner，用户不需要、也不应填写 Owner 地址或任何私钥。
+### 4.1 填写字段
 
-| 页面字段 | 对应协议数据 | 填写方式 | 公开性 / 说明 |
+| 页面字段 | 链上字段 | 填写规则 | 公开性 |
 | --- | --- | --- | --- |
-| 安全规则 | `rule_id` | 从四个 DemoVault 规则中选择 | 公开。决定后续 Proof 的不变量与输入集合。 |
-| Scope | 用于计算 `scope_hash` | 用简短、可审计的模块范围描述，例如 `Vault accounting logic` | Scope 原文仅在当前浏览器用于计算；不上链。不要填写真实漏洞细节。 |
-| Bounty ID | `bounty_id` | 点击“生成公开标识”后自动生成 | 公开 Aleo `field`，不可重复；不手填。 |
-| Scope Hash | `scope_hash` | 由 Scope 与规则自动生成 | 公开 `field` commitment；不手填。修改 Scope 或规则后必须重新生成。 |
-| Critical / High / Medium / Low Reward | 四个奖励档位 | 填写非负整数，单位是 `microcredits` | 公开。当前部署版本只登记奖励档位，**不会锁定或托管 Credits**。 |
-| 有效期（Blocks） | 相对区块数 | 填写至少 `100` 的整数 | 页面根据当前 Testnet 高度计算 `disclosure_deadline`。 |
-| Disclosure Deadline Height | `disclosure_deadline` | 自动计算 | 公开绝对区块高度，不手填。 |
-| 预计 Public Fee | Wallet Fee | 填写正整数 `microcredits` | 公开交易手续费；签名钱包自行确认最终收费。 |
+| 安全规则 | `rule_id` | 从页面提供的规则中选择一项 | 公开 |
+| Scope | `scope_hash` 的原始描述 | 填写简短的模块范围，例如 `Vault accounting logic`；不写漏洞利用细节 | 原文不入链，仅生成承诺值 |
+| Bounty ID | `bounty_id` | 点击“生成公开标识”自动生成；不要手填 | 公开 Aleo `field` |
+| Scope Hash | `scope_hash` | 根据 Scope 与规则自动生成；Scope 或规则变化后重新生成 | 公开 Aleo `field` |
+| Critical / High / Medium / Low Reward | 四档奖励 | 填写非负整数，单位为 `microcredits` | 公开 |
+| 有效期（Blocks） | 相对区块数 | 填写至少 `100` 的整数 | 公开 |
+| Disclosure Deadline Height | `disclosure_deadline` | 页面按当前区块高度自动计算 | 公开 |
+| 预计 Public Fee | 交易费 | 填写正整数，单位为 `microcredits` | 公开 |
 
-提交顺序：检查 Testnet → 生成 `bounty_id` 与 `scope_hash` → 生成 Transaction Preview → 人工确认钱包签名。`Submitted`、`Confirmed` 与 `Mapping Verified` 是三个不同状态；只有 Mapping Verified 才说明公开 Bounty 映射已写入并与交易参数一致。
+当前 Program 登记奖励档位，但尚未启用 Credits 托管。填写奖励金额不代表资金已经锁定。
 
-### Demo Local：本地演示 Bounty
+### 4.2 提交步骤
 
-此模式不会创建 Aleo transaction，也不会写入 Testnet。
+1. 打开 `/create-bounty`。
+2. 连接 Leo Wallet；确认地址与网络状态正常。
+3. 选择安全规则，填写 Scope 与四档奖励。
+4. 点击“生成公开标识”，确认 `Bounty ID` 与 `Scope Hash` 已生成且均以 `field` 结尾。
+5. 设置有效期和预计手续费。
+6. 点击“生成 Transaction Preview”。
+7. 检查 Preview：Program ID、函数名 `create_bounty`、Bounty ID、Scope Hash、Rule、奖励档位、Deadline、手续费。
+8. 点击请求钱包签名。
+9. 在 Leo Wallet 弹窗中复核网络、函数、公开输入和费用后，由你本人确认或取消。
 
-| 字段 | 用途 | 注意事项 |
+### 4.3 创建结果判断
+
+钱包返回请求标识不等于链上 Transaction ID。仅以真实 `at1...` Transaction ID 为准。
+
+| 状态 | 含义 | 下一步 |
 | --- | --- | --- |
-| 项目名称 | 本地演示卡片标题 | 仅本地 Demo。 |
-| 披露截止说明 | 本地工作流说明 | 这是文本，不是 Testnet block height。 |
-| Scope | 本地受影响模块描述 | 不填真实漏洞路径或 PoC。 |
-| 安全规则 | 选择 DemoVault 不变量 | 决定本地 mock evaluator。 |
-| Bounty Pool 与四档奖励 | 演示奖励数值 | 不代表资金托管。 |
+| Wallet cancelled | 钱包未签名 | 修改参数或重新请求签名 |
+| Submitted | 请求已提交 | 等待 Testnet 处理 |
+| Confirmed | 交易已被接受 | 查询 `bounties` Mapping |
+| Mapping Verified | Mapping 与交易公开输入一致 | Bounty 可用于提交 Claim |
+| Rejected / Aborted | 交易未写入有效 Bounty | 读取拒绝原因后修正，不要把它当作成功 |
 
-## 创建结果 `/create-bounty/result`
+保存以下公开信息：Transaction ID、Bounty ID、Scope Hash、Rule、Deadline、Owner 地址。
 
-此页只填写或粘贴公开验收数据：
+## 5. 核验 Bounty `/create-bounty/result` 与 `/bounties/[bountyId]`
 
-| 字段 | 格式 | 用途 |
+### 5.1 创建结果页
+
+1. 打开 `/create-bounty/result`。
+2. 粘贴真实 `at1...` Transaction ID。
+3. 粘贴 Bounty ID，例如 `257640041950318553814753415615134947371field`。
+4. 等待页面读取交易和 Mapping。
+5. 核对 Owner、Bounty ID、Scope Hash、Rule、四档奖励、Deadline、Status。
+
+只有 `Mapping Verified` 代表公开 Mapping 已存在且内容与创建交易一致。`Confirmed` 不能替代该检查。
+
+### 5.2 公开详情页
+
+访问 `/bounties/[bountyId]`，将 URL 中的 `[bountyId]` 替换为公开 Aleo `field`。
+
+示例：
+
+```text
+/bounties/257640041950318553814753415615134947371field
+```
+
+页面只读取 `bounties` Mapping。若找不到键，说明该 Bounty 尚未写入、键不正确，或交易没有成功执行 Final。
+
+## 6. 提交链上 Claim `/submit-proof`
+
+Claim 提交调用 `submit_claim`。先核验 Bounty，再生成公开承诺输出，最后由 Whitehat 钱包签名。
+
+### 6.1 先验证公开 Bounty
+
+1. 打开 `/submit-proof`。
+2. 进入 Aleo Testnet Real Mode。
+3. 输入已核验的 On-chain Bounty ID。
+4. 等待页面读取 `bounties` Mapping。
+5. 核对以下公开数据：Program ID、Bounty ID、Scope Hash、Rule、Deadline、Status、Owner。
+6. 只有 Status 为 `Active` 且 Deadline 未过期时继续。
+
+不要使用网页缓存、URL 参数或浏览器存储中的旧数据替代 Mapping 读取结果。
+
+### 6.2 填写可公开元数据
+
+| 字段 | 填写方式 |
+| --- | --- |
+| Bug Type | 填写简短分类，例如 `Vault accounting invariant breach`；不要写 Exploit path、触发参数或 PoC |
+| Requested Fee | 填写本次钱包交易的公开费用，单位为 `microcredits` |
+| Bounty ID | 使用第 6.1 节已核验的 `field` 值 |
+
+### 6.3 私密输入处理
+
+私密输入只在当前设备与 Wallet 证明流程内使用。操作要求：
+
+1. 使用非敏感测试材料，不录入真实漏洞细节。
+2. 不复制 Private Witness、私密状态、报告者秘密到公开备注、截图、URL 或外部表单。
+3. 不调用或恢复服务端私密 Proof API；`/api/aleo/prove` 返回 `410` 是预期的安全边界。
+4. 页面完成、失败或离开操作后，应清除当前表单中的私密输入。
+
+### 6.4 Preview 与 Wallet 签名
+
+生成 Preview 后，逐项检查：
+
+1. Program ID 为 `zkbugbounty_7f3c92.aleo`。
+2. Function 为 `submit_claim`。
+3. Network 为 Aleo Testnet。
+4. 钱包地址是当前 Whitehat 地址。
+5. Bounty ID、Scope Hash、Rule 与已读取 Mapping 一致。
+6. Claim Hash、Witness Commitment、Reporter Commitment、Nullifier 均为公开 `field` 值。
+7. Severity 合法，且满足 Program 的验证条件。
+8. 手续费符合预期。
+
+页面会先查询 `nullifiers` Mapping。若 Nullifier 已存在，必须更换一次性测试材料并重新生成公开承诺；不要尝试复用已存在 Nullifier。
+
+确认 Preview 后：
+
+1. 点击请求 Wallet 签名。
+2. 钱包弹窗出现后，人工复核函数、网络、公开输入和费用。
+3. 由你本人确认或取消。
+4. 记录钱包返回的真实 `at1...` Transaction ID，不要将 Wallet Request ID 当作交易 ID。
+
+## 7. 核验 Claim 与 Receipt `/public-claims`
+
+该页面无需连接钱包，所有读取均来自公开链上数据。
+
+### 7.1 读取公开 Registry
+
+1. 打开 `/public-claims`。
+2. 等待 Bounty 与 Claim Registry 加载。
+3. 确认每条记录具有链上来源与 Mapping 状态。
+4. 网络不可用时，页面应显示不可用或空结果；不能把错误状态视为确认结果。
+
+### 7.2 查询指定 Bounty
+
+1. 在“查询链上 Bounty 状态”输入 Bounty ID，例如 `257640041950318553814753415615134947371field`。
+2. 点击“查询 mapping”。
+3. 核对 Owner、Scope Hash、Rule、Reward tiers、Deadline、Status。
+
+### 7.3 查询指定 Claim Receipt
+
+1. 在“独立核验链上 Claim Receipt”输入 Claim Hash（Aleo `field`）。
+2. 点击“查询 Receipt”。
+3. 核对 Claim Hash、Bounty ID、Scope Hash、Rule、Severity、Witness Commitment、Reporter Commitment、Nullifier、Proof Status 与 Protocol Version。
+4. 再查询同一 Nullifier，确认其为已占用状态。
+
+成功验收应同时满足：Transaction Confirmed、Nullifier Mapping found、Claim Receipt Mapping found。三项缺少任一项，都不应标记 Claim 为完整链上验收。
+
+## 8. Triage `/triage`
+
+当前 Testnet 已部署版本不支持链上奖励托管、锁定、支付或退款。因此本页不能用于发起真实资金操作。
+
+可执行的安全操作：
+
+1. 读取公开 Claim、Receipt 与披露状态。
+2. 记录只包含公开信息的分诊备注。
+3. 通过独立安全渠道与项目方交换加密披露材料。
+
+禁止事项：
+
+- 不要把明文漏洞报告、Exploit、PoC 或 Private Witness 粘贴到公开备注。
+- 不要依据页面上的未部署支付入口判断奖励已锁定或已付款。
+- 不要把披露材料、解密材料或私钥上传至网站。
+
+## 9. 重复 Nullifier 验收 `/security-tests/duplicate-nullifier`
+
+此页面仅用于 Testnet 安全验收，验证 Program Final 会拒绝重复 Nullifier。被拒绝交易可能仍消耗 Testnet Fee。
+
+操作步骤：
+
+1. 准备一个已经成功写入的公开 Nullifier 与原始 Claim Receipt。
+2. 打开 `/security-tests/duplicate-nullifier`。
+3. 确认 Preview 使用相同 Nullifier，但使用新的测试 Claim Hash、Witness Commitment 与 Reporter Commitment。
+4. 确认 Bounty、Scope Hash、Rule、Deadline、Severity 均仍然有效。
+5. 页面必须显示预期结果为 `Rejected` 和费用风险。
+6. 只有在明确理解费用风险后，才请求钱包签名。
+7. 钱包弹窗出现后由你本人决定确认或取消。
+8. 若确认，记录第二笔 `at1...` Transaction ID，并查询结果。
+
+验收通过条件：第二笔交易为 `Rejected`；原 Nullifier Mapping 不变；原 Claim Receipt 不变；新 Claim Hash 未产生有效 Receipt；公开 Claim 数量不增加。
+
+如果重复交易被 `Accepted`，立即停止后续操作，并将其视为最高优先级安全问题。
+
+## 10. 常见状态与处理
+
+| 页面状态 | 含义 | 操作 |
 | --- | --- | --- |
-| Public Transaction ID | `at1...` | 查询 `create_bounty` 是否 Confirmed。不要使用 Wallet Request ID 代替。 |
-| Bounty ID | Aleo `field`，例如 `123field` | 查询 `bounties` Mapping；留空时可从已确认交易的公开输入推导。 |
+| Wallet extension unavailable | 浏览器未检测到 Leo Wallet | 安装或启用扩展后刷新页面 |
+| Wallet locked | 钱包未解锁 | 在扩展内解锁后重新连接 |
+| Wrong network | 钱包不是 Testnet | 切换到 Aleo Testnet 后重新授权 |
+| Connection rejected | 用户拒绝连接授权 | 重新点击连接，并在弹窗中授权 |
+| Transaction rejected | Program Final 或交易条件拒绝 | 记录 Transaction ID 与原因，修正公开输入后重新生成 Preview |
+| Mapping not found | 公开键不存在或 Final 未写入 | 核对 `field` 编码、交易状态与函数 ABI |
+| Endpoint unavailable | 公共节点暂不可达 | 稍后重试；不要把不可用当作未部署或已确认 |
 
-页面会比对 Owner、Bounty ID、Scope Hash、Rule、奖励档位与 Deadline。确认交易存在不代表 Mapping 已验证。
+## 11. 已部署能力与限制
 
-## 公开 Bounty 详情 `/bounties/[bountyId]`
+已验收：
 
-只读页面。URL 中的 `bountyId` 必须是公开 Aleo `field`。页面读取 `bounties` Mapping，展示 Owner、Scope Hash、Rule、奖励档位、Deadline 与状态。这里不填写私密数据，也不提供 Mock 回退。
+- Wallet-signed `create_bounty`
+- Wallet-signed `submit_claim`
+- `bounties` Mapping
+- `nullifiers` Mapping
+- `claim_receipts` Mapping
+- Duplicate Nullifier 拒绝
+- 公开 Registry 读取
 
-## 提交 Private Proof `/submit-proof`
+尚未启用链上操作：
 
-默认是 Aleo Testnet Real Mode。Real Mode 先验证公开 Bounty，之后才显示对应规则的设备端输入。
+- `fund_bounty`
+- `lock_reward`
+- `release_reward`
+- `refund_bounty`
+- 链上 Escrow 与真实付款
 
-### Real Mode：先填写公开 Bounty ID
-
-| 字段 | 格式 | 用途 |
-| --- | --- | --- |
-| On-chain Bounty ID | `123field` | 必填。读取真实 `bounties` Mapping，并校验 Active 状态、Rule、Scope Hash 与 Deadline。 |
-| Bug Type | 简短公开分类 | 公开 Claim 元数据，例如 `Vault accounting invariant breach`。不得写入 Exploit path、触发参数或 PoC。 |
-| Requested Fee | `microcredits` | 钱包签名交易的公开费用。 |
-
-Mapping 验证通过后，页面显示 Owner、Rule、Scope Hash、Deadline 与当前区块高度；这些均为公开链上数据。
-
-### 规则对应的临时 PrivateProofInput
-
-以下输入只用于当前页面的组件内存和钱包设备侧计算。当前项目应只使用虚构 DemoVault 测试值；不要填真实合约状态、真实攻击参数或敏感业务数据。
-
-| 规则 | 初始状态输入 | 临时变化输入 | 验证目标 |
-| --- | --- | --- | --- |
-| Vault Accounting Safety | `vaultBalance`、`totalClaims` | `hiddenDeltaBalance`、`hiddenDeltaClaims` | `vaultBalance >= totalClaims` 被打破 |
-| Claims vs Deposits Safety | `totalDeposits`、`totalClaims` | `hiddenDeltaClaims` | `totalClaims <= totalDeposits` 被打破 |
-| Reward Reserve Safety | `vaultBalance`、`reservedRewards` | `hiddenDeltaBalance`、`hiddenDeltaReservedRewards` | `reservedRewards <= vaultBalance` 被打破 |
-| Withdrawal Limit Safety | `withdrawLimit`、`userBalance`、`requestedWithdrawAmount` | `hiddenDeltaWithdrawAmount`、`hiddenDeltaUserBalance` | `withdrawLimit <= vaultBalance` 对应条件被打破 |
-
-其他临时字段：
-
-- `privateCallSequence`：仅 Demo/本地模拟可用的序列描述；不要填写真实调用序列。
-- `privateStateValues`：仅 Demo/本地模拟的状态描述；不要填写真实状态快照。
-- `reporterSecret`：为当前测试 Claim 使用的随机、一次性秘密。它不是 Aleo Private Key，也不能复用钱包、账户或生产凭据。
-
-生成后的公开输出只有 `claimHash`、`witnessCommitment`、`nullifier`、`reporterCommitment`、`severity`、`ruleId`、`scopeHash`、Receipt/Registry 标识和验证状态。页面会在完成、失败或离开流程时清空临时输入。
-
-### Demo Local
-
-可以选择本地 Bounty 和 Mock/Aleo 开发 Engine，验证四个 DemoVault 不变量。此模式的状态只用于演示，不能当作 Testnet Claim、Receipt 或支付状态。
-
-## Triage `/triage`
-
-当前页面分为公开 Receipt、责任披露工作流、公开时间线、加密披露工作台和 AI 建议。Reward Lock、Patch、Paid、Reject 仍是 Local Demo State；当前已部署 Program 尚未提供 Escrow/支付 entry，因此不能将它们理解为链上支付。
-
-### 可填写的数据
-
-| 角色 | 字段 / 文件 | 用途 | 数据边界 |
-| --- | --- | --- |
-| Triage Arbiter | 公开备注 | 解释处理结论或给出 Severity 建议 | 只写可公开内容；不要写漏洞复现步骤。 |
-| Project Owner | Owner Public Key JSON | 给 Whitehat 的加密收件公钥 | 可导出；解密密钥 bundle 不上传、不写 Store。 |
-| Whitehat | Owner Public Key JSON、私密披露报告 | 在当前设备加密报告 | 密文需要通过外部安全通道交付；明文不上传。 |
-| Project Owner | Ciphertext Package JSON、Disclosure Decryption Key JSON | 本地完整性校验与解密 | 仅当前组件内存使用；解密后应主动清除。 |
-
-登记交付时，Store 只保留 `packageHash`、`recipientKeyId` 与公开状态；Ciphertext、明文报告、解密密钥和 Private Witness 都不会保存。
-
-## 公开 Claims `/public-claims`
-
-默认是公开只读浏览，无需钱包，也无需填写任何表单。页面读取 Testnet discovery、`claim_receipts` 与 `nullifiers` Mapping，并将本地演示 Registry 放在折叠区域中。
-
-可复制或作为 URL 参数使用的公开数据包括：
-
-- `Receipt ID`、`Claim Hash`、`Registry Key`
-- `Witness Commitment`、`Nullifier`、`Scope Hash`
-- Rule、Affected Module、Severity、Proof Status、Disclosure Status、Payout Status
-- Program ID、Network、Public Transaction ID、Protocol Version
-
-页面不会展示 Witness、hidden delta、reporter secret、触发参数、Exploit path 或 PoC。
-
-## 公开 Receipt `/public-claims/[registryKey]`
-
-只读详情页。`registryKey` 是 URL 中的公开索引键；页面允许复制 Receipt、Claim、Commitment 和 Nullifier 等公开值。不要把任何私密内容拼接到 URL。
-
-## Duplicate Nullifier 安全测试 `/security-tests/duplicate-nullifier`
-
-此页仅用于受控 Testnet 验收。它重用已存在的 Nullifier 构造一个“预期被拒绝”的交易 Preview，以验证 Final 的重复保护。不要把它用于真实漏洞数据；在钱包弹窗前必须人工确认，且被拒绝交易仍可能消耗 Testnet Fee。
-
-## 钱包数据规则
-
-钱包连接仅在创建/提交实际链上交易时需要。前端只读取公开地址、网络状态与交易响应；永远不要向本项目输入、粘贴或上传：
-
-- Aleo Private Key
-- Seed Phrase
-- View Key
-- 私密钱包导出文件
-
-如果钱包未连接、被锁定或网络不是 Aleo Testnet，先在钱包扩展中处理；不要将任何凭据填入网页表单。
-
-## 当前链上能力边界
-
-当前 Testnet 已验收的能力是 `create_bounty`、`submit_claim`、Bounty/Nullifier/Claim Receipt Registry 与重复 Nullifier 拒绝。`fund_bounty`、`lock_reward`、`release_reward`、`refund_bounty` 尚未部署；任何显示为 Reward Lock、Paid 或 Escrow 的内容都必须视为 Local Demo，直到 Program Upgrade 被人工广播并完成 Testnet 验收。
+在这些功能完成 Program Upgrade、人工广播并通过 Testnet 验收之前，不能将网页中的奖励状态解释为链上资金状态。
