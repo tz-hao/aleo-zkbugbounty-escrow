@@ -36,12 +36,13 @@ test("dashboard keeps the privacy promise and one primary protocol entry", () =>
     "Private Witness · Public Proof",
     "证明漏洞存在",
     "Exploit 保持私密",
-    "zh.brand.slogan",
+    "zh.home.proofAction",
     "href=\"/submit-proof\"",
     "Private Witness 留在设备端",
   ]) {
     assert.equal(combinedSource.includes(phrase), true, `${phrase} should be present on dashboard`);
   }
+  assert.equal(source.includes("zh.brand.slogan"), false, "homepage must not repeat the removed English slogan");
 });
 
 test("Multi-Invariant DemoVault rules remain in the create and submit workflows", () => {

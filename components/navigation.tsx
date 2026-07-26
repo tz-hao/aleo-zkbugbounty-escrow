@@ -28,26 +28,31 @@ const links = [
 export function Navigation() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isHomepage = pathname === "/";
 
   return (
     <header className="site-navigation sticky top-0 z-40 px-3 pt-3">
       <div className="nav-glass mx-auto flex h-[3.75rem] max-w-7xl items-center gap-3 rounded-lg px-3 sm:px-4 lg:px-5">
-        <Link className="group flex min-w-0 shrink-0 items-center gap-2.5" href="/">
-          <span className="brand-mark flex h-9 w-9 items-center justify-center rounded-lg transition group-hover:border-emerald-300/40">
-            <ShieldCheck size={20} aria-hidden="true" />
-          </span>
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-semibold text-white sm:text-base">zkBugBounty</span>
-            <span className="hidden text-[0.68rem] text-slate-500 2xl:block">
-              Zero-knowledge disclosure
-            </span>
-          </span>
-        </Link>
+        {!isHomepage ? (
+          <>
+            <Link className="group flex min-w-0 shrink-0 items-center gap-2.5" href="/">
+              <span className="brand-mark flex h-9 w-9 items-center justify-center rounded-lg transition group-hover:border-emerald-300/40">
+                <ShieldCheck size={20} aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-white sm:text-base">zkBugBounty</span>
+                <span className="hidden text-[0.68rem] text-slate-500 2xl:block">
+                  Zero-knowledge disclosure
+                </span>
+              </span>
+            </Link>
 
-        <span className="hidden items-center gap-2 rounded-md border border-emerald-300/15 bg-emerald-300/[0.055] px-2.5 py-1.5 text-[0.68rem] font-semibold text-emerald-100 xl:inline-flex">
-          <span className="network-pulse" aria-hidden="true" />
-          Aleo Testnet
-        </span>
+            <span className="hidden items-center gap-2 rounded-md border border-emerald-300/15 bg-emerald-300/[0.055] px-2.5 py-1.5 text-[0.68rem] font-semibold text-emerald-100 xl:inline-flex">
+              <span className="network-pulse" aria-hidden="true" />
+              Aleo Testnet
+            </span>
+          </>
+        ) : null}
 
         <nav aria-label="主导航" className="hidden min-w-0 flex-1 items-center justify-center lg:flex">
           <div className="flex items-center gap-0.5">
@@ -76,9 +81,11 @@ export function Navigation() {
           </div>
         </nav>
 
-        <div className="ml-auto hidden shrink-0 lg:block">
-          <WalletConnectionControl />
-        </div>
+        {!isHomepage ? (
+          <div className="ml-auto hidden shrink-0 lg:block">
+            <WalletConnectionControl />
+          </div>
+        ) : null}
         <button
           aria-controls="mobile-navigation"
           aria-expanded={mobileOpen}
@@ -126,9 +133,11 @@ export function Navigation() {
               );
             })}
           </nav>
-          <div className="mt-4 border-t border-white/10 pt-4">
-            <WalletConnectionControl />
-          </div>
+          {!isHomepage ? (
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <WalletConnectionControl />
+            </div>
+          ) : null}
         </div>
       ) : null}
     </header>

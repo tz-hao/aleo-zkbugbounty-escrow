@@ -19,6 +19,7 @@ test("dashboard is a single immersive protocol entry", () => {
   ]) {
     assert.equal(combinedSource.includes(phrase), true, `${phrase} should be present on the dashboard`);
   }
+  assert.equal(source.includes("home-protocol-slogan"), false, "removed hero slogan must not remain on the homepage");
   for (const referenceCopy of ["ALEO GILT", "ENTER THE PROTOCOL", ">START<"]) {
     assert.equal(combinedSource.includes(referenceCopy), false, `${referenceCopy} must not be copied from the reference`);
   }
@@ -54,7 +55,7 @@ test("global styles expose reusable professional surface primitives", () => {
 test("navigation is compact and keeps Demo roles out of the global header", () => {
   const source = readFileSync("components/navigation.tsx", "utf8");
 
-  for (const phrase of ["site-navigation", "h-[3.75rem]", "mobile-navigation", "WalletConnectionControl", "lg:hidden"]) {
+  for (const phrase of ["site-navigation", "isHomepage", "h-[3.75rem]", "mobile-navigation", "WalletConnectionControl", "lg:hidden"]) {
     assert.equal(source.includes(phrase), true, `${phrase} should be present in navigation`);
   }
   for (const forbidden of ["useAppState", "switchActor", "roleDisplayLabels", "<select"]) {

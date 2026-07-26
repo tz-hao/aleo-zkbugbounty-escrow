@@ -429,16 +429,6 @@ body:has(.home-immersive) .site-navigation nav a[aria-current="page"] {
   color: #b5f5e5;
 }
 
-.home-protocol-slogan {
-  max-width: 44rem;
-  margin-top: 1.25rem;
-  color: rgba(207, 250, 254, 0.7);
-  font-family: var(--font-geist-mono), "SFMono-Regular", Consolas, monospace;
-  font-size: clamp(0.62rem, 1.1vw, 0.78rem);
-  font-weight: 400;
-  line-height: 1.7;
-}
-
 .home-enter-action {
   position: relative;
   display: inline-flex;
@@ -517,10 +507,6 @@ body:has(.home-immersive) .site-navigation nav a[aria-current="page"] {
   .home-protocol-title {
     font-size: clamp(2.25rem, 11vw, 3.1rem);
     line-height: 1.04;
-  }
-
-  .home-protocol-slogan {
-    max-width: 19rem;
   }
 
   .home-hero-visual img {

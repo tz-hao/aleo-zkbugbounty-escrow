@@ -25,9 +25,6 @@ export function Dashboard() {
           证明漏洞存在
           <span>Exploit 保持私密</span>
         </h1>
-        <p className="home-protocol-slogan">
-          {zh.brand.slogan}
-        </p>
         <Link className="focus-ring home-enter-action" href="/submit-proof">
           {zh.home.proofAction}
           <ArrowRight size={17} aria-hidden="true" />
