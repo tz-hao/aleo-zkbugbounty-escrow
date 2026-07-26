@@ -33,9 +33,9 @@ test("dashboard keeps the privacy promise and one primary protocol entry", () =>
   const combinedSource = `${source}\n${heroSource}`;
 
   for (const phrase of [
-    "Private by default",
+    "Private Witness · Public Proof",
     "证明漏洞存在",
-    "Exploit 无需公开",
+    "Exploit 保持私密",
     "zh.brand.slogan",
     "href=\"/submit-proof\"",
     "Private Witness 留在设备端",

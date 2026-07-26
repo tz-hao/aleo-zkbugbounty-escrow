@@ -30,7 +30,7 @@ export function Navigation() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 px-3 pt-3">
+    <header className="site-navigation sticky top-0 z-40 px-3 pt-3">
       <div className="nav-glass mx-auto flex h-[3.75rem] max-w-7xl items-center gap-3 rounded-lg px-3 sm:px-4 lg:px-5">
         <Link className="group flex min-w-0 shrink-0 items-center gap-2.5" href="/">
           <span className="brand-mark flex h-9 w-9 items-center justify-center rounded-lg transition group-hover:border-emerald-300/40">

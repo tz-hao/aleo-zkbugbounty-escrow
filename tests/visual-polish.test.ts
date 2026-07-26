@@ -11,13 +11,16 @@ test("dashboard is a single immersive protocol entry", () => {
   for (const phrase of [
     "home-immersive",
     "HeroProofVisual",
-    "Private by default",
+    "Private Witness · Public Proof",
     "证明漏洞存在",
-    "Exploit 无需公开",
+    "Exploit 保持私密",
     "进入协议",
-    "/images/zk-proof-circuit-hero.png",
+    "/images/zkbugbounty-protocol-portal.webp",
   ]) {
     assert.equal(combinedSource.includes(phrase), true, `${phrase} should be present on the dashboard`);
+  }
+  for (const referenceCopy of ["ALEO GILT", "ENTER THE PROTOCOL", ">START<"]) {
+    assert.equal(combinedSource.includes(referenceCopy), false, `${referenceCopy} must not be copied from the reference`);
   }
   assert.equal(source.includes("useAppState"), false, "homepage metrics must not use local Demo state");
   for (const removed of [
@@ -51,7 +54,7 @@ test("global styles expose reusable professional surface primitives", () => {
 test("navigation is compact and keeps Demo roles out of the global header", () => {
   const source = readFileSync("components/navigation.tsx", "utf8");
 
-  for (const phrase of ["h-[3.75rem]", "mobile-navigation", "WalletConnectionControl", "lg:hidden"]) {
+  for (const phrase of ["site-navigation", "h-[3.75rem]", "mobile-navigation", "WalletConnectionControl", "lg:hidden"]) {
     assert.equal(source.includes(phrase), true, `${phrase} should be present in navigation`);
   }
   for (const forbidden of ["useAppState", "switchActor", "roleDisplayLabels", "<select"]) {

@@ -2,29 +2,29 @@
 
 ## Evidence
 
-- Reference: `C:\Users\71546\.codex\worktrees\5d77\aleo\artifacts\design-qa-source-1024x560.png`
-- Implementation: `C:\Users\71546\.codex\worktrees\5d77\aleo\artifacts\design-qa-home-1024x560.png`
-- Side-by-side comparison: `C:\Users\71546\.codex\worktrees\5d77\aleo\artifacts\design-qa-comparison-2064x560.png`
+- Reference: `C:\Users\71546\.codex\worktrees\5d77\aleo\artifacts\portal-reference-1024x560.png`
+- Implementation: `C:\Users\71546\.codex\worktrees\5d77\aleo\artifacts\portal-implementation-1024x560.png`
+- Side-by-side comparison: `C:\Users\71546\.codex\worktrees\5d77\aleo\artifacts\portal-comparison-2064x560.png`
 - Viewport: 1024 x 560, DPR 1
 - State: desktop, dark theme, wallet disconnected
 
 ## Review
 
-- Composition: the homepage is now a single immersive hero with one primary action.
-- Typography: concise Chinese-first hierarchy preserves the protocol slogan without repeating explanations.
-- Spacing: the hero fills the viewport with no vertical or horizontal overflow.
-- Color and imagery: the existing ZK circuit visual carries the dark cyan/violet reference direction.
-- Interaction: navigation and the primary proof submission path remain functional.
-- Submit Proof: Real Mode progressively reveals witness and signing controls only after a Testnet Bounty is verified.
+- Composition: the homepage matches the reference's single-screen protocol entrance, centered portal, low headline, and one CTA.
+- Typography: all reference wording was replaced by zkBugBounty-owned Chinese-first copy and the canonical privacy slogan.
+- Spacing: the desktop and 390px mobile views fill the viewport without horizontal or vertical overflow.
+- Color and imagery: the generated text-free portal keeps the graphite, cyan, emerald, and restrained violet direction.
+- Interaction: the integrated navigation, mobile menu, Wallet control, and primary proof submission path remain functional.
 
 ## Comparison History
 
-1. Removed the previous registry, deployment, protocol, comparison, and rule sections from the homepage.
-2. Corrected a one-pixel viewport overflow by tightening the hero height calculation.
-3. Removed the Submit Proof side rail and deferred private input controls to eliminate long empty layouts.
+1. Replaced the circuit-node hero with an original, text-free wireframe protocol portal generated from the selected composition.
+2. Integrated the existing navigation over the hero to match the reference's continuous visual canvas.
+3. Rebuilt the type hierarchy around one Chinese headline, one protocol statement, and one CTA.
+4. Verified exact 1024 x 560 and 390 x 844 viewport fit with no overflow or console warnings.
 
 ## Residual Difference
 
-P3: the product keeps its functional glass navigation separate from the visual canvas, while the reference integrates navigation into the artwork. This preserves wallet and route access without weakening the single-screen composition.
+P3: zkBugBounty retains its functional wallet and route controls instead of copying the reference's generic navigation labels.
 
 final result: passed

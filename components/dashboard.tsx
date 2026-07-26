@@ -10,25 +10,25 @@ export function Dashboard() {
       <HeroProofVisual />
 
       <div className="home-immersive-top">
-        <span className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-100">
+        <span className="inline-flex items-center gap-2 text-[0.68rem] font-medium text-emerald-100/80">
           <span className="network-pulse" aria-hidden="true" />
-          Aleo Testnet
+          Aleo Testnet · Network confirmed
         </span>
-        <span className="hidden font-mono text-[0.68rem] text-slate-500 sm:block">
+        <span className="hidden font-mono text-[0.64rem] text-slate-600 sm:block">
           zkbugbounty_7f3c92.aleo
         </span>
       </div>
 
       <div className="home-immersive-content">
-        <p className="page-kicker">Private by default</p>
-        <h1 className="mt-4 max-w-4xl text-4xl font-medium leading-[1.08] text-white sm:text-6xl lg:text-7xl" id="home-title">
+        <p className="home-protocol-label">Private Witness · Public Proof</p>
+        <h1 className="home-protocol-title" id="home-title">
           证明漏洞存在
-          <span className="gradient-heading-accent block">Exploit 无需公开</span>
+          <span>Exploit 保持私密</span>
         </h1>
-        <p className="mt-5 max-w-2xl font-mono text-xs font-medium leading-6 text-cyan-50/80 sm:text-sm">
+        <p className="home-protocol-slogan">
           {zh.brand.slogan}
         </p>
-        <Link className="focus-ring home-enter-action mt-8" href="/submit-proof">
+        <Link className="focus-ring home-enter-action" href="/submit-proof">
           {zh.home.proofAction}
           <ArrowRight size={17} aria-hidden="true" />
         </Link>
