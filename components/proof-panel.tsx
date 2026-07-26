@@ -20,7 +20,7 @@ export function ProofPanel({
           <LockKeyhole size={17} aria-hidden="true" />
           {zh.proofPanel.title}
         </div>
-        <span className="rounded-md border border-emerald-300/25 bg-emerald-300/10 px-2 py-1 text-xs text-emerald-100">
+        <span className="rounded-md border border-violet-300/25 bg-violet-300/10 px-2 py-1 text-xs text-violet-100">
           {zh.proofPanel.publicOnly}
         </span>
       </div>
@@ -65,8 +65,8 @@ export function ProofPanel({
       <div className="mt-4 flex items-center gap-2 text-sm">
         {proof?.verified ? (
           <>
-            <CheckCircle2 className="text-emerald-300" size={18} aria-hidden="true" />
-            <span className="text-emerald-100">{zh.proofPanel.ready}</span>
+            <CheckCircle2 className="text-violet-300" size={18} aria-hidden="true" />
+            <span className="text-violet-100">{zh.proofPanel.ready}</span>
           </>
         ) : (
           <>
@@ -90,7 +90,7 @@ function ProofField({
 }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className="text-xs text-slate-500">{label}</p>
       <p className={`mt-1 break-all text-slate-100 ${mono ? "font-mono" : ""}`}>{value}</p>
     </div>
   );

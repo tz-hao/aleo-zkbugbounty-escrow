@@ -7,6 +7,7 @@ import { DEMO_VAULT_RULES, getDemoVaultRule } from "@/lib/demo-vault";
 import { canCreateBounty } from "@/lib/permissions";
 import { useAppState } from "./app-state-provider";
 import { zh } from "@/lib/i18n/zh";
+import { ExecutionStatusBadge } from "./execution-status-badge";
 
 const ruleSelectorOrder = [
   "Vault Accounting Safety",
@@ -59,9 +60,7 @@ export function BountyForm() {
     <form className="surface-card grid gap-5 rounded-lg p-5 sm:p-6" onSubmit={handleSubmit}>
       <div className="flex flex-col gap-2 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <span className="rounded-md border border-violet-300/25 bg-violet-300/10 px-2 py-1 text-xs font-semibold text-violet-100">
-            Demo Mode
-          </span>
+          <ExecutionStatusBadge kind="local" />
           <h2 className="mt-3 text-xl font-semibold text-white">本地演示 Bounty</h2>
         </div>
         <p className="max-w-xl text-sm leading-6 text-slate-400">
@@ -69,8 +68,8 @@ export function BountyForm() {
         </p>
       </div>
       {!allowed ? (
-        <div className="rounded-lg border border-red-400/25 bg-red-500/10 p-3 text-sm text-red-100">
-          {zh.createBounty.forbidden}
+        <div className="rounded-lg border border-amber-300/20 bg-amber-300/[0.07] p-3 text-sm text-amber-100">
+          当前 Demo Preview 视角不能创建本地 Bounty。请在上方演示设置中切换为 Project Owner；这不会改变钱包或链上权限。
         </div>
       ) : null}
       <div className="grid gap-4 md:grid-cols-2">
@@ -108,7 +107,7 @@ export function BountyForm() {
       <label className="grid gap-2 text-sm text-slate-300">
         {zh.createBounty.fields.rule}
         <select
-          className="focus-ring rounded-lg border border-emerald-300/20 bg-emerald-300/8 px-3 py-3 font-mono text-emerald-100 disabled:text-slate-500"
+        className="focus-ring rounded-lg border border-violet-300/20 bg-violet-300/8 px-3 py-3 font-mono text-violet-100 disabled:text-slate-500"
           disabled={!allowed}
           onChange={(event) => setRuleId(event.target.value as typeof ruleId)}
           required
@@ -121,21 +120,21 @@ export function BountyForm() {
           ))}
         </select>
       </label>
-      <div className="grid gap-3 rounded-lg border border-emerald-300/20 bg-emerald-300/8 p-4 text-sm text-emerald-100 md:grid-cols-2">
+      <div className="grid gap-3 rounded-lg border border-violet-300/20 bg-violet-300/8 p-4 text-sm text-violet-100 md:grid-cols-2">
         <div>
-          <p className="text-xs tracking-normal text-emerald-300/80">{zh.createBounty.fields.ruleName}</p>
+          <p className="text-xs tracking-normal text-violet-200/80">{zh.createBounty.fields.ruleName}</p>
           <p className="mt-1 font-semibold text-white">{zh.rules[selectedRule.id].name}</p>
         </div>
         <div>
-          <p className="text-xs tracking-normal text-emerald-300/80">{zh.createBounty.fields.affectedModule}</p>
+          <p className="text-xs tracking-normal text-violet-200/80">{zh.createBounty.fields.affectedModule}</p>
           <p className="mt-1 text-white">{selectedRule.affectedModule}</p>
         </div>
         <div>
-          <p className="text-xs tracking-normal text-emerald-300/80">Invariant</p>
+          <p className="text-xs tracking-normal text-violet-200/80">Invariant</p>
           <p className="mt-1 font-mono text-white">{selectedRule.invariantText}</p>
         </div>
         <div>
-          <p className="text-xs tracking-normal text-emerald-300/80">{zh.createBounty.fields.description}</p>
+          <p className="text-xs tracking-normal text-violet-200/80">{zh.createBounty.fields.description}</p>
           <p className="mt-1 text-white">{zh.rules[selectedRule.id].description}</p>
         </div>
       </div>

@@ -28,10 +28,8 @@ import {
 } from "@/lib/aleo-create-bounty";
 import { CANONICAL_ALEO_PROGRAM_ID } from "@/lib/aleo-program";
 import { DEMO_VAULT_RULES, getDemoVaultRule } from "@/lib/demo-vault";
-import { canCreateBounty } from "@/lib/permissions";
 import type { DemoVaultRuleId } from "@/lib/models";
 import { useAleoWallet } from "./aleo-wallet-provider";
-import { useAppState } from "./app-state-provider";
 
 type NetworkState =
   | { kind: "loading" }
@@ -66,9 +64,7 @@ async function fetchNetworkState(): Promise<NetworkState> {
 
 export function AleoCreateBountyForm() {
   const router = useRouter();
-  const { state } = useAppState();
   const wallet = useAleoWallet();
-  const allowed = canCreateBounty(state.currentActor);
   const [network, setNetwork] = useState<NetworkState>({ kind: "loading" });
   const [scope, setScope] = useState("Vault accounting logic");
   const [ruleId, setRuleId] = useState<DemoVaultRuleId>("vault-accounting-safety");
@@ -157,7 +153,6 @@ export function AleoCreateBountyForm() {
   }
 
   async function handleWalletRequest() {
-    if (!allowed) return;
     setSubmitting(true);
     setMessage(null);
     try {
@@ -173,7 +168,6 @@ export function AleoCreateBountyForm() {
   }
 
   const canRequestWallet =
-    allowed &&
     wallet.connectionState === "Connected" &&
     network.kind === "available" &&
     preview !== null &&
@@ -184,11 +178,11 @@ export function AleoCreateBountyForm() {
       <div className="flex flex-col gap-4 border-b border-white/10 pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-md border border-emerald-300/25 bg-emerald-300/10 px-2 py-1 text-xs font-semibold text-emerald-100">
-              Real Mode
+            <span className="rounded-md border border-cyan-300/25 bg-cyan-300/10 px-2 py-1 text-xs font-semibold text-cyan-100">
+              Aleo Testnet
             </span>
             <span className="rounded-md border border-cyan-300/20 bg-cyan-300/[0.07] px-2 py-1 text-xs text-cyan-100">
-              Data Source: Aleo Testnet
+              Wallet signature required
             </span>
           </div>
           <h2 id="real-create-bounty-title" className="mt-3 text-xl font-semibold text-white">
@@ -202,11 +196,18 @@ export function AleoCreateBountyForm() {
         <NetworkBadge network={network} onRefresh={() => void refreshNetwork()} />
       </div>
 
-      {!allowed ? (
-        <div className="mt-5 rounded-lg border border-red-400/25 bg-red-500/10 p-3 text-sm text-red-100">
-          当前演示角色不能打开 Project Owner 交易入口。Role Switcher 只控制 UI，链上权限最终由钱包签名者决定。
-        </div>
-      ) : null}
+      <div className="mt-5 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.05] p-4">
+        <p className="text-sm font-semibold text-cyan-50">
+          {wallet.address && wallet.connectionState === "Connected"
+            ? "当前连接的钱包将作为 Bounty Owner 创建"
+            : "连接钱包后，该地址将作为 Bounty Owner 创建"}
+        </p>
+        <p className="mt-1 break-all text-xs leading-5 text-slate-400">
+          {wallet.address && wallet.connectionState === "Connected"
+            ? `${wallet.address} · Program 通过 self.signer 确认 Owner`
+            : "真实权限只取决于钱包签名者与链上 Program，不读取 Demo Preview 身份。"}
+        </p>
+      </div>
 
       <form className="mt-5 grid gap-5" onSubmit={handlePreview}>
         <label className="grid gap-2 text-sm text-slate-300">

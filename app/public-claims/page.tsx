@@ -14,13 +14,11 @@ import {
   SeverityBadge,
 } from "@/components/status-badge";
 import { useAppState } from "@/components/app-state-provider";
-import { canViewPublicClaims } from "@/lib/permissions";
 import { getRuleDisplayName, zh } from "@/lib/i18n/zh";
 import { getImpactBand, getVerificationLabel, getVerificationStatement } from "@/lib/proof-verification";
 
 export default function PublicClaimsPage() {
   const { state } = useAppState();
-  const canView = canViewPublicClaims(state.currentActor);
   const visibleClaims = state.publicClaimRegistry.filter((entry) => entry.payoutStatus !== "Rejected");
 
   return (
@@ -36,18 +34,19 @@ export default function PublicClaimsPage() {
               {zh.publicClaims.description}
             </p>
           </div>
-          <div className="rounded-lg border border-emerald-300/20 bg-emerald-300/[0.07] p-4 text-sm text-emerald-100">
-            {zh.publicClaims.registryNotice}
+          <div className="border-l-2 border-emerald-300/35 pl-4 text-sm leading-6 text-slate-300">
+            <p className="font-semibold text-emerald-100">公开浏览模式</p>
+            <p className="mt-1">读取公开 Registry 无需连接 Wallet，也不涉及角色或权限切换。</p>
           </div>
         </div>
       </section>
 
-      <AleoDeploymentStatus />
       <AleoPublicIndex />
+      <AleoDeploymentStatus />
       <AleoBountyRegistryPanel />
       <AleoClaimReceiptPanel />
 
-      <section className="grid gap-3 md:grid-cols-4">
+      <section className="grid divide-y divide-white/10 border-y border-white/10 sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-5">
         {[
           ["Exploit Details: Hidden", zh.privacy.exploitHidden],
           ["Private Witness: Never Stored", zh.privacy.witnessNeverStored],
@@ -55,26 +54,26 @@ export default function PublicClaimsPage() {
           ["Verification Level: Explicit", "每条 Claim 明确区分 Mock、Local Leo 开发执行与 Network Confirmed"],
           ["Responsible Disclosure: In Progress / Patched", "Responsible Disclosure 状态公开可审计"],
         ].map(([label, detail]) => (
-          <div className="surface-card rounded-lg p-4" key={label}>
-            <p className="font-mono text-[0.68rem] text-slate-500">{label}</p>
+          <div className="px-4 py-4" key={label}>
+            <p className="font-mono text-xs text-slate-500">{label}</p>
             <p className="mt-2 text-sm font-semibold text-white">{detail}</p>
           </div>
         ))}
       </section>
 
-      <section className="flex flex-wrap items-center justify-between gap-3 border-y border-white/10 py-4">
-        <div>
-          <p className="page-kicker">Demo Mode Registry</p>
-          <p className="mt-1 text-sm text-slate-400">以下卡片来自本地演示状态，不属于 Aleo Testnet Registry。</p>
-        </div>
-        <span className="rounded-md border border-violet-300/25 bg-violet-300/10 px-3 py-2 text-xs text-violet-100">
-          Mock / Local State
-        </span>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        {canView
-          ? visibleClaims.map((entry) => {
+      <details className="group surface-card rounded-lg">
+        <summary className="focus-ring flex min-h-16 cursor-pointer list-none flex-wrap items-center justify-between gap-3 rounded-lg px-5 py-4 [&::-webkit-details-marker]:hidden">
+          <div>
+            <p className="page-kicker">本地演示 Registry</p>
+            <p className="mt-1 text-sm text-slate-400">与 Aleo Testnet 数据严格分离，默认不参与协议总览。</p>
+          </div>
+          <span className="rounded-md border border-violet-300/25 bg-violet-300/10 px-3 py-2 text-xs text-violet-100">
+            Local simulation
+          </span>
+        </summary>
+        <div className="border-t border-white/10 p-5">
+          <section className="grid gap-4 lg:grid-cols-2">
+            {visibleClaims.map((entry) => {
               const bounty = state.bounties.find((item) => item.id === entry.bountyId);
               const receipt = state.claimReceipts.find((item) => item.receiptId === entry.receiptId);
               const patchedStatus = entry.disclosureStatus === "Patched" ? "已修复" : zh.common.pending;
@@ -99,16 +98,16 @@ export default function PublicClaimsPage() {
                     <RegistryField label="受影响模块" value={entry.affectedModule} />
                     <RegistryField label="Impact Band" value={getImpactBand(entry.severity)} />
                     <RegistryField label="Bug Type" value={entry.bugType} />
-                    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                    <div className="border-b border-white/10 py-3">
+                      <p className="text-xs text-slate-500">
                         披露状态（Disclosure Status）
                       </p>
                       <div className="mt-2">
                         <DisclosureStatusBadge status={entry.disclosureStatus} />
                       </div>
                     </div>
-                    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                    <div className="border-b border-white/10 py-3">
+                      <p className="text-xs text-slate-500">
                         支付状态（Payout Status）
                       </p>
                       <div className="mt-2">
@@ -139,12 +138,13 @@ export default function PublicClaimsPage() {
                   </Link>
                 </article>
               );
-            })
-          : null}
-      </section>
-      {canView && visibleClaims.length === 0 ? (
-        <div className="surface-card rounded-lg p-6 text-sm text-slate-400">{zh.publicClaims.noClaims}</div>
-      ) : null}
+            })}
+          </section>
+          {visibleClaims.length === 0 ? (
+            <p className="py-4 text-sm text-slate-400">{zh.publicClaims.noClaims}</p>
+          ) : null}
+        </div>
+      </details>
     </div>
   );
 }
@@ -159,8 +159,8 @@ function RegistryField({
   mono?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{label}</p>
+    <div className="min-w-0 border-b border-white/10 py-3">
+      <p className="text-xs text-slate-500">{label}</p>
       <p className={`mt-1 break-all text-sm text-slate-200 ${mono ? "font-mono" : ""}`}>{value}</p>
     </div>
   );

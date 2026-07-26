@@ -10,7 +10,7 @@ const severityClass: Record<Severity, string> = {
 
 const proofClass: Record<ProofStatus, string> = {
   Pending: "border-slate-300/20 bg-slate-300/10 text-slate-200",
-  Verified: "border-emerald-300/30 bg-emerald-300/10 text-emerald-100",
+  Verified: "border-violet-300/30 bg-violet-300/10 text-violet-100",
   Invalid: "border-red-400/35 bg-red-500/12 text-red-100",
 };
 
@@ -24,7 +24,7 @@ const disclosureClass: Record<DisclosureStatus, string> = {
 const payoutClass: Record<PayoutStatus, string> = {
   Unfunded: "border-slate-300/20 bg-slate-300/10 text-slate-200",
   RewardLocked: "border-cyan-300/30 bg-cyan-300/10 text-cyan-100",
-  Paid: "border-emerald-300/35 bg-emerald-300/14 text-emerald-100",
+  Paid: "border-violet-300/35 bg-violet-300/12 text-violet-100",
   Rejected: "border-red-400/35 bg-red-500/12 text-red-100",
 };
 

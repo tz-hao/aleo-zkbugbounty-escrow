@@ -40,8 +40,8 @@ test("submit proof page isolates Mock Demo Mode from Wallet device-side Real Mod
 
   for (const expected of [
     "Mock Invariant Engine",
-    "Demo Mode",
-    "Device-side Proof",
+    "Local Demo",
+    "Device-side execution",
     "Wallet-signed submit_claim",
     "submitWalletClaim",
     "/api/aleo/bounties/",
@@ -59,6 +59,11 @@ test("submit proof page isolates Mock Demo Mode from Wallet device-side Real Mod
   assert.equal(source.includes("console.log"), false, "submit proof page must not log private proof input");
   assert.equal(source.includes("/api/aleo/prove"), false, "Real Mode must not send witness to Next.js");
   assert.equal(source.includes("generateAleoProof"), false, "server-side proof helper must be removed");
+  const walletRequest = source.slice(
+    source.indexOf("async function requestWalletSignedClaim"),
+    source.indexOf("function publishClaim"),
+  );
+  assert.equal(walletRequest.includes("demoAllowed"), false, "Real Mode must not use Demo role permissions");
   assert.match(source, /finally\s*\{[\s\S]*?clearPrivateInputState\(\)/);
 });
 

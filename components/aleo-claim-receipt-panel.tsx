@@ -78,7 +78,7 @@ export function AleoClaimReceiptPanel() {
             autoComplete="off"
             spellCheck={false}
           />
-          <button className="primary-action shrink-0" type="submit" disabled={loading}>
+          <button className="secondary-action shrink-0" type="submit" disabled={loading}>
             <Search size={16} aria-hidden="true" />
             {loading ? "查询中" : "查询 Receipt"}
           </button>
@@ -87,7 +87,11 @@ export function AleoClaimReceiptPanel() {
 
       <div className="mt-5 border-t border-white/10 pt-4" aria-live="polite">
         <p className="flex items-center gap-2 text-sm text-slate-300">
-          <ShieldCheck size={16} className="text-emerald-300" aria-hidden="true" />
+          <ShieldCheck
+            size={16}
+            className={receipt ? "text-emerald-300" : "text-slate-500"}
+            aria-hidden="true"
+          />
           {message}
         </p>
 

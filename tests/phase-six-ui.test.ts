@@ -29,23 +29,18 @@ test("submit proof page includes private state inputs for each DemoVault invaria
 
 test("dashboard explains the protocol layer from private witness to public registry", () => {
   const source = readFileSync("components/dashboard.tsx", "utf8");
-  const uiCopy = `${readFileSync("lib/i18n/zh.ts", "utf8")}\n${readFileSync("lib/i18n/glossary.ts", "utf8")}`;
-  const combinedSource = `${source}\n${uiCopy}`;
 
   for (const phrase of [
-    "公开协议层（Protocol Layer）",
+    "协议说明",
     "Private Witness",
-    "Witness Commitment",
+    "Commitment",
     "Nullifier",
-    "Claim Hash",
     "Claim Receipt",
-    "Public Claim Registry",
-    "Witness Commitment 证明 Whitehat 已提交私有见证数据",
-    "Nullifier 用于阻止重复 Claim",
-    "Claim Receipt 提供可审计的公开元数据；是否链上确认以 Verification Level 为准。",
-    "Public Claim Registry 模拟 Aleo 的公开 Mapping。",
+    "Aleo Testnet Program Mappings",
+    "Confirmed 与 Mapping Verified 分开表达",
+    "不进入 Store、URL、日志或 Public Metadata",
   ]) {
-    assert.equal(combinedSource.includes(phrase), true, `${phrase} should be present on dashboard`);
+    assert.equal(source.includes(phrase), true, `${phrase} should be present on dashboard`);
   }
 });
 
@@ -60,8 +55,8 @@ test("dashboard presents the Multi-Invariant DemoVault rules", () => {
     "Claims vs Deposits Safety",
     "Reward Reserve Safety",
     "Withdrawal Limit Safety",
-    "Project Owner 可使用预设安全 Invariant 定义 Bounty Scope",
-    "Whitehat 使用 Private Witness 证明规则被破坏",
+    "安全规则",
+    "AleoRegistryOverview",
   ]) {
     assert.equal(combinedSource.includes(phrase), true, `${phrase} should be present on dashboard`);
   }

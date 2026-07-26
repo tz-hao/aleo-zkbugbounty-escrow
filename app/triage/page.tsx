@@ -2,6 +2,8 @@
 
 import { AlertTriangle, Bot, CheckCircle2, Clock3, FileText, ReceiptText } from "lucide-react";
 import { ClaimCard } from "@/components/claim-card";
+import { DemoRolePreview } from "@/components/demo-role-preview";
+import { ExecutionStatusBadge } from "@/components/execution-status-badge";
 import { RewardEscrowStatus } from "@/components/reward-escrow-status";
 import { TriageActionControls } from "@/components/triage-action-controls";
 import { useAppState } from "@/components/app-state-provider";
@@ -31,6 +33,12 @@ export default function TriagePage() {
     }
     return actor.role === "TriageArbiter";
   });
+  const actorContext = {
+    ProjectOwner: "当前 Demo 视角可推进所属 Bounty 的本地披露流程。",
+    Whitehat: "当前 Demo 视角仅可在 Details Requested 后共享加密包状态。",
+    TriageArbiter: "当前 Demo 视角可添加公开分诊备注与 Severity 建议。",
+    PublicUser: "当前为公开浏览视角，仅可查看本地流程状态。",
+  }[actor.role];
 
   return (
     <div className="grid gap-6">
@@ -41,16 +49,21 @@ export default function TriagePage() {
             <h1 className="text-3xl font-semibold tracking-normal text-white sm:text-4xl">
               {zh.triage.title}
             </h1>
+            <p className="mt-2 font-mono text-sm text-violet-100/80">
+              Triage &amp; Responsible Disclosure
+            </p>
             <p className="muted-copy mt-3 max-w-2xl">
               {zh.triage.description}
             </p>
           </div>
-          <div className="rounded-lg border border-violet-300/20 bg-violet-300/[0.07] p-4 text-sm text-violet-100">
-            {zh.triage.roleNotice}
+          <div className="border-l-2 border-violet-300/35 pl-4 text-sm leading-6 text-slate-300">
+            <ExecutionStatusBadge kind="local" />
+            <p className="mt-2">{actorContext}</p>
           </div>
         </div>
       </section>
 
+      <DemoRolePreview />
       <RewardEscrowStatus />
 
       {!hasTriageAccess ? (
@@ -62,7 +75,8 @@ export default function TriagePage() {
                 {zh.triage.noAccessTitle}
               </h2>
               <p className="mt-2 max-w-2xl text-sm text-slate-400">
-                {zh.triage.noAccessBody}
+                Public User 在本地 Triage Demo 中为只读。可在上方 Demo Preview 设置中切换演示视角；
+                该设置不会改变钱包或链上权限。
               </p>
             </div>
           </div>
@@ -116,8 +130,8 @@ export default function TriagePage() {
                         <ReceiptField label="Witness Commitment" value={receipt?.witnessCommitment ?? claim.witnessCommitment} />
                         <ReceiptField label="Nullifier" value={receipt?.nullifier ?? claim.nullifier} />
                         <ReceiptField label="安全规则（Rule Name）" value={receipt?.ruleName ?? claim.ruleName} />
-                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                        <div className="border-b border-white/10 py-3">
+                          <p className="text-xs text-slate-500">
                             Proof Engine
                           </p>
                           <p className="mt-1 flex items-center gap-2 text-slate-200">
@@ -154,8 +168,8 @@ export default function TriagePage() {
                           ["披露状态", zh.status.disclosure[claim.disclosureStatus]],
                           ["Disclosure Package", packageState?.status ?? "尚未分享"],
                         ].map(([label, value]) => (
-                          <div className="rounded-lg border border-white/10 bg-black/20 p-3" key={label}>
-                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                          <div className="border-l border-white/10 py-1 pl-3" key={label}>
+                            <p className="text-xs text-slate-500">
                               {label}
                             </p>
                             <p className="mt-1 flex items-center gap-2 text-sm text-slate-100">
@@ -213,20 +227,20 @@ export default function TriagePage() {
                       </span>
                     </div>
                     <div className="grid gap-3 lg:grid-cols-3">
-                      <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                      <div className="border-l border-white/10 py-1 pl-3">
+                        <p className="text-xs text-slate-500">
                           风险摘要（Risk Summary）
                         </p>
                         <p className="mt-2 text-sm text-slate-200">{copilot.riskSummary}</p>
                       </div>
-                      <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                      <div className="border-l border-white/10 py-1 pl-3">
+                        <p className="text-xs text-slate-500">
                           建议下一步
                         </p>
                         <p className="mt-2 text-sm text-slate-200">{copilot.recommendedNextStep}</p>
                       </div>
-                      <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                      <div className="border-l border-white/10 py-1 pl-3">
+                        <p className="text-xs text-slate-500">
                           Responsible Disclosure 提醒
                         </p>
                         <p className="mt-2 text-sm text-slate-200">
@@ -278,7 +292,7 @@ export default function TriagePage() {
 function WorkflowField({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-[0.18em] text-cyan-100/60">{label}</p>
+      <p className="text-xs text-cyan-100/60">{label}</p>
       <p className="mt-1 text-sm font-semibold text-white">{value}</p>
     </div>
   );
@@ -286,8 +300,8 @@ function WorkflowField({ label, value }: { label: string; value: string }) {
 
 function ReceiptField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{label}</p>
+    <div className="min-w-0 border-b border-white/10 py-3">
+      <p className="text-xs text-slate-500">{label}</p>
       <p className="mt-1 break-all font-mono text-cyan-100">{value}</p>
     </div>
   );

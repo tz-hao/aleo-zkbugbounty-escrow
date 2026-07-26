@@ -67,10 +67,10 @@ export function AleoPublicIndex() {
   const items = registry?.kind === kind ? registry.items : [];
 
   return (
-    <section className="surface-card-strong rounded-lg p-5 sm:p-6">
+    <section className="surface-card rounded-lg p-5 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="page-kicker">Aleo Testnet · Real Registry</p>
+          <p className="page-kicker">链上 Registry</p>
           <h2 className="mt-2 text-xl font-semibold text-white">公开链上索引</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
             RPC 只负责发现公开 Transaction；每条结果必须再次通过 Aleo Mapping 验证。Confirmed 不等于 Mapping Verified。
@@ -79,7 +79,7 @@ export function AleoPublicIndex() {
         <div className="inline-flex w-fit rounded-md border border-white/10 bg-black/20 p-1" aria-label="Registry view">
           {(["bounties", "claims"] as const).map((item) => (
             <button
-              className={`focus-ring rounded px-3 py-2 text-xs font-semibold ${
+              className={`focus-ring min-h-11 rounded px-3 py-2 text-xs font-semibold ${
                 kind === item ? "bg-cyan-300/15 text-cyan-100" : "text-slate-400 hover:text-white"
               }`}
               key={item}
