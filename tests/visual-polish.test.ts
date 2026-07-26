@@ -20,6 +20,13 @@ test("dashboard is a single immersive protocol entry", () => {
     assert.equal(combinedSource.includes(phrase), true, `${phrase} should be present on the dashboard`);
   }
   assert.equal(source.includes("home-protocol-slogan"), false, "removed hero slogan must not remain on the homepage");
+  for (const removedCoverMetadata of [
+    "home-immersive-top",
+    "Aleo Testnet · Network confirmed",
+    "zkbugbounty_7f3c92.aleo",
+  ]) {
+    assert.equal(source.includes(removedCoverMetadata), false, `${removedCoverMetadata} must not appear on the homepage cover`);
+  }
   for (const referenceCopy of ["ALEO GILT", "ENTER THE PROTOCOL", ">START<"]) {
     assert.equal(combinedSource.includes(referenceCopy), false, `${referenceCopy} must not be copied from the reference`);
   }

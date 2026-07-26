@@ -383,17 +383,6 @@ body:has(.home-immersive) .site-navigation nav a[aria-current="page"] {
     linear-gradient(180deg, rgba(2, 4, 8, 0.02) 42%, rgba(2, 3, 7, 0.18) 66%, rgba(2, 3, 6, 0.52) 100%);
 }
 
-.home-immersive-top {
-  position: absolute;
-  z-index: 2;
-  top: 5.25rem;
-  right: 2rem;
-  left: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
 .home-immersive-content {
   position: absolute;
   inset: 0;
@@ -492,16 +481,6 @@ body:has(.home-immersive) .site-navigation nav a[aria-current="page"] {
 
   .home-immersive-content {
     padding: 7.25rem 1.25rem 4rem;
-  }
-
-  .home-immersive-top {
-    top: 5.25rem;
-    right: 1.25rem;
-    left: 1.25rem;
-  }
-
-  .home-immersive-top > span:last-child {
-    display: none;
   }
 
   .home-protocol-title {

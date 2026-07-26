@@ -9,16 +9,6 @@ export function Dashboard() {
     <section className="home-immersive section-reveal" aria-labelledby="home-title">
       <HeroProofVisual />
 
-      <div className="home-immersive-top">
-        <span className="inline-flex items-center gap-2 text-[0.68rem] font-medium text-emerald-100/80">
-          <span className="network-pulse" aria-hidden="true" />
-          Aleo Testnet · Network confirmed
-        </span>
-        <span className="hidden font-mono text-[0.64rem] text-slate-600 sm:block">
-          zkbugbounty_7f3c92.aleo
-        </span>
-      </div>
-
       <div className="home-immersive-content">
         <p className="home-protocol-label">Private Witness · Public Proof</p>
         <h1 className="home-protocol-title" id="home-title">
