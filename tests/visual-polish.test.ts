@@ -4,17 +4,20 @@ import { test } from "node:test";
 
 test("dashboard prioritizes the real registry and a concise protocol boundary", () => {
   const source = readFileSync("components/dashboard.tsx", "utf8");
+  const heroSource = readFileSync("components/hero-proof-visual.tsx", "utf8");
+  const combinedSource = `${source}\n${heroSource}`;
 
   for (const phrase of [
     "professional-site-hero",
     "AleoRegistryOverview",
-    "可信执行边界",
-    "Private Witness",
-    "Public Proof Artifacts",
-    "Aleo Testnet Program Mappings",
-    "协议说明",
+    "HeroProofVisual",
+    "链上事实，而不是本地计数",
+    "Private input",
+    "Public receipt",
+    "Aleo Program Mappings",
+    "协议执行路径",
   ]) {
-    assert.equal(source.includes(phrase), true, `${phrase} should be present on the dashboard`);
+    assert.equal(combinedSource.includes(phrase), true, `${phrase} should be present on the dashboard`);
   }
   assert.equal(source.includes("useAppState"), false, "homepage metrics must not use local Demo state");
 });
@@ -38,7 +41,7 @@ test("global styles expose reusable professional surface primitives", () => {
 test("navigation is compact and keeps Demo roles out of the global header", () => {
   const source = readFileSync("components/navigation.tsx", "utf8");
 
-  for (const phrase of ["h-16", "mobile-navigation", "WalletConnectionControl", "lg:hidden"]) {
+  for (const phrase of ["h-[3.75rem]", "mobile-navigation", "WalletConnectionControl", "lg:hidden"]) {
     assert.equal(source.includes(phrase), true, `${phrase} should be present in navigation`);
   }
   for (const forbidden of ["useAppState", "switchActor", "roleDisplayLabels", "<select"]) {

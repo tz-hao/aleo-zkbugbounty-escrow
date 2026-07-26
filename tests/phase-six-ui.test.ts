@@ -29,18 +29,19 @@ test("submit proof page includes private state inputs for each DemoVault invaria
 
 test("dashboard explains the protocol layer from private witness to public registry", () => {
   const source = readFileSync("components/dashboard.tsx", "utf8");
+  const heroSource = readFileSync("components/hero-proof-visual.tsx", "utf8");
+  const combinedSource = `${source}\n${heroSource}`;
 
   for (const phrase of [
-    "协议说明",
-    "Private Witness",
-    "Commitment",
+    "协议执行路径",
+    "Private input",
+    "Receipt 与 Commitment",
     "Nullifier",
-    "Claim Receipt",
-    "Aleo Testnet Program Mappings",
+    "Aleo Program Mappings",
     "Confirmed 与 Mapping Verified 分开表达",
     "不进入 Store、URL、日志或 Public Metadata",
   ]) {
-    assert.equal(source.includes(phrase), true, `${phrase} should be present on dashboard`);
+    assert.equal(combinedSource.includes(phrase), true, `${phrase} should be present on dashboard`);
   }
 });
 

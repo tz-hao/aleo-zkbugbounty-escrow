@@ -61,7 +61,7 @@ export const zh = {
   home: {
     kicker: "Private Proof-of-Exploit Protocol for Responsible Disclosure",
     title: "证明漏洞存在，而不泄露 Exploit",
-    description: "zkBugBounty 是运行于 Aleo Testnet 的隐私漏洞证明协议 Demo。Whitehat 可以使用 Private Witness 证明安全 Invariant 被破坏，而无需公开 Exploit Path、触发参数或完整 PoC。",
+    description: "zkBugBounty 运行于 Aleo Testnet。Whitehat 可以使用 Private Witness 证明安全 Invariant 被破坏，而无需公开 Exploit Path、触发参数或完整 PoC。",
     createAction: "创建 Bounty",
     proofAction: "生成 Private Proof",
     trustSignals: ["Exploit 始终密封", "Receipt 标注验证级别", "Registry 公开可审计"],

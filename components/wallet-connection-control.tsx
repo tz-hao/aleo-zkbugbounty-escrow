@@ -26,7 +26,7 @@ export function WalletConnectionControl() {
         {address && connectionState === "Connected" ? (
           <>
             <span
-              className="inline-flex min-h-11 min-w-0 items-center gap-2 rounded-lg border border-emerald-300/25 bg-emerald-300/10 px-3 font-mono text-xs text-emerald-100"
+              className="inline-flex min-h-10 min-w-0 items-center gap-2 rounded-lg border border-emerald-300/20 bg-emerald-300/[0.075] px-3 font-mono text-xs text-emerald-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
               title={address}
             >
               <WalletCards size={15} aria-hidden="true" />
@@ -36,7 +36,7 @@ export function WalletConnectionControl() {
               </span>
             </span>
             <button
-              className="focus-ring inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-300 hover:border-white/20 hover:text-white"
+              className="focus-ring inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.035] text-slate-400 transition hover:border-white/20 hover:text-white"
               type="button"
               onClick={() => void disconnect()}
               aria-label="断开 Leo Wallet"
@@ -47,7 +47,7 @@ export function WalletConnectionControl() {
           </>
         ) : connectionState === "NotInstalled" ? (
           <a
-            className="focus-ring secondary-action min-h-11 flex-1 py-2 sm:flex-none"
+            className="focus-ring secondary-action min-h-10 flex-1 py-2 sm:flex-none"
             href="https://leo.app/"
             target="_blank"
             rel="noreferrer"
@@ -57,7 +57,7 @@ export function WalletConnectionControl() {
           </a>
         ) : (
           <button
-            className="focus-ring secondary-action min-h-11 flex-1 py-2 disabled:cursor-wait disabled:text-slate-500 sm:flex-none"
+            className="focus-ring wallet-connect-action inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold disabled:cursor-wait disabled:text-slate-500 sm:flex-none"
             type="button"
             disabled={busy}
             onClick={() => void connect()}
@@ -73,7 +73,7 @@ export function WalletConnectionControl() {
       </div>
       <details className="group relative shrink-0">
         <summary
-          className={`focus-ring flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-lg border [&::-webkit-details-marker]:hidden ${
+          className={`focus-ring flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg border [&::-webkit-details-marker]:hidden ${
             errorMessage
               ? "border-red-300/25 bg-red-300/10 text-red-100"
               : "border-white/10 bg-white/[0.04] text-slate-400 hover:text-white"
@@ -83,7 +83,7 @@ export function WalletConnectionControl() {
           <CircleHelp size={16} aria-hidden="true" />
           <span className="sr-only">展开 Wallet 状态详情</span>
         </summary>
-        <div className="absolute right-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-white/10 bg-[#090f18] p-3 text-xs leading-5 text-slate-300 shadow-2xl">
+        <div className="absolute right-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-white/10 bg-[#090b10]/95 p-3 text-xs leading-5 text-slate-300 shadow-2xl backdrop-blur-xl">
           <p className="font-semibold text-white">Leo Wallet 诊断</p>
           <p className="mt-1 break-words text-slate-400">{diagnosticText}</p>
           {errorMessage ? (

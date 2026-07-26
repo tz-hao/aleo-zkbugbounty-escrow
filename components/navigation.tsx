@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   FilePlus2,
   Menu,
+  Radio,
   ShieldCheck,
   TerminalSquare,
   X,
@@ -29,36 +30,47 @@ export function Navigation() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-[#05070b]/90 shadow-[0_12px_36px_rgba(0,0,0,0.24)] backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-40 px-3 pt-3">
+      <div className="nav-glass mx-auto flex h-[3.75rem] max-w-7xl items-center gap-3 rounded-lg px-3 sm:px-4 lg:px-5">
         <Link className="group flex min-w-0 shrink-0 items-center gap-2.5" href="/">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/30 bg-cyan-300/10 text-cyan-200 transition group-hover:border-emerald-300/35 group-hover:text-emerald-100">
+          <span className="brand-mark flex h-9 w-9 items-center justify-center rounded-lg transition group-hover:border-emerald-300/40">
             <ShieldCheck size={20} aria-hidden="true" />
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-base font-semibold text-white">zkBugBounty</span>
-            <span className="hidden text-xs text-cyan-100/60 xl:block">
-              {zh.brand.chineseSubtitle}
+            <span className="block truncate text-sm font-semibold text-white sm:text-base">zkBugBounty</span>
+            <span className="hidden text-[0.68rem] text-slate-500 2xl:block">
+              Zero-knowledge disclosure
             </span>
           </span>
         </Link>
 
+        <span className="hidden items-center gap-2 rounded-md border border-emerald-300/15 bg-emerald-300/[0.055] px-2.5 py-1.5 text-[0.68rem] font-semibold text-emerald-100 xl:inline-flex">
+          <span className="network-pulse" aria-hidden="true" />
+          Aleo Testnet
+        </span>
+
         <nav aria-label="主导航" className="hidden min-w-0 flex-1 items-center justify-center lg:flex">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             {links.map(({ href, label, icon: Icon }) => {
               const active = pathname === href;
               return (
                 <Link
-                  className={`focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition ${
+                  className={`focus-ring relative inline-flex min-h-10 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition xl:text-sm ${
                     active
-                      ? "bg-white/[0.08] text-cyan-100"
-                      : "text-slate-400 hover:bg-white/[0.05] hover:text-white"
+                      ? "bg-white/[0.055] text-white"
+                      : "text-slate-400 hover:bg-white/[0.035] hover:text-slate-100"
                   }`}
                   href={href}
                   key={href}
                 >
                   <Icon size={15} aria-hidden="true" />
                   {label}
+                  {active ? (
+                    <span
+                      className="absolute inset-x-3 -bottom-[0.65rem] h-px bg-gradient-to-r from-transparent via-emerald-300 to-transparent"
+                      aria-hidden="true"
+                    />
+                  ) : null}
                 </Link>
               );
             })}
@@ -72,7 +84,7 @@ export function Navigation() {
           aria-controls="mobile-navigation"
           aria-expanded={mobileOpen}
           aria-label={mobileOpen ? "关闭导航菜单" : "打开导航菜单"}
-          className="focus-ring ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-200 lg:hidden"
+          className="focus-ring ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-200 lg:hidden"
           onClick={() => setMobileOpen((open) => !open)}
           type="button"
         >
@@ -82,9 +94,19 @@ export function Navigation() {
 
       {mobileOpen ? (
         <div
-          className="border-t border-white/10 bg-[#070b12]/98 px-4 py-4 shadow-2xl lg:hidden"
+          className="nav-glass mx-auto mt-2 max-w-7xl rounded-lg p-3 shadow-2xl lg:hidden"
           id="mobile-navigation"
         >
+          <div className="mb-3 flex items-center justify-between border-b border-white/[0.08] px-2 pb-3">
+            <span className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-100">
+              <span className="network-pulse" aria-hidden="true" />
+              Aleo Testnet
+            </span>
+            <span className="inline-flex items-center gap-1.5 font-mono text-[0.68rem] text-slate-500">
+              <Radio size={12} aria-hidden="true" />
+              testnetbeta
+            </span>
+          </div>
           <nav aria-label="移动端主导航" className="grid gap-1">
             {links.map(({ href, label, icon: Icon }) => {
               const active = pathname === href;
@@ -92,7 +114,7 @@ export function Navigation() {
                 <Link
                   className={`focus-ring inline-flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium ${
                     active
-                      ? "bg-cyan-300/10 text-cyan-100"
+                      ? "bg-emerald-300/[0.08] text-emerald-100"
                       : "text-slate-300 hover:bg-white/[0.05] hover:text-white"
                   }`}
                   href={href}

@@ -3,6 +3,7 @@ import "./globals.css";
 import { AppStateProvider } from "@/components/app-state-provider";
 import { AleoWalletProvider } from "@/components/aleo-wallet-provider";
 import { Navigation } from "@/components/navigation";
+import { SiteFooter } from "@/components/site-footer";
 import { zh } from "@/lib/i18n/zh";
 
 export const metadata: Metadata = {
@@ -22,9 +23,10 @@ export default function RootLayout({
           <AleoWalletProvider>
             <a className="skip-link" href="#main-content">{zh.common.skipToContent}</a>
             <Navigation />
-            <main id="main-content" className="mx-auto flex w-full max-w-7xl flex-col gap-7 px-4 pb-14 pt-7 sm:px-6 lg:px-8">
+            <main id="main-content" className="main-shell mx-auto flex w-full max-w-7xl flex-col gap-7 px-4 pb-12 pt-6 sm:px-6 sm:pt-8 lg:px-8">
               {children}
             </main>
+            <SiteFooter />
           </AleoWalletProvider>
         </AppStateProvider>
       </body>

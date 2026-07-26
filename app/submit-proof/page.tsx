@@ -304,9 +304,9 @@ export default function SubmitProofPage() {
   return (
     <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
       <section className="grid gap-5">
-        <div className="surface-card-strong rounded-lg p-6">
+        <div className="surface-card-strong workflow-hero rounded-lg p-6">
           <p className="page-kicker mb-3">{zh.submit.kicker}</p>
-          <h1 className="text-3xl font-semibold tracking-normal text-white sm:text-4xl">
+          <h1 className="gradient-heading text-3xl font-semibold tracking-normal sm:text-4xl">
             {zh.submit.title}
           </h1>
           <p className="muted-copy mt-3">
