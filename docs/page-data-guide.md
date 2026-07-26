@@ -401,6 +401,26 @@ Real Mode 的 Bug Type、Rule 与 Scope Hash 由已读取的 Bounty 和 Program 
 
 不要填写：漏洞复现步骤、漏洞路径、触发参数、PoC、Private Witness、加密材料明文、任何钱包密钥。
 
+#### 本地加密演练：可导入文件与文本
+
+下列文件专门用于截图中的“Encrypted Disclosure · Device Only”区域：
+
+| 页面控件 | 使用文件 / 文本 | 用途 |
+| --- | --- | --- |
+| 导入 Owner Public Key | [`triage-owner-public-key.fixture.json`](./fixtures/triage-owner-public-key.fixture.json) | 有效 ECDH P-256 公钥；可直接用“选择 JSON 文件”导入 |
+| 私密披露报告 | [`triage-private-disclosure-report.fixture.txt`](./fixtures/triage-private-disclosure-report.fixture.txt) 的全部文本 | 复制后粘贴到文本框；内容为虚构测试报告 |
+
+操作步骤：
+
+1. 在 Triage 页面将当前 Claim 推进至 `RewardLocked` 后，再进入 `DetailsRequested`。
+2. 以 Whitehat 视角打开该 Claim 的 Encrypted Disclosure 区域。
+3. 点击“选择 JSON 文件”，导入 `triage-owner-public-key.fixture.json`。
+4. 打开 `triage-private-disclosure-report.fixture.txt`，复制全部内容并粘贴到“私密披露报告”。
+5. 点击“本地加密”。页面应生成 Ciphertext Package，并允许导出 JSON。
+6. 需要验证端到端解密时，不使用本仓库的示例公钥；由 Project Owner 在页面点击“生成披露密钥”，自行导出 Public Key 和 Disclosure Decryption Key，再将该 Public Key 交给 Whitehat。
+
+示例公钥没有附带解密私钥，因此它只用于验证导入与加密流程。这样不会把任何解密材料或钱包密钥写入仓库。
+
 ### 12.9 重复 Nullifier 验收 `/security-tests/duplicate-nullifier`
 
 此页没有可自由填写的漏洞参数。它应从第一个已确认 Claim 读取已有 Nullifier，并构造预期为 `Rejected` 的交易 Preview。
