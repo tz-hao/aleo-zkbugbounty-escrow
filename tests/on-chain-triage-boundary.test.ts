@@ -20,7 +20,7 @@ test("local upgrade ABI still reports triage-specific entries as unavailable", (
   assert.deepEqual(inspection.missingMappings, ["triage_states"]);
 });
 
-test("Role Switcher cannot authorize or persist a Real Mode triage transition", () => {
+test("Demo Preview cannot authorize or persist a Real Mode triage transition", () => {
   assert.equal(ON_CHAIN_TRIAGE_CAPABILITY.walletActionsEnabled, false);
   assert.equal(ON_CHAIN_TRIAGE_CAPABILITY.uiRoleSwitcherAuthority, false);
   assert.equal(ON_CHAIN_TRIAGE_CAPABILITY.roleAuthority, "self.signer");
@@ -36,6 +36,6 @@ test("on-chain triage API refuses writes without parsing a request", () => {
   assert.match(route, /status: 409/);
   assert.equal(route.includes("request.json"), false);
   assert.equal(route.includes("requestTransaction"), false);
-  assert.match(status, /Role Switcher/);
+  assert.match(status, /Demo Preview/);
   assert.match(status, /self\.signer/);
 });

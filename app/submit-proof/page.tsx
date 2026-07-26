@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   CheckCircle2,
   Database,
+  FlaskConical,
   LoaderCircle,
+  LockKeyhole,
   RefreshCw,
   Send,
   ShieldAlert,
@@ -14,12 +16,15 @@ import { useRouter } from "next/navigation";
 import { ProofPanel } from "@/components/proof-panel";
 import { useAppState } from "@/components/app-state-provider";
 import { useAleoWallet } from "@/components/aleo-wallet-provider";
+import { DemoRolePreview } from "@/components/demo-role-preview";
+import { ExecutionStatusBadge } from "@/components/execution-status-badge";
 import { canSubmitProof } from "@/lib/permissions";
 import { createMockVaultEngine } from "@/lib/proof-engines/mock-vault-engine";
 import type { OnChainBountyState, ProofResult } from "@/lib/models";
 import type { PrivateProofInput } from "@/lib/proof-engines/types";
 import { translateUiError, zh } from "@/lib/i18n/zh";
 import { isAleoFieldLiteral } from "@/lib/aleo-bounty-registry";
+import { CANONICAL_ALEO_PROGRAM_ID } from "@/lib/aleo-program";
 import {
   DEFAULT_SUBMIT_CLAIM_FEE_MICROCREDITS,
   deriveReporterSecretField,
@@ -37,6 +42,8 @@ type AleoNetworkResponse = {
     latestHeight?: number;
   };
 };
+
+type SubmissionMode = "real" | "demo";
 
 export default function SubmitProofPage() {
   const router = useRouter();
@@ -73,12 +80,17 @@ export default function SubmitProofPage() {
   const [walletClaimMessage, setWalletClaimMessage] = useState("");
   const [isLoadingBounty, setIsLoadingBounty] = useState(false);
   const [isRequestingWallet, setIsRequestingWallet] = useState(false);
-  const allowed = canSubmitProof(state.currentActor);
+  const [submissionMode, setSubmissionMode] = useState<SubmissionMode>("real");
+  const demoAllowed = canSubmitProof(state.currentActor);
 
   const selectedBounty = useMemo(
     () => state.bounties.find((bounty) => bounty.id === bountyId),
     [bountyId, state.bounties],
   );
+  const activeRuleId =
+    submissionMode === "real" ? onChainBounty?.ruleId : selectedBounty?.ruleId;
+  const privateInputsDisabled =
+    submissionMode === "real" ? !onChainBounty : !demoAllowed;
 
   useEffect(() => {
     const publicBountyId = new URLSearchParams(window.location.search).get("bountyId");
@@ -91,7 +103,10 @@ export default function SubmitProofPage() {
   async function handleGenerate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    if (!allowed) {
+    if (submissionMode !== "demo") {
+      return;
+    }
+    if (!demoAllowed) {
       setError(zh.submit.forbidden);
       return;
     }
@@ -218,10 +233,6 @@ export default function SubmitProofPage() {
   async function requestWalletSignedClaim() {
     setWalletClaimError("");
     setWalletClaimMessage("");
-    if (!allowed) {
-      setWalletClaimError("只有 Whitehat 可以请求 submit_claim。");
-      return;
-    }
     if (!onChainBounty || latestBlockHeight === null) {
       setWalletClaimError("请先验证真实 Aleo Testnet Bounty mapping。");
       return;
@@ -302,27 +313,85 @@ export default function SubmitProofPage() {
             {zh.submit.description}
           </p>
         </div>
+        <div className="flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="page-kicker">提交环境</p>
+            <p className="mt-1 text-sm text-slate-400">链上 Wallet flow 与本地 Mock flow 严格隔离。</p>
+          </div>
+          <div
+            aria-label="Claim 提交模式"
+            className="grid grid-cols-2 rounded-lg border border-white/10 bg-black/20 p-1"
+          >
+            <button
+              aria-pressed={submissionMode === "real"}
+              className={`focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold ${
+                submissionMode === "real"
+                  ? "bg-cyan-300/14 text-cyan-100"
+                  : "text-slate-400 hover:bg-white/[0.05] hover:text-white"
+              }`}
+              onClick={() => {
+                setSubmissionMode("real");
+                setProof(null);
+                setError("");
+              }}
+              type="button"
+            >
+              <Database size={15} aria-hidden="true" />
+              Aleo Testnet
+            </button>
+            <button
+              aria-pressed={submissionMode === "demo"}
+              className={`focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold ${
+                submissionMode === "demo"
+                  ? "bg-violet-300/14 text-violet-100"
+                  : "text-slate-400 hover:bg-white/[0.05] hover:text-white"
+              }`}
+              onClick={() => {
+                setSubmissionMode("demo");
+                setProof(null);
+                setError("");
+              }}
+              type="button"
+            >
+              <FlaskConical size={15} aria-hidden="true" />
+              Local Demo
+            </button>
+          </div>
+        </div>
+        {submissionMode === "demo" ? <DemoRolePreview /> : null}
         <form className="surface-card grid gap-4 rounded-lg p-5 sm:p-6" onSubmit={handleGenerate}>
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
             <div>
-              <p className="page-kicker">Demo Mode</p>
-              <p className="mt-1 text-sm text-slate-400">本地 Mock 验证，不代表 Aleo Testnet Proof。</p>
+              <p className="page-kicker">
+                {submissionMode === "real" ? "链上 Claim" : "本地验证"}
+              </p>
+              <p className="mt-1 text-sm text-slate-400">
+                {submissionMode === "real"
+                  ? "从 Testnet Mapping 读取 Bounty，并由当前 Wallet 签名。"
+                  : "Mock proof 仅用于本地流程演示，不代表链上确认。"}
+              </p>
             </div>
-            <span className="rounded-md border border-violet-300/25 bg-violet-300/10 px-3 py-2 text-xs text-violet-100">
-              Mock only
-            </span>
+            {submissionMode === "real" ? (
+              <span className="rounded-md border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-xs font-semibold text-cyan-100">
+                Wallet signature required
+              </span>
+            ) : (
+              <ExecutionStatusBadge kind="local" />
+            )}
           </div>
-          {!allowed ? (
-            <div className="rounded-lg border border-red-400/25 bg-red-500/10 p-3 text-sm text-red-100">
-              {zh.submit.forbidden}
+          {submissionMode === "demo" && !demoAllowed ? (
+            <div className="rounded-lg border border-amber-300/20 bg-amber-300/[0.07] p-3 text-sm text-amber-100">
+              当前 Demo Preview 视角不能提交本地 Proof。请切换为 Whitehat；该设置不改变 Wallet 或链上权限。
             </div>
           ) : null}
-          <div className="grid gap-4 md:grid-cols-2">
+          {submissionMode === "demo" ? (
+            <>
+              <div className="grid gap-4 md:grid-cols-2">
             <label className="grid gap-2 text-sm text-slate-300">
               {zh.submit.selectBounty}
               <select
                 className="focus-ring input-surface rounded-lg px-3 py-3"
-                disabled={!allowed}
+                    disabled={!demoAllowed}
                 onChange={(event) => {
                   setBountyId(event.target.value);
                   setProof(null);
@@ -346,152 +415,190 @@ export default function SubmitProofPage() {
                 <option className="bg-slate-950">Mock Invariant Engine</option>
               </select>
             </label>
-          </div>
-          <div className="rounded-lg border border-violet-300/20 bg-violet-300/[0.07] p-3 text-sm text-violet-100">
-            <span className="font-semibold">{zh.submit.capability}：</span>{" "}
-            {zh.submit.capabilities.mock} Real Mode 不会调用服务端 Prover，也不会回退为 Mock Verified。
-          </div>
-          <div className="rounded-lg border border-emerald-300/20 bg-emerald-300/8 p-3 text-sm text-emerald-100">
-            {zh.submit.rule}：<span className="font-mono">{selectedBounty?.ruleText ?? zh.submit.noBounty}</span>
-            {selectedBounty ? (
-              <span className="mt-2 block text-emerald-50">
-                {selectedBounty.ruleName} - {selectedBounty.affectedModule}
-              </span>
-            ) : null}
-          </div>
+              </div>
+              <div className="border-l-2 border-violet-300/35 bg-violet-300/[0.05] px-4 py-3 text-sm text-violet-100">
+                <span className="font-semibold">{zh.submit.capability}：</span>{" "}
+                {zh.submit.capabilities.mock} Real Mode 不调用服务端 Prover，也不会回退为 Mock Verified。
+              </div>
+              <div className="border-y border-white/10 py-3 text-sm text-slate-300">
+                {zh.submit.rule}：{" "}
+                <span className="font-mono text-emerald-100">
+                  {selectedBounty?.ruleText ?? zh.submit.noBounty}
+                </span>
+                {selectedBounty ? (
+                  <span className="mt-2 block text-slate-400">
+                    {selectedBounty.ruleName} · {selectedBounty.affectedModule}
+                  </span>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="grid gap-3 border-y border-white/10 py-4 md:grid-cols-[1fr_auto]">
+                <label className="grid gap-2 text-sm text-slate-300">
+                  On-chain Bounty ID
+                  <input
+                    autoComplete="off"
+                    className="focus-ring input-surface rounded-lg px-3 py-3 font-mono"
+                    onChange={(event) => {
+                      setOnChainBountyId(event.target.value);
+                      setOnChainBounty(null);
+                      setLatestBlockHeight(null);
+                      setWalletClaimMessage("");
+                    }}
+                    placeholder="123field"
+                    spellCheck={false}
+                    value={onChainBountyId}
+                  />
+                </label>
+                <button
+                  className="focus-ring secondary-action self-end"
+                  disabled={isLoadingBounty}
+                  onClick={() => void loadOnChainBounty()}
+                  type="button"
+                >
+                  {isLoadingBounty ? (
+                    <LoaderCircle className="animate-spin" size={16} aria-hidden="true" />
+                  ) : (
+                    <Database size={16} aria-hidden="true" />
+                  )}
+                  {isLoadingBounty ? "查询 Mapping" : "验证链上 Bounty"}
+                </button>
+              </div>
+              <div className="border-l-2 border-cyan-300/35 bg-cyan-300/[0.04] px-4 py-3">
+                <p className="text-sm font-semibold text-cyan-50">
+                  {wallet.address && wallet.connectionState === "Connected"
+                    ? "当前钱包将作为 Whitehat / Reporter 提交 Claim"
+                    : "连接钱包后，该地址将作为 Whitehat / Reporter 提交 Claim"}
+                </p>
+                <p className="mt-1 break-all text-xs leading-5 text-slate-400">
+                  {wallet.address && wallet.connectionState === "Connected"
+                    ? wallet.address
+                    : "Real Mode 不读取 Demo Preview 身份；Program 使用 self.signer 确认提交者。"}
+                </p>
+              </div>
+              {onChainBounty && latestBlockHeight !== null ? (
+                <dl className="grid gap-x-5 sm:grid-cols-2 lg:grid-cols-3">
+                  <WalletFact label="Status" value={onChainBounty.status} />
+                  <WalletFact label="Rule" value={onChainBounty.ruleId} />
+                  <WalletFact label="Scope Hash" value={onChainBounty.scopeHash} />
+                  <WalletFact label="Owner" value={onChainBounty.owner} />
+                  <WalletFact label="Deadline" value={String(onChainBounty.disclosureDeadline)} />
+                  <WalletFact label="Current Height" value={String(latestBlockHeight)} />
+                </dl>
+              ) : (
+                <p className="text-sm leading-6 text-slate-500">
+                  先验证真实 Testnet Mapping，页面才会加载该 Rule 对应的私密输入。
+                </p>
+              )}
+              {walletClaimMessage ? (
+                <p className="flex items-start gap-2 text-sm text-cyan-100" role="status">
+                  <CheckCircle2 className="mt-0.5 shrink-0 text-cyan-200" size={16} aria-hidden="true" />
+                  {walletClaimMessage}
+                </p>
+              ) : null}
+              {walletClaimError ? (
+                <p className="text-sm text-red-200" role="alert">
+                  {walletClaimError}
+                </p>
+              ) : null}
+            </>
+          )}
           <div className="rounded-lg border border-cyan-300/20 bg-cyan-300/8 p-3 text-sm text-cyan-100">
             {zh.privacy.privateWitnessTemporary}
           </div>
-          <label className="grid gap-2 text-sm text-slate-300">
-            {zh.submit.bugType}
-            <input
-              className="focus-ring input-surface rounded-lg px-3 py-3"
-              disabled={!allowed}
-              onChange={(event) => setBugType(event.target.value)}
-              value={bugType}
-            />
-          </label>
+          {submissionMode === "demo" ? (
+            <label className="grid gap-2 text-sm text-slate-300">
+              {zh.submit.bugType}
+              <input
+                className="focus-ring input-surface rounded-lg px-3 py-3"
+                disabled={!demoAllowed}
+                onChange={(event) => setBugType(event.target.value)}
+                value={bugType}
+              />
+            </label>
+          ) : null}
           <div className="grid gap-4 md:grid-cols-2">
             <p className="text-sm font-semibold text-white md:col-span-2">Private Witness 输入</p>
-            {selectedBounty?.ruleId === "vault-accounting-safety" ? (
+            {activeRuleId === "vault-accounting-safety" ? (
               <>
-                <NumberField disabled={!allowed} label="vaultBalance" onChange={setVaultBalance} value={vaultBalance} />
-                <NumberField disabled={!allowed} label="totalClaims" onChange={setTotalClaims} value={totalClaims} />
-                <NumberField disabled={!allowed} label="hiddenDeltaBalance" onChange={setHiddenDeltaBalance} value={hiddenDeltaBalance} />
-                <NumberField disabled={!allowed} label="hiddenDeltaClaims" onChange={setHiddenDeltaClaims} value={hiddenDeltaClaims} />
+                <NumberField disabled={privateInputsDisabled} label="vaultBalance" onChange={setVaultBalance} value={vaultBalance} />
+                <NumberField disabled={privateInputsDisabled} label="totalClaims" onChange={setTotalClaims} value={totalClaims} />
+                <NumberField disabled={privateInputsDisabled} label="hiddenDeltaBalance" onChange={setHiddenDeltaBalance} value={hiddenDeltaBalance} />
+                <NumberField disabled={privateInputsDisabled} label="hiddenDeltaClaims" onChange={setHiddenDeltaClaims} value={hiddenDeltaClaims} />
               </>
             ) : null}
-            {selectedBounty?.ruleId === "claims-vs-deposits" ? (
+            {activeRuleId === "claims-vs-deposits" ? (
               <>
-                <NumberField disabled={!allowed} label="totalDeposits" onChange={setTotalDeposits} value={totalDeposits} />
-                <NumberField disabled={!allowed} label="totalClaims" onChange={setTotalClaims} value={totalClaims} />
-                <NumberField disabled={!allowed} label="hiddenDeltaClaims" onChange={setHiddenDeltaClaims} value={hiddenDeltaClaims} />
+                <NumberField disabled={privateInputsDisabled} label="totalDeposits" onChange={setTotalDeposits} value={totalDeposits} />
+                <NumberField disabled={privateInputsDisabled} label="totalClaims" onChange={setTotalClaims} value={totalClaims} />
+                <NumberField disabled={privateInputsDisabled} label="hiddenDeltaClaims" onChange={setHiddenDeltaClaims} value={hiddenDeltaClaims} />
               </>
             ) : null}
-            {selectedBounty?.ruleId === "reward-reserve-safety" ? (
+            {activeRuleId === "reward-reserve-safety" ? (
               <>
-                <NumberField disabled={!allowed} label="vaultBalance" onChange={setVaultBalance} value={vaultBalance} />
-                <NumberField disabled={!allowed} label="reservedRewards" onChange={setReservedRewards} value={reservedRewards} />
-                <NumberField disabled={!allowed} label="hiddenDeltaBalance" onChange={setHiddenDeltaBalance} value={hiddenDeltaBalance} />
-                <NumberField disabled={!allowed} label="hiddenDeltaReservedRewards" onChange={setHiddenDeltaReservedRewards} value={hiddenDeltaReservedRewards} />
+                <NumberField disabled={privateInputsDisabled} label="vaultBalance" onChange={setVaultBalance} value={vaultBalance} />
+                <NumberField disabled={privateInputsDisabled} label="reservedRewards" onChange={setReservedRewards} value={reservedRewards} />
+                <NumberField disabled={privateInputsDisabled} label="hiddenDeltaBalance" onChange={setHiddenDeltaBalance} value={hiddenDeltaBalance} />
+                <NumberField disabled={privateInputsDisabled} label="hiddenDeltaReservedRewards" onChange={setHiddenDeltaReservedRewards} value={hiddenDeltaReservedRewards} />
               </>
             ) : null}
-            {selectedBounty?.ruleId === "withdraw-limit-safety" ? (
+            {activeRuleId === "withdraw-limit-safety" ? (
               <>
-                <NumberField disabled={!allowed} label="withdrawLimit" onChange={setWithdrawLimit} value={withdrawLimit} />
-                <NumberField disabled={!allowed} label="userBalance" onChange={setUserBalance} value={userBalance} />
-                <NumberField disabled={!allowed} label="requestedWithdrawAmount" onChange={setRequestedWithdrawAmount} value={requestedWithdrawAmount} />
-                <NumberField disabled={!allowed} label="hiddenDeltaWithdrawAmount" onChange={setHiddenDeltaWithdrawAmount} value={hiddenDeltaWithdrawAmount} />
-                <NumberField disabled={!allowed} label="hiddenDeltaUserBalance" onChange={setHiddenDeltaUserBalance} value={hiddenDeltaUserBalance} />
+                <NumberField disabled={privateInputsDisabled} label="withdrawLimit" onChange={setWithdrawLimit} value={withdrawLimit} />
+                <NumberField disabled={privateInputsDisabled} label="userBalance" onChange={setUserBalance} value={userBalance} />
+                <NumberField disabled={privateInputsDisabled} label="requestedWithdrawAmount" onChange={setRequestedWithdrawAmount} value={requestedWithdrawAmount} />
+                <NumberField disabled={privateInputsDisabled} label="hiddenDeltaWithdrawAmount" onChange={setHiddenDeltaWithdrawAmount} value={hiddenDeltaWithdrawAmount} />
+                <NumberField disabled={privateInputsDisabled} label="hiddenDeltaUserBalance" onChange={setHiddenDeltaUserBalance} value={hiddenDeltaUserBalance} />
               </>
             ) : null}
           </div>
-          <label className="grid gap-2 text-sm text-slate-300">
-            privateCallSequence
-            <textarea
-              className="focus-ring input-surface min-h-20 rounded-lg px-3 py-3"
-              disabled={!allowed}
-              onChange={(event) => setPrivateCallSequence(event.target.value)}
-              value={privateCallSequence}
-            />
-          </label>
-          <label className="grid gap-2 text-sm text-slate-300">
-            privateStateValues
-            <textarea
-              className="focus-ring input-surface min-h-20 rounded-lg px-3 py-3"
-              disabled={!allowed}
-              onChange={(event) => setPrivateStateValues(event.target.value)}
-              value={privateStateValues}
-            />
-          </label>
+          {submissionMode === "demo" ? (
+            <>
+              <label className="grid gap-2 text-sm text-slate-300">
+                privateCallSequence
+                <textarea
+                  className="focus-ring input-surface min-h-20 rounded-lg px-3 py-3"
+                  disabled={!demoAllowed}
+                  onChange={(event) => setPrivateCallSequence(event.target.value)}
+                  value={privateCallSequence}
+                />
+              </label>
+              <label className="grid gap-2 text-sm text-slate-300">
+                privateStateValues
+                <textarea
+                  className="focus-ring input-surface min-h-20 rounded-lg px-3 py-3"
+                  disabled={!demoAllowed}
+                  onChange={(event) => setPrivateStateValues(event.target.value)}
+                  value={privateStateValues}
+                />
+              </label>
+            </>
+          ) : null}
           <label className="grid gap-2 text-sm text-slate-300">
             reporterSecret
             <input
               className="focus-ring input-surface rounded-lg px-3 py-3"
-              disabled={!allowed}
+              disabled={privateInputsDisabled}
               onChange={(event) => setReporterSecret(event.target.value)}
               type="password"
               value={reporterSecret}
             />
           </label>
-          <section className="rounded-lg border border-cyan-300/20 bg-cyan-300/[0.055] p-4 sm:p-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="page-kicker">Aleo Testnet · Real Mode</p>
-                <h2 className="mt-2 text-lg font-semibold text-white">Device-side Proof · Wallet-signed submit_claim</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Private Witness 直接交给 Leo Wallet 执行 canonical Program，不发送到 Next.js 或 Vercel。
-                </p>
+          {submissionMode === "real" ? (
+            <section className="border-t border-cyan-300/20 pt-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-white">Wallet-signed submit_claim</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-400">
+                    Device-side execution。Private Witness 不发送到 Next.js 或 Vercel。
+                  </p>
+                </div>
+                <span className="inline-flex w-fit items-center gap-2 rounded-md border border-cyan-300/20 bg-cyan-300/[0.08] px-3 py-2 text-xs text-cyan-100">
+                  <Database size={14} aria-hidden="true" />
+                  Testnet mapping
+                </span>
               </div>
-              <span className="inline-flex w-fit items-center gap-2 rounded-md border border-cyan-300/20 bg-cyan-300/[0.08] px-3 py-2 text-xs text-cyan-100">
-                <Database size={14} aria-hidden="true" />
-                bounties mapping
-              </span>
-            </div>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
-              <label className="grid gap-2 text-sm text-slate-300">
-                On-chain Bounty ID
-                <input
-                  className="focus-ring input-surface rounded-lg px-3 py-3 font-mono"
-                  value={onChainBountyId}
-                  onChange={(event) => {
-                    setOnChainBountyId(event.target.value);
-                    setOnChainBounty(null);
-                    setLatestBlockHeight(null);
-                    setWalletClaimMessage("");
-                  }}
-                  placeholder="123field"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-              </label>
-              <button
-                className="focus-ring secondary-action self-end"
-                type="button"
-                disabled={isLoadingBounty}
-                onClick={() => void loadOnChainBounty()}
-              >
-                {isLoadingBounty ? (
-                  <LoaderCircle className="animate-spin" size={16} aria-hidden="true" />
-                ) : (
-                  <Database size={16} aria-hidden="true" />
-                )}
-                {isLoadingBounty ? "查询 Mapping" : "验证链上 Bounty"}
-              </button>
-            </div>
-
-            {onChainBounty && latestBlockHeight !== null ? (
-              <dl className="mt-4 grid gap-x-5 sm:grid-cols-2 lg:grid-cols-3">
-                <WalletFact label="Status" value={onChainBounty.status} />
-                <WalletFact label="Rule" value={onChainBounty.ruleId} />
-                <WalletFact label="Scope Hash" value={onChainBounty.scopeHash} />
-                <WalletFact label="Owner" value={onChainBounty.owner} />
-                <WalletFact label="Deadline" value={String(onChainBounty.disclosureDeadline)} />
-                <WalletFact label="Current Height" value={String(latestBlockHeight)} />
-              </dl>
-            ) : null}
-
             <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,220px)_1fr] sm:items-end">
               <label className="grid gap-2 text-sm text-slate-300">
                 Public Fee（microcredits）
@@ -508,7 +615,6 @@ export default function SubmitProofPage() {
                   className="focus-ring primary-action disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-slate-600"
                   type="button"
                   disabled={
-                    !allowed ||
                     !onChainBounty ||
                     latestBlockHeight === null ||
                     wallet.connectionState !== "Connected" ||
@@ -535,16 +641,6 @@ export default function SubmitProofPage() {
             <p className="mt-4 text-xs leading-5 text-slate-500">
               Private Witness 只在当前页面与 Wallet 扩展调用栈中存在；不会进入 Store、URL、日志、Public Metadata 或任何 Next.js Proof API。Wallet 成功、拒绝或异常后都会清空页面私密输入。
             </p>
-            {walletClaimMessage ? (
-              <p className="mt-3 flex items-start gap-2 text-sm text-emerald-100" role="status">
-                <CheckCircle2 className="mt-0.5 shrink-0" size={16} aria-hidden="true" />
-                {walletClaimMessage}
-              </p>
-            ) : null}
-            {walletClaimError ? (
-              <p className="mt-3 text-sm text-red-200" role="alert">{walletClaimError}</p>
-            ) : null}
-
             {wallet.claimSubmission ? (
               <div className="mt-4 border-t border-white/10 pt-4">
                 <p className="text-xs text-slate-500">
@@ -568,28 +664,67 @@ export default function SubmitProofPage() {
                 </button>
               </div>
             ) : null}
-          </section>
-          <div className="flex flex-wrap gap-3">
-            <button
-              className="focus-ring secondary-action disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-slate-600"
-              disabled={!allowed || isGenerating}
-            >
-              <ShieldAlert size={17} aria-hidden="true" />
-              {zh.submit.generate}
-            </button>
-            <button
-              className="focus-ring primary-action disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-slate-600"
-              disabled={!proof?.verified || !allowed || isGenerating}
-              onClick={publishClaim}
-              type="button"
-            >
-              <Send size={17} aria-hidden="true" />
-              {zh.submit.publish}
-            </button>
-          </div>
+            </section>
+          ) : (
+            <div className="flex flex-wrap gap-3">
+              <button
+                className="focus-ring secondary-action disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-slate-600"
+                disabled={!demoAllowed || isGenerating}
+              >
+                <ShieldAlert size={17} aria-hidden="true" />
+                {zh.submit.generate}
+              </button>
+              <button
+                className="focus-ring primary-action disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-slate-600"
+                disabled={!proof?.verified || !demoAllowed || isGenerating}
+                onClick={publishClaim}
+                type="button"
+              >
+                <Send size={17} aria-hidden="true" />
+                {zh.submit.publish}
+              </button>
+            </div>
+          )}
         </form>
       </section>
-      <ProofPanel error={error} isLoading={isGenerating} proof={proof} />
+      {submissionMode === "demo" ? (
+        <ProofPanel error={error} isLoading={isGenerating} proof={proof} />
+      ) : (
+        <section className="terminal-panel h-fit rounded-lg p-5 lg:sticky lg:top-24">
+          <div className="flex items-start gap-3 border-b border-cyan-300/15 pb-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-cyan-300/20 bg-cyan-300/[0.08] text-cyan-100">
+              <LockKeyhole size={19} aria-hidden="true" />
+            </span>
+            <div>
+              <p className="page-kicker">链上提交边界</p>
+              <h2 className="mt-1 text-lg font-semibold text-white">Wallet 执行，公开 Registry 验收</h2>
+            </div>
+          </div>
+          <dl className="mt-4">
+            <WalletFact label="Program ID" value={CANONICAL_ALEO_PROGRAM_ID} />
+            <WalletFact label="Function" value="submit_claim" />
+            <WalletFact label="Network" value="Aleo Testnet / testnetbeta" />
+            <WalletFact
+              label="Wallet"
+              value={
+                wallet.address && wallet.connectionState === "Connected"
+                  ? wallet.address
+                  : "Not connected"
+              }
+            />
+            <WalletFact
+              label="Bounty Mapping"
+              value={onChainBounty ? "Mapping verified" : "Awaiting public mapping query"}
+            />
+          </dl>
+          <div className="mt-4 border-l-2 border-emerald-300/35 pl-3">
+            <p className="text-sm font-semibold text-emerald-100">Real Mode 无 Mock fallback</p>
+            <p className="mt-1 text-xs leading-5 text-slate-400">
+              服务端 Proof API 保持禁用。Wallet 拒绝、网络不可用或 Mapping 查询失败时，不会显示假成功。
+            </p>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

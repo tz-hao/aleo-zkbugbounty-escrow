@@ -104,18 +104,27 @@ export function AleoDeploymentStatus() {
         : "unavailable";
 
   return (
-    <section className="surface-card-strong rounded-lg p-5 sm:p-6" aria-live="polite">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <section className="surface-card rounded-lg p-5" aria-live="polite">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-emerald-300/25 bg-emerald-300/10 text-emerald-100">
+          <div
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
+              confirmed
+                ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
+                : "border-white/10 bg-white/[0.04] text-slate-400"
+            }`}
+          >
             <ShieldCheck size={19} aria-hidden="true" />
           </div>
           <div>
-            <p className="page-kicker text-[0.68rem]">Aleo Testnet Deployment</p>
-            <h2 className="mt-1 text-lg font-semibold text-white">zkBugBounty Protocol 已部署</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-400">
-              Registry 查询连接真实 Testnet Program；签名与广播仍由用户钱包独立完成。
-            </p>
+            <p className="page-kicker">部署核验</p>
+            <h2 className="mt-1 text-lg font-semibold text-white">
+              {confirmed
+                ? "Program 与部署交易已链上核验"
+                : partial
+                  ? "Program 已找到，部分接口不可用"
+                  : "等待公开节点返回部署证据"}
+            </h2>
           </div>
         </div>
         <span
@@ -132,13 +141,21 @@ export function AleoDeploymentStatus() {
         </span>
       </div>
 
-      <div className="mt-5 grid gap-4 border-t border-white/10 pt-4 md:grid-cols-[1fr_1.2fr_auto] md:items-end">
+      <div className="mt-4 grid gap-4 border-t border-white/10 pt-4 sm:grid-cols-[0.7fr_1.3fr]">
         <DeploymentField label="Network" value={networkLabel} />
         <DeploymentField label="Program ID" value={ALEO_TESTNET_DEPLOYMENT.programId} mono />
-        <DeploymentField label="Verification" value={`${liveSourceLabel} / keys ${keyCountLabel}`} mono />
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <div className="flex flex-wrap gap-2">
+      <details className="group mt-4 border-t border-white/10 pt-3">
+        <summary className="focus-ring min-h-11 cursor-pointer list-none py-2 text-xs font-semibold text-slate-400 hover:text-white [&::-webkit-details-marker]:hidden">
+          查看部署证据与 Explorer 链接
+        </summary>
+        <div className="grid gap-4 pt-2">
+          <DeploymentField
+            label="Verification"
+            value={`${liveSourceLabel} / keys ${keyCountLabel}`}
+            mono
+          />
+          <div className="flex flex-wrap gap-2">
           <a
             className="focus-ring secondary-action"
             href={ALEO_TESTNET_DEPLOYMENT.programExplorerUrl}
@@ -158,7 +175,8 @@ export function AleoDeploymentStatus() {
             <ExternalLink size={15} aria-hidden="true" />
           </a>
         </div>
-      </div>
+        </div>
+      </details>
     </section>
   );
 }
@@ -174,7 +192,7 @@ function DeploymentField({
 }) {
   return (
     <div className="min-w-0">
-      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className="text-xs text-slate-500">{label}</p>
       <p className={`mt-1 break-all text-sm text-slate-100 ${mono ? "font-mono" : ""}`}>{value}</p>
     </div>
   );

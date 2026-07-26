@@ -178,7 +178,7 @@ test("aleo program files are present with the expected public transition boundar
   };
   assert.equal(packageMetadata.license, "MIT");
 
-  const source = readFileSync("leo/bug_proof/src/main.leo", "utf8");
+  const source = readFileSync("leo/bug_proof/src/main.leo", "utf8").replace(/\r\n/g, "\n");
   assert.equal(source.includes("program zkbugbounty_7f3c92.aleo"), true);
   assert.equal(source.includes("prove_vault_invariant_break"), true);
   assert.equal(source.includes("public bounty_id"), true);

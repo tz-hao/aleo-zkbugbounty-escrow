@@ -35,25 +35,25 @@ export function ClaimCard({
         </div>
       </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+        <div className="border-l border-white/10 py-1 pl-3">
           <p className="text-xs tracking-normal text-slate-500">声明收据（Claim Receipt）</p>
           <p className="mt-1 flex items-center gap-2 font-mono text-xs text-slate-200">
             <ReceiptText size={14} aria-hidden="true" />
             {claim.claimReceiptId}
           </p>
         </div>
-        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+        <div className="border-l border-white/10 py-1 pl-3">
           <p className="text-xs tracking-normal text-slate-500">奖励档位（Reward Tier）</p>
           <p className="mt-1 text-sm text-slate-200">
             {bounty ? `${bounty.rewards[claim.severity.toLowerCase() as keyof Bounty["rewards"]]} ALEO` : "Public"}
           </p>
         </div>
-        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-          <p className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-500">
+        <div className="border-l border-white/10 py-1 pl-3">
+          <p className="flex items-center gap-2 text-xs text-slate-500">
             <EyeOff size={14} aria-hidden="true" />
             Exploit Details
           </p>
-          <p className="mt-1 flex items-center gap-2 text-sm text-emerald-100">
+          <p className="mt-1 flex items-center gap-2 text-sm text-cyan-100">
             <Fingerprint size={14} aria-hidden="true" />
             {zh.privacy.exploitHidden}
           </p>
@@ -61,7 +61,7 @@ export function ClaimCard({
       </div>
       {showCommitment ? (
         <div className="mt-3 rounded-lg border border-cyan-300/15 bg-cyan-300/8 p-3">
-          <p className="text-xs uppercase tracking-[0.18em] text-cyan-100/70">Witness Commitment</p>
+          <p className="text-xs text-cyan-100/70">Witness Commitment</p>
           <p className="mt-1 break-all font-mono text-xs text-cyan-100">{claim.witnessCommitment}</p>
         </div>
       ) : null}

@@ -54,8 +54,8 @@ export function PublicBountyView({ bountyId }: { bountyId: string }) {
     <div className="grid gap-6">
       <section className="surface-card-strong rounded-lg p-6 sm:p-7">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md border border-emerald-300/25 bg-emerald-300/10 px-2 py-1 text-xs font-semibold text-emerald-100">Real Mode</span>
-          <span className="rounded-md border border-cyan-300/20 bg-cyan-300/[0.07] px-2 py-1 text-xs text-cyan-100">Data Source: Aleo Testnet</span>
+          <span className="rounded-md border border-cyan-300/25 bg-cyan-300/10 px-2 py-1 text-xs font-semibold text-cyan-100">Aleo Testnet query</span>
+          <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-slate-300">Data Source: Aleo Testnet Public Mapping</span>
         </div>
         <h1 className="mt-4 text-3xl font-semibold text-white sm:text-4xl">公开 Bounty Registry</h1>
         <p className="mt-3 break-all font-mono text-sm text-cyan-100">{bountyId}</p>

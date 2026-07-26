@@ -296,8 +296,8 @@ test("escrow API remains disabled until the upgraded program is manually broadca
   assert.match(route, /status: 409/);
   assert.equal(route.includes("request.json"), false);
   assert.equal(route.includes("requestTransaction"), false);
-  assert.match(status, /Program Upgrade Required/);
-  assert.match(status, /Wallet Actions Disabled/);
+  assert.match(status, /Awaiting Program Upgrade/);
+  assert.match(status, /链上支付操作未启用/);
   assert.match(status, /Confirmed Transaction/);
   assert.match(status, /Mapping Verified/);
 });

@@ -62,7 +62,8 @@ test("wallet provider clears request state on extension disconnect and keeps pub
   assert.match(provider, /WalletAdapterNetwork\.TestnetBeta/);
   assert.match(provider, /feeMicrocredits/);
   assert.match(control, /Leo Wallet/);
-  assert.match(control, /Verified/);
-  assert.match(control, /Mobile Wallet 未验证/);
+  assert.match(control, /Wallet adapter detected/);
+  assert.match(control, /Expected network/);
+  assert.match(control, /<details/);
   assert.match(control, /min-w-0/);
 });

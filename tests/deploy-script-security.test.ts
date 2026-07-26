@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 const scriptPath = "scripts/deploy-aleo-testnet.sh";
-const script = readFileSync(scriptPath, "utf8");
+const script = readFileSync(scriptPath, "utf8").replace(/\r\n/g, "\n");
 const privateKeyLiteralPrefix = ["A", "PrivateKey"].join("");
 
 test("Aleo Testnet deployment script keeps key entry manual and process-scoped", () => {

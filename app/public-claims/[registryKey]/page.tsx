@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { ArrowLeft, Check, Copy, ReceiptText } from "lucide-react";
 import { useState } from "react";
 import { useAppState } from "@/components/app-state-provider";
+import { ExecutionStatusBadge } from "@/components/execution-status-badge";
 import { DisclosureStatusBadge, PayoutStatusBadge, ProofStatusBadge, SeverityBadge } from "@/components/status-badge";
 import { zh } from "@/lib/i18n/zh";
 import { getVerificationLabel, getVerificationStatement } from "@/lib/proof-verification";
@@ -37,7 +38,8 @@ export default function PublicReceiptPage() {
         </Link>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="page-kicker mb-3">{zh.receipt.kicker}</p>
+            <ExecutionStatusBadge kind="local" />
+            <p className="page-kicker mb-3 mt-3">{zh.receipt.kicker}</p>
             <h1 className="text-3xl font-semibold text-white">{bounty?.projectName ?? zh.receipt.titleFallback}</h1>
             <p className="muted-copy mt-2">{zh.receipt.description}</p>
           </div>
@@ -82,8 +84,8 @@ export default function PublicReceiptPage() {
           ["Verification Status", getVerificationStatement(entry.verification)],
         ].map(([label, value]) => (
           <div className="surface-card rounded-lg p-4" key={label}>
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{label}</p>
-            <p className="mt-1 font-semibold text-emerald-100">{value}</p>
+            <p className="text-xs text-slate-500">{label}</p>
+            <p className="mt-1 font-semibold text-cyan-100">{value}</p>
           </div>
         ))}
       </section>
@@ -105,9 +107,9 @@ function CopyField({ label, value }: { label: string; value: string }) {
   }
 
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+    <div className="min-w-0 border-b border-white/10 py-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{label}</p>
+        <p className="text-xs text-slate-500">{label}</p>
         <button aria-label={`${zh.receipt.copy} ${label}`} className="focus-ring flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-white/10 text-slate-300 hover:border-cyan-300/30 hover:text-cyan-100" onClick={copyValue} type="button">
           {copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
         </button>
