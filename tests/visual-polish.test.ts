@@ -2,24 +2,34 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-test("dashboard prioritizes the real registry and a concise protocol boundary", () => {
+test("dashboard is a single immersive protocol entry", () => {
   const source = readFileSync("components/dashboard.tsx", "utf8");
   const heroSource = readFileSync("components/hero-proof-visual.tsx", "utf8");
-  const combinedSource = `${source}\n${heroSource}`;
+  const uiCopySource = readFileSync("lib/i18n/zh.ts", "utf8");
+  const combinedSource = `${source}\n${heroSource}\n${uiCopySource}`;
 
   for (const phrase of [
-    "professional-site-hero",
-    "AleoRegistryOverview",
+    "home-immersive",
     "HeroProofVisual",
-    "链上事实，而不是本地计数",
-    "Private input",
-    "Public receipt",
-    "Aleo Program Mappings",
-    "协议执行路径",
+    "Private by default",
+    "证明漏洞存在",
+    "Exploit 无需公开",
+    "进入协议",
+    "/images/zk-proof-circuit-hero.png",
   ]) {
     assert.equal(combinedSource.includes(phrase), true, `${phrase} should be present on the dashboard`);
   }
   assert.equal(source.includes("useAppState"), false, "homepage metrics must not use local Demo state");
+  for (const removed of [
+    "AleoRegistryOverview",
+    "AleoDeploymentStatus",
+    "Multi-Invariant DemoVault",
+    "Architecture Comparison",
+    "stack-marquee",
+    "<details",
+  ]) {
+    assert.equal(source.includes(removed), false, `${removed} should not remain on the focused homepage`);
+  }
 });
 
 test("global styles expose reusable professional surface primitives", () => {

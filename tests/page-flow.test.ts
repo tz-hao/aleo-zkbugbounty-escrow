@@ -174,7 +174,7 @@ test("Whitehat sees dynamic witness form based on selected bounty rule", () => {
     "withdraw-limit-safety",
     "hiddenDeltaWithdrawAmount",
     "hiddenDeltaUserBalance",
-    "Private Witness 只用于当前 Proof 请求，不写入 Store、浏览器持久化或 Public Metadata。",
+    "Private Witness 仅在当前设备内存中临时存在，不持久化。",
   ]) {
     assert.equal(combinedSource.includes(phrase), true, `${phrase} should appear in submit proof dynamic form`);
   }

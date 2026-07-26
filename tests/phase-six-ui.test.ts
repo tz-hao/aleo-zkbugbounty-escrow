@@ -27,38 +27,36 @@ test("submit proof page includes private state inputs for each DemoVault invaria
   }
 });
 
-test("dashboard explains the protocol layer from private witness to public registry", () => {
+test("dashboard keeps the privacy promise and one primary protocol entry", () => {
   const source = readFileSync("components/dashboard.tsx", "utf8");
   const heroSource = readFileSync("components/hero-proof-visual.tsx", "utf8");
   const combinedSource = `${source}\n${heroSource}`;
 
   for (const phrase of [
-    "协议执行路径",
-    "Private input",
-    "Receipt 与 Commitment",
-    "Nullifier",
-    "Aleo Program Mappings",
-    "Confirmed 与 Mapping Verified 分开表达",
-    "不进入 Store、URL、日志或 Public Metadata",
+    "Private by default",
+    "证明漏洞存在",
+    "Exploit 无需公开",
+    "zh.brand.slogan",
+    "href=\"/submit-proof\"",
+    "Private Witness 留在设备端",
   ]) {
     assert.equal(combinedSource.includes(phrase), true, `${phrase} should be present on dashboard`);
   }
 });
 
-test("dashboard presents the Multi-Invariant DemoVault rules", () => {
-  const source = readFileSync("components/dashboard.tsx", "utf8");
-  const uiCopySource = readFileSync("lib/i18n/zh.ts", "utf8");
-  const combinedSource = `${source}\n${uiCopySource}`;
+test("Multi-Invariant DemoVault rules remain in the create and submit workflows", () => {
+  const createSource = readFileSync("components/bounty-form.tsx", "utf8");
+  const submitSource = readFileSync("app/submit-proof/page.tsx", "utf8");
+  const vaultSource = readFileSync("lib/demo-vault.ts", "utf8");
+  const combinedSource = `${createSource}\n${submitSource}\n${vaultSource}`;
 
   for (const phrase of [
-    "Multi-Invariant DemoVault",
-    "Vault Accounting Safety",
-    "Claims vs Deposits Safety",
-    "Reward Reserve Safety",
-    "Withdrawal Limit Safety",
-    "安全规则",
-    "AleoRegistryOverview",
+    "DEMO_VAULT_RULES",
+    "vault-accounting-safety",
+    "claims-vs-deposits",
+    "reward-reserve-safety",
+    "withdraw-limit-safety",
   ]) {
-    assert.equal(combinedSource.includes(phrase), true, `${phrase} should be present on dashboard`);
+    assert.equal(combinedSource.includes(phrase), true, `${phrase} should remain in workflow code`);
   }
 });

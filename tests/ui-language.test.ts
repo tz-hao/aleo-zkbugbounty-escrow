@@ -10,7 +10,7 @@ test("Chinese UI copy keeps required security terms in English", () => {
   assert.equal(zh.navigation.home, "首页");
   assert.match(zh.navigation.submitProof, /Private Proof/);
   assert.match(zh.home.title, /Exploit/);
-  assert.match(zh.submit.title, /Submit Private Proof/);
+  assert.match(zh.submit.title, /Private Proof/);
   assert.equal(glossary.witnessCommitment, "见证承诺（Witness Commitment）");
   assert.equal(glossary.nullifier, "防重复标识（Nullifier）");
 });

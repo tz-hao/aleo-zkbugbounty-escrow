@@ -6,7 +6,6 @@ import {
   Database,
   FlaskConical,
   LoaderCircle,
-  LockKeyhole,
   RefreshCw,
   Send,
   ShieldAlert,
@@ -24,7 +23,6 @@ import type { OnChainBountyState, ProofResult } from "@/lib/models";
 import type { PrivateProofInput } from "@/lib/proof-engines/types";
 import { translateUiError, zh } from "@/lib/i18n/zh";
 import { isAleoFieldLiteral } from "@/lib/aleo-bounty-registry";
-import { CANONICAL_ALEO_PROGRAM_ID } from "@/lib/aleo-program";
 import {
   DEFAULT_SUBMIT_CLAIM_FEE_MICROCREDITS,
   deriveReporterSecretField,
@@ -302,25 +300,26 @@ export default function SubmitProofPage() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-      <section className="grid gap-5">
-        <div className="surface-card-strong workflow-hero rounded-lg p-6">
-          <p className="page-kicker mb-3">{zh.submit.kicker}</p>
-          <h1 className="gradient-heading text-3xl font-semibold tracking-normal sm:text-4xl">
-            {zh.submit.title}
-          </h1>
-          <p className="muted-copy mt-3">
-            {zh.submit.description}
-          </p>
-        </div>
-        <div className="flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="page-kicker">提交环境</p>
-            <p className="mt-1 text-sm text-slate-400">链上 Wallet flow 与本地 Mock flow 严格隔离。</p>
-          </div>
+    <div
+      className={`mx-auto grid w-full gap-4 ${
+        submissionMode === "demo"
+          ? "max-w-7xl xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.7fr)]"
+          : "max-w-5xl"
+      }`}
+    >
+      <section className="grid gap-4">
+        <div className="surface-card-strong rounded-lg p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="page-kicker mb-2">{zh.submit.kicker}</p>
+              <h1 className="gradient-heading text-2xl font-semibold sm:text-3xl">
+                {zh.submit.title}
+              </h1>
+              <p className="mt-2 text-sm text-slate-400">{zh.submit.description}</p>
+            </div>
           <div
             aria-label="Claim 提交模式"
-            className="grid grid-cols-2 rounded-lg border border-white/10 bg-black/20 p-1"
+              className="grid shrink-0 grid-cols-2 rounded-lg border border-white/10 bg-black/20 p-1"
           >
             <button
               aria-pressed={submissionMode === "real"}
@@ -357,23 +356,17 @@ export default function SubmitProofPage() {
               Local Demo
             </button>
           </div>
+          </div>
         </div>
         {submissionMode === "demo" ? <DemoRolePreview /> : null}
-        <form className="surface-card grid gap-4 rounded-lg p-5 sm:p-6" onSubmit={handleGenerate}>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
-            <div>
-              <p className="page-kicker">
-                {submissionMode === "real" ? "链上 Claim" : "本地验证"}
-              </p>
-              <p className="mt-1 text-sm text-slate-400">
-                {submissionMode === "real"
-                  ? "从 Testnet Mapping 读取 Bounty，并由当前 Wallet 签名。"
-                  : "Mock proof 仅用于本地流程演示，不代表链上确认。"}
-              </p>
-            </div>
+        <form className="surface-card grid gap-4 rounded-lg p-5" onSubmit={handleGenerate}>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+            <p className="page-kicker">
+              {submissionMode === "real" ? "Testnet Claim" : "Local Verification"}
+            </p>
             {submissionMode === "real" ? (
-              <span className="rounded-md border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-xs font-semibold text-cyan-100">
-                Wallet signature required
+              <span className="text-xs font-semibold text-cyan-100">
+                Mapping → Witness → Wallet
               </span>
             ) : (
               <ExecutionStatusBadge kind="local" />
@@ -465,16 +458,21 @@ export default function SubmitProofPage() {
                   {isLoadingBounty ? "查询 Mapping" : "验证链上 Bounty"}
                 </button>
               </div>
-              <div className="border-l-2 border-cyan-300/35 bg-cyan-300/[0.04] px-4 py-3">
-                <p className="text-sm font-semibold text-cyan-50">
-                  {wallet.address && wallet.connectionState === "Connected"
-                    ? "当前钱包将作为 Whitehat / Reporter 提交 Claim"
-                    : "连接钱包后，该地址将作为 Whitehat / Reporter 提交 Claim"}
+              <div className="flex min-w-0 flex-col gap-1 border-l-2 border-cyan-300/35 bg-cyan-300/[0.04] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <p className="shrink-0 text-sm font-semibold text-cyan-50">
+                  当前钱包将作为 Whitehat / Reporter
                 </p>
-                <p className="mt-1 break-all text-xs leading-5 text-slate-400">
+                <p
+                  className="min-w-0 truncate font-mono text-xs text-slate-400"
+                  title={
+                    wallet.address && wallet.connectionState === "Connected"
+                      ? wallet.address
+                      : "等待连接 Leo Wallet"
+                  }
+                >
                   {wallet.address && wallet.connectionState === "Connected"
                     ? wallet.address
-                    : "Real Mode 不读取 Demo Preview 身份；Program 使用 self.signer 确认提交者。"}
+                    : "等待连接 Leo Wallet"}
                 </p>
               </div>
               {onChainBounty && latestBlockHeight !== null ? (
@@ -487,9 +485,7 @@ export default function SubmitProofPage() {
                   <WalletFact label="Current Height" value={String(latestBlockHeight)} />
                 </dl>
               ) : (
-                <p className="text-sm leading-6 text-slate-500">
-                  先验证真实 Testnet Mapping，页面才会加载该 Rule 对应的私密输入。
-                </p>
+                <p className="text-sm text-slate-500">验证 Mapping 后显示对应 Rule 输入。</p>
               )}
               {walletClaimMessage ? (
                 <p className="flex items-start gap-2 text-sm text-cyan-100" role="status">
@@ -504,7 +500,7 @@ export default function SubmitProofPage() {
               ) : null}
             </>
           )}
-          <div className="rounded-lg border border-cyan-300/20 bg-cyan-300/8 p-3 text-sm text-cyan-100">
+          <div className="border-l-2 border-cyan-300/30 px-3 py-1 text-xs text-cyan-100">
             {zh.privacy.privateWitnessTemporary}
           </div>
           {submissionMode === "demo" ? (
@@ -518,7 +514,8 @@ export default function SubmitProofPage() {
               />
             </label>
           ) : null}
-          <div className="grid gap-4 md:grid-cols-2">
+          {submissionMode === "demo" || onChainBounty ? (
+          <div className="grid gap-3 md:grid-cols-2">
             <p className="text-sm font-semibold text-white md:col-span-2">Private Witness 输入</p>
             {activeRuleId === "vault-accounting-safety" ? (
               <>
@@ -553,6 +550,7 @@ export default function SubmitProofPage() {
               </>
             ) : null}
           </div>
+          ) : null}
           {submissionMode === "demo" ? (
             <>
               <label className="grid gap-2 text-sm text-slate-300">
@@ -575,96 +573,88 @@ export default function SubmitProofPage() {
               </label>
             </>
           ) : null}
-          <label className="grid gap-2 text-sm text-slate-300">
-            reporterSecret
-            <input
-              className="focus-ring input-surface rounded-lg px-3 py-3"
-              disabled={privateInputsDisabled}
-              onChange={(event) => setReporterSecret(event.target.value)}
-              type="password"
-              value={reporterSecret}
-            />
-          </label>
+          {submissionMode === "demo" || onChainBounty ? (
+            <label className="grid gap-2 text-sm text-slate-300">
+              reporterSecret
+              <input
+                className="focus-ring input-surface rounded-lg px-3 py-3"
+                disabled={privateInputsDisabled}
+                onChange={(event) => setReporterSecret(event.target.value)}
+                type="password"
+                value={reporterSecret}
+              />
+            </label>
+          ) : null}
           {submissionMode === "real" ? (
-            <section className="border-t border-cyan-300/20 pt-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            onChainBounty && latestBlockHeight !== null ? (
+              <section className="border-t border-cyan-300/20 pt-4">
                 <div>
                   <p className="text-sm font-semibold text-white">Wallet-signed submit_claim</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-400">
-                    Device-side execution。Private Witness 不发送到 Next.js 或 Vercel。
+                  <p className="mt-1 text-xs text-slate-400">
+                    Device-side execution · Private Witness 不离开 Wallet 边界
                   </p>
                 </div>
-                <span className="inline-flex w-fit items-center gap-2 rounded-md border border-cyan-300/20 bg-cyan-300/[0.08] px-3 py-2 text-xs text-cyan-100">
-                  <Database size={14} aria-hidden="true" />
-                  Testnet mapping
-                </span>
-              </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,220px)_1fr] sm:items-end">
-              <label className="grid gap-2 text-sm text-slate-300">
-                Public Fee（microcredits）
-                <input
-                  className="focus-ring input-surface rounded-lg px-3 py-3 font-mono"
-                  min="1"
-                  type="number"
-                  value={walletClaimFee}
-                  onChange={(event) => setWalletClaimFee(event.target.value)}
-                />
-              </label>
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  className="focus-ring primary-action disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-slate-600"
-                  type="button"
-                  disabled={
-                    !onChainBounty ||
-                    latestBlockHeight === null ||
-                    wallet.connectionState !== "Connected" ||
-                    isRequestingWallet
-                  }
-                  onClick={() => void requestWalletSignedClaim()}
-                >
-                  {isRequestingWallet ? (
-                    <LoaderCircle className="animate-spin" size={16} aria-hidden="true" />
-                  ) : (
-                    <WalletCards size={16} aria-hidden="true" />
-                  )}
-                  {isRequestingWallet ? "等待 Leo Wallet" : "请求 Wallet 签名"}
-                </button>
-                <span className="text-xs text-slate-500">
-                  {wallet.connectionState === "Connected" ? "Leo Wallet connected" : "需要连接 Leo Wallet"}
-                </span>
-                <span className="text-xs text-slate-500">
-                  Transaction preview ready: {onChainBounty && latestBlockHeight !== null ? "Ready" : "Awaiting mapping"}
-                </span>
-              </div>
-            </div>
-
-            <p className="mt-4 text-xs leading-5 text-slate-500">
-              Private Witness 只在当前页面与 Wallet 扩展调用栈中存在；不会进入 Store、URL、日志、Public Metadata 或任何 Next.js Proof API。Wallet 成功、拒绝或异常后都会清空页面私密输入。
-            </p>
-            {wallet.claimSubmission ? (
-              <div className="mt-4 border-t border-white/10 pt-4">
-                <p className="text-xs text-slate-500">
-                  {wallet.claimSubmission.publicTransactionId
-                    ? "Public Transaction ID"
-                    : "Wallet Request ID（尚非链上 Transaction ID）"}
-                </p>
-                <p className="mt-1 break-all font-mono text-xs text-cyan-100">
-                  {wallet.claimSubmission.publicTransactionId ?? wallet.claimSubmission.walletRequestId}
-                </p>
-                <p className="mt-2 text-xs leading-5 text-slate-400">
-                  {wallet.claimSubmission.statusText}
-                </p>
-                <button
-                  className="focus-ring secondary-action mt-3"
-                  type="button"
-                  onClick={() => void wallet.refreshClaimSubmission()}
-                >
-                  <RefreshCw size={15} aria-hidden="true" />
-                  刷新 Wallet 状态
-                </button>
-              </div>
-            ) : null}
-            </section>
+                <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,220px)_1fr] sm:items-end">
+                  <label className="grid gap-2 text-sm text-slate-300">
+                    Public Fee（microcredits）
+                    <input
+                      className="focus-ring input-surface rounded-lg px-3 py-3 font-mono"
+                      min="1"
+                      onChange={(event) => setWalletClaimFee(event.target.value)}
+                      type="number"
+                      value={walletClaimFee}
+                    />
+                  </label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      className="focus-ring primary-action disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-slate-600"
+                      disabled={
+                        wallet.connectionState !== "Connected" ||
+                        isRequestingWallet
+                      }
+                      onClick={() => void requestWalletSignedClaim()}
+                      type="button"
+                    >
+                      {isRequestingWallet ? (
+                        <LoaderCircle className="animate-spin" size={16} aria-hidden="true" />
+                      ) : (
+                        <WalletCards size={16} aria-hidden="true" />
+                      )}
+                      {isRequestingWallet ? "等待 Leo Wallet" : "请求 Wallet 签名"}
+                    </button>
+                    <span className="text-xs text-slate-500">
+                      {wallet.connectionState === "Connected"
+                        ? "Transaction preview ready"
+                        : "需要连接 Leo Wallet"}
+                    </span>
+                  </div>
+                </div>
+                {wallet.claimSubmission ? (
+                  <div className="mt-4 border-t border-white/10 pt-4">
+                    <p className="text-xs text-slate-500">
+                      {wallet.claimSubmission.publicTransactionId
+                        ? "Public Transaction ID"
+                        : "Wallet Request ID（尚非链上 Transaction ID）"}
+                    </p>
+                    <p className="mt-1 break-all font-mono text-xs text-cyan-100">
+                      {wallet.claimSubmission.publicTransactionId ??
+                        wallet.claimSubmission.walletRequestId}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-400">
+                      {wallet.claimSubmission.statusText}
+                    </p>
+                    <button
+                      className="focus-ring secondary-action mt-3"
+                      onClick={() => void wallet.refreshClaimSubmission()}
+                      type="button"
+                    >
+                      <RefreshCw size={15} aria-hidden="true" />
+                      刷新 Wallet 状态
+                    </button>
+                  </div>
+                ) : null}
+              </section>
+            ) : null
           ) : (
             <div className="flex flex-wrap gap-3">
               <button
@@ -689,42 +679,7 @@ export default function SubmitProofPage() {
       </section>
       {submissionMode === "demo" ? (
         <ProofPanel error={error} isLoading={isGenerating} proof={proof} />
-      ) : (
-        <section className="terminal-panel h-fit rounded-lg p-5 lg:sticky lg:top-24">
-          <div className="flex items-start gap-3 border-b border-cyan-300/15 pb-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-cyan-300/20 bg-cyan-300/[0.08] text-cyan-100">
-              <LockKeyhole size={19} aria-hidden="true" />
-            </span>
-            <div>
-              <p className="page-kicker">链上提交边界</p>
-              <h2 className="mt-1 text-lg font-semibold text-white">Wallet 执行，公开 Registry 验收</h2>
-            </div>
-          </div>
-          <dl className="mt-4">
-            <WalletFact label="Program ID" value={CANONICAL_ALEO_PROGRAM_ID} />
-            <WalletFact label="Function" value="submit_claim" />
-            <WalletFact label="Network" value="Aleo Testnet / testnetbeta" />
-            <WalletFact
-              label="Wallet"
-              value={
-                wallet.address && wallet.connectionState === "Connected"
-                  ? wallet.address
-                  : "Not connected"
-              }
-            />
-            <WalletFact
-              label="Bounty Mapping"
-              value={onChainBounty ? "Mapping verified" : "Awaiting public mapping query"}
-            />
-          </dl>
-          <div className="mt-4 border-l-2 border-emerald-300/35 pl-3">
-            <p className="text-sm font-semibold text-emerald-100">Real Mode 无 Mock fallback</p>
-            <p className="mt-1 text-xs leading-5 text-slate-400">
-              服务端 Proof API 保持禁用。Wallet 拒绝、网络不可用或 Mapping 查询失败时，不会显示假成功。
-            </p>
-          </div>
-        </section>
-      )}
+      ) : null}
     </div>
   );
 }

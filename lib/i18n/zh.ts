@@ -27,10 +27,10 @@ export const zh = {
   },
   navigation: {
     home: "首页",
-    createBounty: "创建 Bounty",
-    submitProof: "提交 Private Proof",
-    triage: "漏洞 Triage",
-    publicClaims: "公开 Claims",
+    createBounty: "创建",
+    submitProof: "Private Proof",
+    triage: "Triage",
+    publicClaims: "Registry",
   },
   rules: {
     "vault-accounting-safety": {
@@ -51,7 +51,7 @@ export const zh = {
     },
   },
   privacy: {
-    privateWitnessTemporary: "Private Witness 只用于当前 Proof 请求，不写入 Store、浏览器持久化或 Public Metadata。",
+    privateWitnessTemporary: "Private Witness 仅在当前设备内存中临时存在，不持久化。",
     publicMetadataBoundary: "Public Metadata 不包含 Private Witness、Reporter Secret、Hidden Delta、Exploit Path 或 PoC。",
     aiBoundary: "AI 只能读取 Public Metadata，无法访问 Private Witness 或 Exploit 细节。",
     exploitHidden: "Exploit 细节已隐藏",
@@ -63,7 +63,7 @@ export const zh = {
     title: "证明漏洞存在，而不泄露 Exploit",
     description: "zkBugBounty 运行于 Aleo Testnet。Whitehat 可以使用 Private Witness 证明安全 Invariant 被破坏，而无需公开 Exploit Path、触发参数或完整 PoC。",
     createAction: "创建 Bounty",
-    proofAction: "生成 Private Proof",
+    proofAction: "进入协议",
     trustSignals: ["Exploit 始终密封", "Receipt 标注验证级别", "Registry 公开可审计"],
     deskTitle: "Proof without disclosure",
     deskLabel: "协议执行边界",
@@ -77,9 +77,9 @@ export const zh = {
     rulesDescription: "Project Owner 可使用预设安全 Invariant 定义 Bounty Scope；Whitehat 使用 Private Witness 证明规则被破坏，公开侧只会得到 Public Metadata。",
   },
   createBounty: {
-    kicker: "Project Owner 工作区",
-    title: "创建漏洞赏金（Create Bounty）",
-    description: "选择公开的 DemoVault Invariant，定义 Scope，并为 Verified Claim 配置奖励档位。",
+    kicker: "Project Owner",
+    title: "创建 Bounty",
+    description: "选择 Invariant，设置 Scope 与奖励档位。",
     ownerNotice: "Real Mode 中，连接钱包将通过 self.signer 成为链上 Bounty Owner；Demo Preview 不影响链上权限。",
     fields: {
       projectName: "项目名称",
@@ -95,9 +95,9 @@ export const zh = {
     forbidden: "当前 Demo Preview 视角不能创建本地 Bounty。",
   },
   submit: {
-    kicker: "Whitehat 提交通道",
-    title: "提交隐私漏洞证明（Submit Private Proof）",
-    description: "Private Witness 仅用于当前 Proof 生成；提交后的 Bug Claim 只包含 Public Metadata。",
+    kicker: "Whitehat",
+    title: "提交 Private Proof",
+    description: "验证链上 Bounty，在设备端完成 Proof，并由 Wallet 签名。",
     forbidden: "当前 Demo Preview 视角不能提交本地 Private Proof。",
     selectBounty: "选择 Bounty",
     selectEngine: "选择 Proof Engine",
@@ -124,9 +124,9 @@ export const zh = {
     waiting: "等待 Private Input",
   },
   triage: {
-    kicker: "安全协作工作台",
+    kicker: "Triage",
     title: "漏洞分诊与负责任披露",
-    description: "在 Local Demo 中演示严格的 Responsible Disclosure 状态机；链上支付操作等待 Program Upgrade。",
+    description: "核验 Claim，推进披露与修复；链上支付等待 Program Upgrade。",
     roleNotice: "本页角色仅用于 Local Demo；链上权限以 Wallet self.signer 与 Program Mapping 为准。",
     noAccessTitle: "公开用户无法访问 Triage 操作。",
     noAccessBody: "Public User 在本地流程中为只读；Demo Preview 不代表钱包或链上权限。",
@@ -186,9 +186,9 @@ export const zh = {
     noTimeline: "暂无公开 Triage 记录。",
   },
   publicClaims: {
-    kicker: "公开 Claim Registry",
-    title: "公开漏洞声明（Public Claims）",
-    description: "公开 Receipt 不等于公开 Exploit；每条 Claim 都明确标注 Mock、Local Leo、Remote Leo 或 Network Confirmed。",
+    kicker: "Public Registry",
+    title: "公开 Claims",
+    description: "公开 Receipt 不等于公开 Exploit；这里只展示验证状态。",
     registryNotice: "公开 Registry 只展示协议收据与披露状态，不提供敏感披露内容或操作入口。",
     viewReceipt: "查看协议收据",
     noClaims: "当前没有可公开展示的 Verified Claims。",

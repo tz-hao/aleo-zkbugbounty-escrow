@@ -33,14 +33,14 @@ test("Demo role selection is isolated in an explicitly local preview control", (
   assert.match(triage, /<DemoRolePreview/);
 });
 
-test("homepage protocol totals come only from Aleo Testnet Registry", () => {
+test("homepage is a focused protocol entry without local or registry metrics", () => {
   const dashboard = readFileSync("components/dashboard.tsx", "utf8");
-  const overview = readFileSync("components/aleo-registry-overview.tsx", "utf8");
 
   assert.equal(dashboard.includes("useAppState"), false);
-  assert.match(dashboard, /AleoRegistryOverview/);
-  assert.match(overview, /\/api\/aleo\/registry\?kind=/);
-  assert.match(overview, /不会使用 Mock 或 localStorage/);
+  assert.equal(dashboard.includes("AleoRegistryOverview"), false);
+  assert.match(dashboard, /home-immersive/);
+  assert.match(dashboard, /HeroProofVisual/);
+  assert.match(dashboard, /href="\/submit-proof"/);
 });
 
 test("wallet diagnostics are available on demand without tiny always-on copy", () => {

@@ -51,7 +51,7 @@ export function Navigation() {
 
         <nav aria-label="主导航" className="hidden min-w-0 flex-1 items-center justify-center lg:flex">
           <div className="flex items-center gap-0.5">
-            {links.map(({ href, label, icon: Icon }) => {
+            {links.map(({ href, label }) => {
               const active = pathname === href;
               return (
                 <Link
@@ -63,7 +63,6 @@ export function Navigation() {
                   href={href}
                   key={href}
                 >
-                  <Icon size={15} aria-hidden="true" />
                   {label}
                   {active ? (
                     <span

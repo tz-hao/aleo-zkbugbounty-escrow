@@ -211,11 +211,9 @@ test("deployment API returns status codes matching deployment verification state
 
 test("deployment UI exposes live public confirmation without persistence", async () => {
   const component = readFileSync("components/aleo-deployment-status.tsx", "utf8");
-  const home = readFileSync("components/dashboard.tsx", "utf8");
   const publicClaims = readFileSync("app/public-claims/page.tsx", "utf8");
   assert.match(component, /\/api\/aleo\/deployment/);
   assert.match(component, /verificationStatus/);
   assert.equal(component.includes("localStorage"), false);
-  assert.match(home, /AleoDeploymentStatus/);
   assert.match(publicClaims, /AleoDeploymentStatus/);
 });
