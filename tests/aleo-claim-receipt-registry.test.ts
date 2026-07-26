@@ -125,7 +125,9 @@ test("Public Claims exposes read-only Aleo receipts without browser persistence"
 
   assert.match(page, /AleoClaimReceiptPanel/);
   assert.match(panel, /\/api\/aleo\/receipts\//);
-  assert.match(panel, /不会使用 localStorage、Mock Receipt 或 Demo State/);
+  assert.equal(page.includes("本地演示 Registry"), false);
+  assert.equal(page.includes("Local simulation"), false);
+  assert.equal(panel.includes("不会使用 localStorage、Mock Receipt 或 Demo State"), false);
   assert.equal(panel.includes("localStorage.setItem"), false);
   assert.equal(panel.includes("sessionStorage"), false);
   assert.equal(panel.includes("reporterSecret"), false);

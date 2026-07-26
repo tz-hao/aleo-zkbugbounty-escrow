@@ -3,7 +3,6 @@
 import { AlertTriangle, Bot, CheckCircle2, Clock3, FileText, ReceiptText } from "lucide-react";
 import { ClaimCard } from "@/components/claim-card";
 import { DemoRolePreview } from "@/components/demo-role-preview";
-import { ExecutionStatusBadge } from "@/components/execution-status-badge";
 import { RewardEscrowStatus } from "@/components/reward-escrow-status";
 import { TriageActionControls } from "@/components/triage-action-controls";
 import { useAppState } from "@/components/app-state-provider";
@@ -33,32 +32,18 @@ export default function TriagePage() {
     }
     return actor.role === "TriageArbiter";
   });
-  const actorContext = {
-    ProjectOwner: "当前 Demo 视角可推进所属 Bounty 的本地披露流程。",
-    Whitehat: "当前 Demo 视角仅可在 Details Requested 后共享加密包状态。",
-    TriageArbiter: "当前 Demo 视角可添加公开分诊备注与 Severity 建议。",
-    PublicUser: "当前为公开浏览视角，仅可查看本地流程状态。",
-  }[actor.role];
-
   return (
     <div className="grid gap-6">
       <section className="surface-card-strong workflow-hero rounded-lg p-6 sm:p-7">
         <p className="page-kicker mb-3 text-violet-200">{zh.triage.kicker}</p>
-        <div className="grid gap-5 lg:grid-cols-[1fr_0.44fr] lg:items-end">
+        <div>
           <div>
             <h1 className="gradient-heading text-3xl font-semibold tracking-normal sm:text-4xl">
               {zh.triage.title}
             </h1>
-            <p className="mt-2 font-mono text-sm text-violet-100/80">
-              Triage &amp; Responsible Disclosure
-            </p>
             <p className="muted-copy mt-3 max-w-2xl">
               {zh.triage.description}
             </p>
-          </div>
-          <div className="border-l-2 border-violet-300/35 pl-4 text-sm leading-6 text-slate-300">
-            <ExecutionStatusBadge kind="local" />
-            <p className="mt-2">{actorContext}</p>
           </div>
         </div>
       </section>

@@ -6,7 +6,7 @@ export default function CreateBountyPage() {
     <div className="grid gap-6">
       <section className="surface-card-strong workflow-hero rounded-lg p-6 sm:p-7">
         <p className="page-kicker mb-3">{zh.createBounty.kicker}</p>
-        <div className="grid gap-5 lg:grid-cols-[1fr_0.42fr] lg:items-end">
+        <div>
           <div>
             <h1 className="gradient-heading text-3xl font-semibold tracking-normal sm:text-4xl">
               {zh.createBounty.title}
@@ -14,9 +14,6 @@ export default function CreateBountyPage() {
             <p className="muted-copy mt-3 max-w-2xl">
               {zh.createBounty.description}
             </p>
-          </div>
-          <div className="rounded-lg border border-emerald-300/20 bg-emerald-300/[0.06] p-4 text-sm text-emerald-100">
-            {zh.createBounty.ownerNotice}
           </div>
         </div>
       </section>

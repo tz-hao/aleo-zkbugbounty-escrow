@@ -321,37 +321,6 @@ body:has(.home-immersive) .main-shell {
   padding: 0.75rem;
 }
 
-body:has(.home-immersive) .site-navigation {
-  position: absolute;
-  inset: 0 0 auto;
-  padding: 1.5rem 1.75rem 0;
-}
-
-body:has(.home-immersive) .site-navigation .nav-glass {
-  height: 3.25rem;
-  max-width: none;
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
-}
-
-body:has(.home-immersive) .site-navigation .brand-mark {
-  height: 2.25rem;
-  width: 2.25rem;
-  border-color: rgba(103, 232, 249, 0.14);
-  background: rgba(3, 7, 12, 0.2);
-}
-
-body:has(.home-immersive) .site-navigation nav a {
-  color: rgba(203, 213, 225, 0.58);
-}
-
-body:has(.home-immersive) .site-navigation nav a:hover,
-body:has(.home-immersive) .site-navigation nav a[aria-current="page"] {
-  color: white;
-}
-
 .home-immersive {
   position: relative;
   min-height: calc(100svh - 1.5rem);
@@ -453,26 +422,9 @@ body:has(.home-immersive) .site-navigation nav a[aria-current="page"] {
   transform: scale(0.98);
 }
 
-.home-immersive-mark {
-  position: absolute;
-  z-index: 2;
-  right: 1.75rem;
-  bottom: 1.75rem;
-  color: rgba(226, 232, 240, 0.34);
-}
-
 @media (max-width: 639px) {
   body:has(.home-immersive) .main-shell {
     padding: 0.75rem;
-  }
-
-  body:has(.home-immersive) .site-navigation {
-    padding: 1.25rem 1.25rem 0;
-  }
-
-  body:has(.home-immersive) .site-navigation .nav-glass {
-    height: 3.25rem;
-    padding-inline: 0.5rem;
   }
 
   .home-immersive {

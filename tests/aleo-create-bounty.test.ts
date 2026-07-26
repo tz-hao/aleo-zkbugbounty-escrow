@@ -258,6 +258,7 @@ test("Real Mode wallet flow uses minimum permissions and never persists success"
   const result = readFileSync("components/create-bounty-result.tsx", "utf8");
   const publicView = readFileSync("components/public-bounty-view.tsx", "utf8");
   const workspace = readFileSync("components/bounty-creation-workspace.tsx", "utf8");
+  const transactionBuilder = readFileSync("lib/aleo-create-bounty.ts", "utf8");
   const combined = `${provider}\n${form}\n${result}\n${publicView}`;
 
   assert.match(provider, /DecryptPermission\.NoDecrypt/);
@@ -265,7 +266,7 @@ test("Real Mode wallet flow uses minimum permissions and never persists success"
   assert.match(provider, /requestTransaction/);
   assert.match(provider, /classifyWalletResponseId/);
   assert.match(provider, /preview\.feeMicrocredits,\s*false/);
-  assert.match(form, /self\.signer/);
+  assert.match(transactionBuilder, /ownerSource: "self\.signer"/);
   assert.match(result, /Submitted[\s\S]*Confirmed[\s\S]*Mapping Verified/);
   assert.match(publicView, /Data Source: Aleo Testnet/);
   assert.match(workspace, /Aleo Testnet/);

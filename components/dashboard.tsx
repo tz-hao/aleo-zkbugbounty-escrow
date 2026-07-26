@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ShieldCheck } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { HeroProofVisual } from "./hero-proof-visual";
 import { zh } from "@/lib/i18n/zh";
@@ -20,10 +20,6 @@ export function Dashboard() {
           <ArrowRight size={17} aria-hidden="true" />
         </Link>
       </div>
-
-      <span className="home-immersive-mark" aria-hidden="true">
-        <ShieldCheck size={22} />
-      </span>
     </section>
   );
 }

@@ -80,7 +80,6 @@ export const zh = {
     kicker: "Project Owner",
     title: "创建 Bounty",
     description: "选择 Invariant，设置 Scope 与奖励档位。",
-    ownerNotice: "Real Mode 中，连接钱包将通过 self.signer 成为链上 Bounty Owner；Demo Preview 不影响链上权限。",
     fields: {
       projectName: "项目名称",
       deadline: "披露期限",

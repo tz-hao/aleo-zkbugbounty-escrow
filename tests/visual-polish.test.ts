@@ -41,6 +41,7 @@ test("dashboard is a single immersive protocol entry", () => {
   ]) {
     assert.equal(source.includes(removed), false, `${removed} should not remain on the focused homepage`);
   }
+  assert.equal(source.includes("home-immersive-mark"), false, "homepage corner icon must not remain");
 });
 
 test("global styles expose reusable professional surface primitives", () => {
@@ -59,10 +60,10 @@ test("global styles expose reusable professional surface primitives", () => {
   }
 });
 
-test("navigation is compact and keeps Demo roles out of the global header", () => {
+test("navigation stays off the immersive homepage and keeps Demo roles out of the global header", () => {
   const source = readFileSync("components/navigation.tsx", "utf8");
 
-  for (const phrase of ["site-navigation", "isHomepage", "h-[3.75rem]", "mobile-navigation", "WalletConnectionControl", "lg:hidden"]) {
+  for (const phrase of ["site-navigation", "pathname === \"/\"", "return null", "h-[3.75rem]", "mobile-navigation", "WalletConnectionControl", "lg:hidden"]) {
     assert.equal(source.includes(phrase), true, `${phrase} should be present in navigation`);
   }
   for (const forbidden of ["useAppState", "switchActor", "roleDisplayLabels", "<select"]) {
