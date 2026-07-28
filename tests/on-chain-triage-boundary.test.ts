@@ -7,17 +7,12 @@ import {
   ON_CHAIN_TRIAGE_CAPABILITY,
 } from "../lib/aleo-triage.ts";
 
-test("local upgrade ABI still reports triage-specific entries as unavailable", () => {
+test("local upgrade ABI contains the full on-chain triage boundary", () => {
   const abi = JSON.parse(readFileSync("leo/bug_proof/build/abi.json", "utf8"));
   const inspection = inspectOnChainTriageAbi(abi);
-  assert.equal(inspection.available, false);
-  assert.deepEqual(inspection.missingFunctions, [
-    "request_disclosure",
-    "attest_encrypted_details",
-    "mark_patched",
-    "reject_claim",
-  ]);
-  assert.deepEqual(inspection.missingMappings, ["triage_states"]);
+  assert.equal(inspection.available, true);
+  assert.deepEqual(inspection.missingFunctions, []);
+  assert.deepEqual(inspection.missingMappings, []);
 });
 
 test("Demo Preview cannot authorize or persist a Real Mode triage transition", () => {
@@ -33,9 +28,9 @@ test("Demo Preview cannot authorize or persist a Real Mode triage transition", (
 test("on-chain triage API refuses writes without parsing a request", () => {
   const route = readFileSync("app/api/aleo/triage/route.ts", "utf8");
   const status = readFileSync("components/reward-escrow-status.tsx", "utf8");
-  assert.match(route, /status: 409/);
+  assert.match(route, /status: 405/);
   assert.equal(route.includes("request.json"), false);
   assert.equal(route.includes("requestTransaction"), false);
-  assert.match(status, /Demo Preview/);
-  assert.match(status, /self\.signer/);
+  assert.match(status, /Program Upgrade Required/);
+  assert.match(status, /Confirmed Transaction/);
 });

@@ -41,7 +41,8 @@ test("Leo submit_claim atomically writes the trusted on-chain Claim Receipt", ()
   assert.match(submitClaim, /let witness_commitment: field = proof\.witness_commitment;/);
   assert.match(submitClaim, /let reporter_commitment: field = proof\.reporter_commitment;/);
   assert.match(submitClaim, /created_height: block\.height/);
-  assert.match(submitClaim, /protocol_version: 1u8/);
+  assert.match(submitClaim, /Mapping::get_or_use\([\s\S]*bounty_protocol_versions,[\s\S]*1u8/);
+  assert.match(submitClaim, /protocol_version: bounty_protocol_version/);
   assert.match(submitClaim, /Mapping::set\(nullifiers, nullifier, bounty_id\);/);
   assert.match(submitClaim, /Mapping::set\(claim_receipts, claim_hash, receipt\);/);
 });

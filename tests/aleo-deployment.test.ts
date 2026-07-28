@@ -68,6 +68,9 @@ function createDeploymentFetcher({
         fee: { transition: "public-fee-not-returned" },
       });
     }
+    if (url === ALEO_TESTNET_DEPLOYMENT.latestEditionApiUrl) {
+      return new Response("0", { status: 200 });
+    }
     return new Response(null, { status: 404 });
   };
 }

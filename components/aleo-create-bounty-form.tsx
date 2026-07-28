@@ -73,7 +73,7 @@ export function AleoCreateBountyForm() {
   const [criticalReward, setCriticalReward] = useState("5000000");
   const [highReward, setHighReward] = useState("2000000");
   const [mediumReward, setMediumReward] = useState("1000000");
-  const [lowReward, setLowReward] = useState("500000");
+  const lowReward = "0";
   const [deadlineBlocks, setDeadlineBlocks] = useState("100000");
   const [feeMicrocredits, setFeeMicrocredits] = useState(
     String(DEFAULT_CREATE_BOUNTY_FEE_MICROCREDITS),
@@ -240,7 +240,7 @@ export function AleoCreateBountyForm() {
           <NumberField label="Critical Reward (microcredits)" value={criticalReward} onChange={setCriticalReward} />
           <NumberField label="High Reward (microcredits)" value={highReward} onChange={setHighReward} />
           <NumberField label="Medium Reward (microcredits)" value={mediumReward} onChange={setMediumReward} />
-          <NumberField label="Low Reward (microcredits)" value={lowReward} onChange={setLowReward} />
+          <ReadOnlyField label="Low Reward（不可领取）" value="0 microcredits" />
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">

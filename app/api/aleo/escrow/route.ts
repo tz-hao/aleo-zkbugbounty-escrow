@@ -1,19 +1,24 @@
 import { NextResponse } from "next/server";
 
-import { REWARD_ESCROW_CAPABILITY } from "@/lib/aleo-reward-escrow";
+import { fetchRewardEscrowCapability } from "@/lib/aleo-reward-escrow";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return NextResponse.json({ escrow: REWARD_ESCROW_CAPABILITY });
+  const escrow = await fetchRewardEscrowCapability();
+  const status = escrow.status === "EndpointUnavailable"
+    ? 503
+    : escrow.status === "ConfigurationError"
+      ? 500
+      : 200;
+  return NextResponse.json({ escrow }, { status });
 }
 
 export async function POST() {
   return NextResponse.json(
     {
-      error: "Reward escrow is not present in the deployed Aleo Program.",
-      escrow: REWARD_ESCROW_CAPABILITY,
+      error: "Server-side Aleo transaction submission is disabled. Use a connected wallet after capability verification.",
     },
-    { status: 409 },
+    { status: 405 },
   );
 }

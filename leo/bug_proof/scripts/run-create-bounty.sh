@@ -9,5 +9,5 @@ leo run create_bounty \
   1000u64 \
   500u64 \
   100u64 \
-  10u64 \
+  0u64 \
   20000000u32

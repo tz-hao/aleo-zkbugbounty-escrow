@@ -173,6 +173,30 @@ fn compute_vault_invariant_break(
         };
     }
 
+fn derive_operation_marker(
+        operation_domain: field,
+        bounty_id: field,
+        claim_hash: field,
+        caller: address,
+        recipient: address,
+        amount: u64,
+        nonce: field,
+    ) -> field {
+        assert(nonce != 0field);
+        let caller_commitment: field = BHP256::hash_to_field(caller);
+        let recipient_commitment: field = BHP256::hash_to_field(recipient);
+        return Poseidon8::hash_to_field([
+            operation_domain,
+            bounty_id,
+            claim_hash,
+            caller_commitment,
+            recipient_commitment,
+            amount as field,
+            nonce,
+            220field,
+        ]);
+    }
+
 program zkbugbounty_7f3c92.aleo {
     struct BountyState {
         owner_address: address,
@@ -224,6 +248,14 @@ program zkbugbounty_7f3c92.aleo {
         release_marker: field,
     }
 
+    struct ClaimTriageState {
+        claim_hash: field,
+        bounty_id: field,
+        status: u8,
+        package_hash: field,
+        updated_height: u32,
+    }
+
     mapping bounties: field => BountyState;
     mapping nullifiers: field => field;
     mapping claim_receipts: field => ClaimReceiptState;
@@ -231,6 +263,9 @@ program zkbugbounty_7f3c92.aleo {
     mapping claim_payouts: field => ClaimPayoutState;
     mapping bounty_claim_counts: field => u64;
     mapping claim_reporters: field => address;
+    mapping claim_triage_states: field => ClaimTriageState;
+    mapping bounty_protocol_versions: field => u8;
+    mapping escrow_operation_markers: field => bool;
 
     fn prove_vault_invariant_break(
         public bounty_id: field,
@@ -320,6 +355,11 @@ program zkbugbounty_7f3c92.aleo {
             assert_eq(bounty.rule_id, rule_id);
             assert_eq(bounty.status, 1u8);
             assert(block.height <= bounty.disclosure_deadline);
+            let bounty_protocol_version: u8 = Mapping::get_or_use(
+                bounty_protocol_versions,
+                bounty_id,
+                1u8,
+            );
 
             assert(!Mapping::contains(nullifiers, nullifier));
             assert(!Mapping::contains(claim_receipts, claim_hash));
@@ -335,7 +375,7 @@ program zkbugbounty_7f3c92.aleo {
                 reporter_commitment: reporter_commitment,
                 proof_status: 1u8,
                 created_height: block.height,
-                protocol_version: 1u8,
+                protocol_version: bounty_protocol_version,
             };
             Mapping::set(nullifiers, nullifier, bounty_id);
             Mapping::set(claim_receipts, claim_hash, receipt);
@@ -368,7 +408,8 @@ program zkbugbounty_7f3c92.aleo {
                 critical_reward >= high_reward &&
                 high_reward >= medium_reward &&
                 medium_reward >= low_reward &&
-                critical_reward > 0u64;
+                medium_reward > 0u64 &&
+                low_reward == 0u64;
             assert(supported_rule);
             assert(valid_rewards);
             assert(disclosure_deadline > block.height);
@@ -386,6 +427,7 @@ program zkbugbounty_7f3c92.aleo {
             };
             Mapping::set(bounties, bounty_id, bounty);
             Mapping::set(bounty_claim_counts, bounty_id, 0u64);
+            Mapping::set(bounty_protocol_versions, bounty_id, 2u8);
         };
     }
 
@@ -446,13 +488,25 @@ program zkbugbounty_7f3c92.aleo {
             amount,
         );
         return final {
-            transfer.run();
             assert(amount > 0u64);
-            assert(funding_marker != 0field);
             assert(Mapping::contains(bounties, bounty_id));
             let bounty: BountyState = Mapping::get(bounties, bounty_id);
             assert_eq(bounty.owner_address, signer);
             assert(bounty.status == 1u8 || bounty.status == 2u8);
+            assert(block.height <= bounty.disclosure_deadline);
+            assert(Mapping::contains(bounty_protocol_versions, bounty_id));
+            let bounty_protocol_version: u8 = Mapping::get(bounty_protocol_versions, bounty_id);
+            assert_eq(bounty_protocol_version, 2u8);
+            let operation_marker: field = derive_operation_marker(
+                201field,
+                bounty_id,
+                0field,
+                signer,
+                signer,
+                amount,
+                funding_marker,
+            );
+            assert(!Mapping::contains(escrow_operation_markers, operation_marker));
 
             let empty: BountyEscrowState = BountyEscrowState {
                 owner_address: signer,
@@ -472,6 +526,7 @@ program zkbugbounty_7f3c92.aleo {
                 empty,
             );
             assert_eq(current.owner_address, signer);
+            transfer.run();
             let updated: BountyEscrowState = BountyEscrowState {
                 owner_address: signer,
                 total_funded: current.total_funded + amount,
@@ -481,10 +536,11 @@ program zkbugbounty_7f3c92.aleo {
                 refunded_amount: current.refunded_amount,
                 status: 1u8,
                 last_funding_height: block.height,
-                last_funding_marker: funding_marker,
+                last_funding_marker: operation_marker,
                 last_refund_marker: current.last_refund_marker,
             };
             Mapping::set(bounty_escrows, bounty_id, updated);
+            Mapping::set(escrow_operation_markers, operation_marker, true);
         };
     }
 
@@ -493,6 +549,7 @@ program zkbugbounty_7f3c92.aleo {
         public claim_hash: field,
         public whitehat_address: address,
         public reward_amount: u64,
+        public lock_marker: field,
     ) -> Final {
         let signer = self.signer;
         return final {
@@ -500,22 +557,45 @@ program zkbugbounty_7f3c92.aleo {
             assert(Mapping::contains(bounties, bounty_id));
             let bounty: BountyState = Mapping::get(bounties, bounty_id);
             assert_eq(bounty.owner_address, signer);
-            assert(bounty.status == 1u8 || bounty.status == 2u8);
+            assert(bounty.status == 1u8 || bounty.status == 2u8 || bounty.status == 3u8);
+            assert(Mapping::contains(bounty_protocol_versions, bounty_id));
+            let bounty_protocol_version: u8 = Mapping::get(bounty_protocol_versions, bounty_id);
+            assert_eq(bounty_protocol_version, 2u8);
 
             assert(Mapping::contains(claim_receipts, claim_hash));
             let receipt: ClaimReceiptState = Mapping::get(claim_receipts, claim_hash);
             assert_eq(receipt.claim_hash, claim_hash);
             assert_eq(receipt.bounty_id, bounty_id);
             assert_eq(receipt.proof_status, 1u8);
+            assert_eq(receipt.protocol_version, 2u8);
+            let expected_reward: u64 =
+                receipt.severity == 3u8
+                    ? bounty.critical_reward
+                    : receipt.severity == 2u8
+                        ? bounty.high_reward
+                        : receipt.severity == 1u8 ? bounty.medium_reward : 0u64;
+            assert(expected_reward > 0u64);
+            assert_eq(reward_amount, expected_reward);
             assert(Mapping::contains(claim_reporters, claim_hash));
             let reporter: address = Mapping::get(claim_reporters, claim_hash);
             assert_eq(reporter, whitehat_address);
+            let operation_marker: field = derive_operation_marker(
+                202field,
+                bounty_id,
+                claim_hash,
+                signer,
+                reporter,
+                reward_amount,
+                lock_marker,
+            );
+            assert(!Mapping::contains(escrow_operation_markers, operation_marker));
 
             assert(Mapping::contains(bounty_escrows, bounty_id));
             let escrow: BountyEscrowState = Mapping::get(bounty_escrows, bounty_id);
             assert_eq(escrow.owner_address, signer);
             assert(escrow.available_balance >= reward_amount);
             assert(!Mapping::contains(claim_payouts, claim_hash));
+            assert(!Mapping::contains(claim_triage_states, claim_hash));
 
             let updated_escrow: BountyEscrowState = BountyEscrowState {
                 owner_address: escrow.owner_address,
@@ -539,8 +619,157 @@ program zkbugbounty_7f3c92.aleo {
                 paid_height: 0u32,
                 release_marker: 0field,
             };
+            let triage: ClaimTriageState = ClaimTriageState {
+                claim_hash: claim_hash,
+                bounty_id: bounty_id,
+                status: 1u8,
+                package_hash: 0field,
+                updated_height: block.height,
+            };
             Mapping::set(bounty_escrows, bounty_id, updated_escrow);
             Mapping::set(claim_payouts, claim_hash, payout);
+            Mapping::set(claim_triage_states, claim_hash, triage);
+            Mapping::set(escrow_operation_markers, operation_marker, true);
+        };
+    }
+
+    fn request_disclosure(
+        public bounty_id: field,
+        public claim_hash: field,
+        public request_marker: field,
+    ) -> Final {
+        let signer = self.signer;
+        return final {
+            assert(Mapping::contains(bounties, bounty_id));
+            let bounty: BountyState = Mapping::get(bounties, bounty_id);
+            assert_eq(bounty.owner_address, signer);
+
+            assert(Mapping::contains(claim_receipts, claim_hash));
+            let receipt: ClaimReceiptState = Mapping::get(claim_receipts, claim_hash);
+            assert_eq(receipt.bounty_id, bounty_id);
+            assert_eq(receipt.proof_status, 1u8);
+
+            assert(Mapping::contains(claim_payouts, claim_hash));
+            let payout: ClaimPayoutState = Mapping::get(claim_payouts, claim_hash);
+            assert_eq(payout.status, 1u8);
+
+            assert(Mapping::contains(claim_triage_states, claim_hash));
+            let current: ClaimTriageState = Mapping::get(claim_triage_states, claim_hash);
+            assert_eq(current.bounty_id, bounty_id);
+            assert_eq(current.status, 1u8);
+            let operation_marker: field = derive_operation_marker(
+                203field,
+                bounty_id,
+                claim_hash,
+                signer,
+                signer,
+                payout.reward_amount,
+                request_marker,
+            );
+            assert(!Mapping::contains(escrow_operation_markers, operation_marker));
+
+            let requested: ClaimTriageState = ClaimTriageState {
+                claim_hash: current.claim_hash,
+                bounty_id: current.bounty_id,
+                status: 2u8,
+                package_hash: 0field,
+                updated_height: block.height,
+            };
+            Mapping::set(claim_triage_states, claim_hash, requested);
+            Mapping::set(escrow_operation_markers, operation_marker, true);
+        };
+    }
+
+    fn attest_encrypted_details(
+        public bounty_id: field,
+        public claim_hash: field,
+        public package_hash: field,
+        public share_marker: field,
+    ) -> Final {
+        let signer = self.signer;
+        return final {
+            assert(package_hash != 0field);
+            assert(Mapping::contains(bounties, bounty_id));
+            let bounty: BountyState = Mapping::get(bounties, bounty_id);
+            assert(Mapping::contains(claim_receipts, claim_hash));
+            let receipt: ClaimReceiptState = Mapping::get(claim_receipts, claim_hash);
+            assert_eq(receipt.bounty_id, bounty_id);
+            assert_eq(receipt.proof_status, 1u8);
+            assert_eq(receipt.protocol_version, 2u8);
+
+            assert(Mapping::contains(claim_reporters, claim_hash));
+            let reporter: address = Mapping::get(claim_reporters, claim_hash);
+            assert_eq(reporter, signer);
+
+            assert(Mapping::contains(claim_payouts, claim_hash));
+            let payout: ClaimPayoutState = Mapping::get(claim_payouts, claim_hash);
+            assert_eq(payout.status, 1u8);
+            assert(Mapping::contains(claim_triage_states, claim_hash));
+            let current: ClaimTriageState = Mapping::get(claim_triage_states, claim_hash);
+            assert_eq(current.bounty_id, bounty_id);
+            assert_eq(current.status, 2u8);
+            let operation_marker: field = derive_operation_marker(
+                204field,
+                bounty_id,
+                claim_hash,
+                signer,
+                bounty.owner_address,
+                payout.reward_amount,
+                share_marker,
+            );
+            assert(!Mapping::contains(escrow_operation_markers, operation_marker));
+
+            let shared: ClaimTriageState = ClaimTriageState {
+                claim_hash: current.claim_hash,
+                bounty_id: current.bounty_id,
+                status: 3u8,
+                package_hash: package_hash,
+                updated_height: block.height,
+            };
+            Mapping::set(claim_triage_states, claim_hash, shared);
+            Mapping::set(escrow_operation_markers, operation_marker, true);
+        };
+    }
+
+    fn mark_patched(
+        public bounty_id: field,
+        public claim_hash: field,
+        public patched_marker: field,
+    ) -> Final {
+        let signer = self.signer;
+        return final {
+            assert(Mapping::contains(bounties, bounty_id));
+            let bounty: BountyState = Mapping::get(bounties, bounty_id);
+            assert_eq(bounty.owner_address, signer);
+
+            assert(Mapping::contains(claim_triage_states, claim_hash));
+            let current: ClaimTriageState = Mapping::get(claim_triage_states, claim_hash);
+            assert_eq(current.bounty_id, bounty_id);
+            assert_eq(current.status, 3u8);
+            assert(current.package_hash != 0field);
+            assert(Mapping::contains(claim_payouts, claim_hash));
+            let payout: ClaimPayoutState = Mapping::get(claim_payouts, claim_hash);
+            assert_eq(payout.status, 1u8);
+            let operation_marker: field = derive_operation_marker(
+                205field,
+                bounty_id,
+                claim_hash,
+                signer,
+                payout.whitehat_address,
+                payout.reward_amount,
+                patched_marker,
+            );
+            assert(!Mapping::contains(escrow_operation_markers, operation_marker));
+
+            let patched: ClaimTriageState = ClaimTriageState {
+                claim_hash: current.claim_hash,
+                bounty_id: current.bounty_id,
+                status: 4u8,
+                package_hash: current.package_hash,
+                updated_height: block.height,
+            };
+            Mapping::set(claim_triage_states, claim_hash, patched);
+            Mapping::set(escrow_operation_markers, operation_marker, true);
         };
     }
 
@@ -558,20 +787,33 @@ program zkbugbounty_7f3c92.aleo {
         );
         return final {
             assert(reward_amount > 0u64);
-            assert(release_marker != 0field);
             assert(Mapping::contains(bounties, bounty_id));
             let bounty: BountyState = Mapping::get(bounties, bounty_id);
             assert_eq(bounty.owner_address, signer);
             assert(bounty.status == 1u8 || bounty.status == 2u8 || bounty.status == 3u8);
+            assert(Mapping::contains(bounty_protocol_versions, bounty_id));
+            let bounty_protocol_version: u8 = Mapping::get(bounty_protocol_versions, bounty_id);
+            assert_eq(bounty_protocol_version, 2u8);
 
             assert(Mapping::contains(claim_receipts, claim_hash));
             let receipt: ClaimReceiptState = Mapping::get(claim_receipts, claim_hash);
             assert_eq(receipt.claim_hash, claim_hash);
             assert_eq(receipt.bounty_id, bounty_id);
             assert_eq(receipt.proof_status, 1u8);
+            assert_eq(receipt.protocol_version, 2u8);
             assert(Mapping::contains(claim_reporters, claim_hash));
             let reporter: address = Mapping::get(claim_reporters, claim_hash);
             assert_eq(reporter, whitehat_address);
+            let operation_marker: field = derive_operation_marker(
+                206field,
+                bounty_id,
+                claim_hash,
+                signer,
+                reporter,
+                reward_amount,
+                release_marker,
+            );
+            assert(!Mapping::contains(escrow_operation_markers, operation_marker));
 
             assert(Mapping::contains(claim_payouts, claim_hash));
             let payout: ClaimPayoutState = Mapping::get(claim_payouts, claim_hash);
@@ -581,10 +823,18 @@ program zkbugbounty_7f3c92.aleo {
             assert_eq(payout.reward_amount, reward_amount);
             assert_eq(payout.status, 1u8);
 
+            assert(Mapping::contains(claim_triage_states, claim_hash));
+            let triage: ClaimTriageState = Mapping::get(claim_triage_states, claim_hash);
+            assert_eq(triage.bounty_id, bounty_id);
+            assert_eq(triage.status, 4u8);
+
             assert(Mapping::contains(bounty_escrows, bounty_id));
             let escrow: BountyEscrowState = Mapping::get(bounty_escrows, bounty_id);
             assert_eq(escrow.owner_address, signer);
             assert(escrow.locked_amount >= reward_amount);
+            assert(Mapping::contains(bounty_claim_counts, bounty_id));
+            let unresolved_claims: u64 = Mapping::get(bounty_claim_counts, bounty_id);
+            assert(unresolved_claims > 0u64);
             transfer.run();
 
             let updated_escrow: BountyEscrowState = BountyEscrowState {
@@ -607,10 +857,137 @@ program zkbugbounty_7f3c92.aleo {
                 status: 2u8,
                 locked_height: payout.locked_height,
                 paid_height: block.height,
-                release_marker: release_marker,
+                release_marker: operation_marker,
+            };
+            let paid_triage: ClaimTriageState = ClaimTriageState {
+                claim_hash: triage.claim_hash,
+                bounty_id: triage.bounty_id,
+                status: 5u8,
+                package_hash: triage.package_hash,
+                updated_height: block.height,
             };
             Mapping::set(bounty_escrows, bounty_id, updated_escrow);
             Mapping::set(claim_payouts, claim_hash, paid_payout);
+            Mapping::set(claim_triage_states, claim_hash, paid_triage);
+            Mapping::set(bounty_claim_counts, bounty_id, unresolved_claims - 1u64);
+            Mapping::set(escrow_operation_markers, operation_marker, true);
+        };
+    }
+
+    fn reject_claim(
+        public bounty_id: field,
+        public claim_hash: field,
+        public rejection_marker: field,
+    ) -> Final {
+        let signer = self.signer;
+        return final {
+            assert(Mapping::contains(bounties, bounty_id));
+            let bounty: BountyState = Mapping::get(bounties, bounty_id);
+            assert_eq(
+                signer,
+                aleo19cavyq6przvp7d5yjtpm60z5nh58rqd0vc3zr8q409fdqdtn7ypq8vfqx6
+            );
+            assert(Mapping::contains(bounty_protocol_versions, bounty_id));
+            let bounty_protocol_version: u8 = Mapping::get(bounty_protocol_versions, bounty_id);
+            assert_eq(bounty_protocol_version, 2u8);
+
+            assert(Mapping::contains(claim_receipts, claim_hash));
+            let receipt: ClaimReceiptState = Mapping::get(claim_receipts, claim_hash);
+            assert_eq(receipt.bounty_id, bounty_id);
+            assert_eq(receipt.proof_status, 1u8);
+            assert_eq(receipt.protocol_version, 2u8);
+            assert(Mapping::contains(claim_reporters, claim_hash));
+            let reporter: address = Mapping::get(claim_reporters, claim_hash);
+            let has_payout: bool = Mapping::contains(claim_payouts, claim_hash);
+            let empty_payout: ClaimPayoutState = ClaimPayoutState {
+                claim_hash: claim_hash,
+                bounty_id: bounty_id,
+                whitehat_address: reporter,
+                reward_amount: 0u64,
+                status: 0u8,
+                locked_height: 0u32,
+                paid_height: 0u32,
+                release_marker: 0field,
+            };
+            let payout: ClaimPayoutState = Mapping::get_or_use(
+                claim_payouts,
+                claim_hash,
+                empty_payout,
+            );
+            let operation_marker: field = derive_operation_marker(
+                207field,
+                bounty_id,
+                claim_hash,
+                signer,
+                reporter,
+                payout.reward_amount,
+                rejection_marker,
+            );
+            assert(!Mapping::contains(escrow_operation_markers, operation_marker));
+
+            let empty_triage: ClaimTriageState = ClaimTriageState {
+                claim_hash: claim_hash,
+                bounty_id: bounty_id,
+                status: 0u8,
+                package_hash: 0field,
+                updated_height: receipt.created_height,
+            };
+            let triage: ClaimTriageState = Mapping::get_or_use(
+                claim_triage_states,
+                claim_hash,
+                empty_triage,
+            );
+            assert_eq(triage.bounty_id, bounty_id);
+            assert(triage.status == 0u8 || triage.status == 1u8 || triage.status == 2u8);
+
+            if has_payout {
+                assert_eq(payout.claim_hash, claim_hash);
+                assert_eq(payout.bounty_id, bounty_id);
+                assert_eq(payout.whitehat_address, reporter);
+                assert_eq(payout.status, 1u8);
+                assert(Mapping::contains(bounty_escrows, bounty_id));
+                let escrow: BountyEscrowState = Mapping::get(bounty_escrows, bounty_id);
+                assert(escrow.locked_amount >= payout.reward_amount);
+
+                let unlocked_escrow: BountyEscrowState = BountyEscrowState {
+                    owner_address: escrow.owner_address,
+                    total_funded: escrow.total_funded,
+                    available_balance: escrow.available_balance + payout.reward_amount,
+                    locked_amount: escrow.locked_amount - payout.reward_amount,
+                    paid_amount: escrow.paid_amount,
+                    refunded_amount: escrow.refunded_amount,
+                    status: escrow.status,
+                    last_funding_height: escrow.last_funding_height,
+                    last_funding_marker: escrow.last_funding_marker,
+                    last_refund_marker: escrow.last_refund_marker,
+                };
+                Mapping::set(bounty_escrows, bounty_id, unlocked_escrow);
+            }
+
+            let rejected_payout: ClaimPayoutState = ClaimPayoutState {
+                claim_hash: payout.claim_hash,
+                bounty_id: payout.bounty_id,
+                whitehat_address: payout.whitehat_address,
+                reward_amount: payout.reward_amount,
+                status: 3u8,
+                locked_height: payout.locked_height,
+                paid_height: 0u32,
+                release_marker: operation_marker,
+            };
+            assert(Mapping::contains(bounty_claim_counts, bounty_id));
+            let unresolved_claims: u64 = Mapping::get(bounty_claim_counts, bounty_id);
+            assert(unresolved_claims > 0u64);
+            let rejected_triage: ClaimTriageState = ClaimTriageState {
+                claim_hash: claim_hash,
+                bounty_id: bounty_id,
+                status: 6u8,
+                package_hash: triage.package_hash,
+                updated_height: block.height,
+            };
+            Mapping::set(claim_payouts, claim_hash, rejected_payout);
+            Mapping::set(claim_triage_states, claim_hash, rejected_triage);
+            Mapping::set(bounty_claim_counts, bounty_id, unresolved_claims - 1u64);
+            Mapping::set(escrow_operation_markers, operation_marker, true);
         };
     }
 
@@ -626,36 +1003,50 @@ program zkbugbounty_7f3c92.aleo {
         );
         return final {
             assert(amount > 0u64);
-            assert(refund_marker != 0field);
             assert(Mapping::contains(bounties, bounty_id));
             let bounty: BountyState = Mapping::get(bounties, bounty_id);
             assert_eq(bounty.owner_address, signer);
             assert_eq(bounty.status, 3u8);
             assert(block.height > bounty.disclosure_deadline);
+            assert(Mapping::contains(bounty_protocol_versions, bounty_id));
+            let bounty_protocol_version: u8 = Mapping::get(bounty_protocol_versions, bounty_id);
+            assert_eq(bounty_protocol_version, 2u8);
 
             assert(Mapping::contains(bounty_escrows, bounty_id));
             let escrow: BountyEscrowState = Mapping::get(bounty_escrows, bounty_id);
+            assert_eq(escrow.status, 1u8);
+            let operation_marker: field = derive_operation_marker(
+                208field,
+                bounty_id,
+                0field,
+                signer,
+                signer,
+                amount,
+                refund_marker,
+            );
+            assert(!Mapping::contains(escrow_operation_markers, operation_marker));
             assert(Mapping::contains(bounty_claim_counts, bounty_id));
             let claim_count: u64 = Mapping::get(bounty_claim_counts, bounty_id);
             assert_eq(escrow.owner_address, signer);
             assert_eq(escrow.locked_amount, 0u64);
             assert_eq(claim_count, 0u64);
-            assert(escrow.available_balance >= amount);
+            assert_eq(escrow.available_balance, amount);
             transfer.run();
 
             let updated_escrow: BountyEscrowState = BountyEscrowState {
                 owner_address: escrow.owner_address,
                 total_funded: escrow.total_funded,
-                available_balance: escrow.available_balance - amount,
+                available_balance: 0u64,
                 locked_amount: escrow.locked_amount,
                 paid_amount: escrow.paid_amount,
                 refunded_amount: escrow.refunded_amount + amount,
                 status: 3u8,
                 last_funding_height: escrow.last_funding_height,
                 last_funding_marker: escrow.last_funding_marker,
-                last_refund_marker: refund_marker,
+                last_refund_marker: operation_marker,
             };
             Mapping::set(bounty_escrows, bounty_id, updated_escrow);
+            Mapping::set(escrow_operation_markers, operation_marker, true);
         };
     }
 

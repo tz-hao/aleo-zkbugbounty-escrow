@@ -1,8 +1,10 @@
 "use client";
 
 import { AlertTriangle, Bot, CheckCircle2, Clock3, FileText, ReceiptText } from "lucide-react";
+import { useState } from "react";
 import { ClaimCard } from "@/components/claim-card";
 import { DemoRolePreview } from "@/components/demo-role-preview";
+import { OnChainTriageWorkspace } from "@/components/on-chain-triage-workspace";
 import { RewardEscrowStatus } from "@/components/reward-escrow-status";
 import { TriageActionControls } from "@/components/triage-action-controls";
 import { useAppState } from "@/components/app-state-provider";
@@ -20,6 +22,7 @@ import { getImpactBand, getVerificationLabel, getVerificationStatement } from "@
 
 export default function TriagePage() {
   const { state } = useAppState();
+  const [triageMode, setTriageMode] = useState<"onchain" | "demo">("onchain");
   const actor = state.currentActor;
   const hasTriageAccess = canViewTriage(actor);
   const visibleClaims = state.claims.filter((claim) => {
@@ -48,8 +51,34 @@ export default function TriagePage() {
         </div>
       </section>
 
-      <DemoRolePreview />
+      <div className="inline-flex w-fit rounded-md border border-white/10 bg-black/20 p-1" aria-label="Triage data source">
+        <button
+          className={`focus-ring min-h-11 rounded px-4 py-2 text-sm font-semibold ${
+            triageMode === "onchain" ? "bg-cyan-300/15 text-cyan-100" : "text-slate-400"
+          }`}
+          type="button"
+          onClick={() => setTriageMode("onchain")}
+        >
+          Aleo Testnet
+        </button>
+        <button
+          className={`focus-ring min-h-11 rounded px-4 py-2 text-sm font-semibold ${
+            triageMode === "demo" ? "bg-violet-300/15 text-violet-100" : "text-slate-400"
+          }`}
+          type="button"
+          onClick={() => setTriageMode("demo")}
+        >
+          本地流程演示
+        </button>
+      </div>
+
       <RewardEscrowStatus />
+
+      {triageMode === "onchain" ? (
+        <OnChainTriageWorkspace />
+      ) : (
+        <>
+      <DemoRolePreview />
 
       {!hasTriageAccess ? (
         <section className="surface-card rounded-lg p-6">
@@ -270,6 +299,8 @@ export default function TriagePage() {
             })
           : null}
       </section>
+        </>
+      )}
     </div>
   );
 }

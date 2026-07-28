@@ -30,7 +30,7 @@ const draft: CreateBountyDraft = {
   criticalReward: "1000",
   highReward: "500",
   mediumReward: "100",
-  lowReward: "10",
+  lowReward: "0",
   disclosureDeadline: 20_000_000,
   feeMicrocredits: 1_000_000,
 };
@@ -46,7 +46,7 @@ function transition(overrides: Record<string, unknown> = {}) {
       { type: "public", value: "1000u64" },
       { type: "public", value: "500u64" },
       { type: "public", value: "100u64" },
-      { type: "public", value: "10u64" },
+      { type: "public", value: "0u64" },
       { type: "public", value: "20000000u32" },
     ],
     ...overrides,
@@ -80,7 +80,7 @@ const mapping: OnChainBountyState = {
   owner,
   scopeHash: "6001field",
   ruleId: "vault-accounting-safety",
-  rewards: { critical: "1000", high: "500", medium: "100", low: "10" },
+  rewards: { critical: "1000", high: "500", medium: "100", low: "0" },
   disclosureDeadline: 20_000_000,
   status: "Active",
   source: "AleoTestnet",
@@ -101,7 +101,7 @@ test("create_bounty builder follows the deployed ABI exactly", () => {
     "1000u64",
     "500u64",
     "100u64",
-    "10u64",
+    "0u64",
     "20000000u32",
   ]);
   assert.equal(preview.programId, "zkbugbounty_7f3c92.aleo");
@@ -122,6 +122,10 @@ test("create_bounty builder rejects malformed fields, reward order, deadline, an
   assert.throws(
     () => buildCreateBountyTransaction({ ...draft, highReward: "1001" }, 19_000_000),
     /Rewards must satisfy/,
+  );
+  assert.throws(
+    () => buildCreateBountyTransaction({ ...draft, lowReward: "1" }, 19_000_000),
+    /Low must be 0/,
   );
   assert.throws(
     () => buildCreateBountyTransaction({ ...draft, disclosureDeadline: 19_000_000 }, 19_000_000),

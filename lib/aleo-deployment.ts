@@ -36,10 +36,12 @@ export type AleoDeploymentStatus = {
   endpoints: {
     program: string;
     transaction: string;
+    latestEdition: string;
   };
   errors?: {
     program?: DeploymentEndpointError;
     transaction?: DeploymentEndpointError;
+    latestEdition?: DeploymentEndpointError;
   };
 };
 
@@ -200,14 +202,38 @@ async function verifyTransactionEndpoint(
   }
 }
 
+async function verifyLatestEditionEndpoint(
+  fetcher: DeploymentFetch,
+): Promise<EndpointResult<number>> {
+  const response = await fetchEndpoint(fetcher, ALEO_TESTNET_DEPLOYMENT.latestEditionApiUrl);
+  if (response.kind !== "found") return response;
+  try {
+    const value = Number(await response.value.text());
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error("Aleo current Program edition is invalid");
+    }
+    return { kind: "found", value };
+  } catch (error) {
+    return {
+      kind: "configuration_error",
+      error: {
+        status: "invalid_payload",
+        message: error instanceof Error ? error.message : "Current Program edition is invalid.",
+      },
+    };
+  }
+}
+
 function deploymentStatusFrom(
   program: EndpointResult<{ source: string }>,
   transaction: EndpointResult<TransactionVerification>,
+  latestEdition: EndpointResult<number>,
 ): AleoDeploymentStatus {
   const programFound = program.kind === "found";
   const transactionFound = transaction.kind === "found";
   const programError = program.kind === "found" ? undefined : program.error;
   const transactionError = transaction.kind === "found" ? undefined : transaction.error;
+  const latestEditionError = latestEdition.kind === "found" ? undefined : latestEdition.error;
 
   let verificationStatus: DeploymentVerificationStatus;
   if (program.kind === "configuration_error" || transaction.kind === "configuration_error") {
@@ -256,7 +282,7 @@ function deploymentStatusFrom(
     transactionId: ALEO_TESTNET_DEPLOYMENT.transactionId,
     programOwner: ALEO_TESTNET_PROGRAM_OWNER,
     edition: transactionFound ? transaction.value.edition : null,
-    currentEdition: transactionFound ? transaction.value.edition : null,
+    currentEdition: latestEdition.kind === "found" ? latestEdition.value : null,
     verifyingKeyCount: transactionFound ? transaction.value.verifyingKeyCount : null,
     programFound,
     transactionFound,
@@ -265,10 +291,12 @@ function deploymentStatusFrom(
     endpoints: {
       program: ALEO_TESTNET_DEPLOYMENT.programApiUrl,
       transaction: ALEO_TESTNET_DEPLOYMENT.transactionApiUrl,
+      latestEdition: ALEO_TESTNET_DEPLOYMENT.latestEditionApiUrl,
     },
     errors: {
       ...(programError ? { program: programError } : {}),
       ...(transactionError ? { transaction: transactionError } : {}),
+      ...(latestEditionError ? { latestEdition: latestEditionError } : {}),
     },
   };
   if (Object.keys(status.errors ?? {}).length === 0) delete status.errors;
@@ -279,11 +307,12 @@ function deploymentStatusFrom(
 export async function fetchAleoDeploymentStatus(
   fetcher: DeploymentFetch = fetch,
 ): Promise<AleoDeploymentStatus> {
-  const [program, transaction] = await Promise.all([
+  const [program, transaction, latestEdition] = await Promise.all([
     verifyProgramEndpoint(fetcher),
     verifyTransactionEndpoint(fetcher),
+    verifyLatestEditionEndpoint(fetcher),
   ]);
-  return deploymentStatusFrom(program, transaction);
+  return deploymentStatusFrom(program, transaction, latestEdition);
 }
 
 export function deploymentHttpStatus(deployment: AleoDeploymentStatus): number {

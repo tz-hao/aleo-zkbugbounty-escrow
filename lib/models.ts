@@ -119,6 +119,57 @@ export type OnChainClaimReceipt = {
   mapping: "claim_receipts";
 };
 
+export type OnChainBountyEscrowState = {
+  bountyId: string;
+  owner: string;
+  totalFunded: string;
+  availableBalance: string;
+  lockedAmount: string;
+  paidAmount: string;
+  refundedAmount: string;
+  status: "Funded" | "Refunded";
+  lastFundingHeight: number;
+  lastFundingMarker: string | null;
+  lastRefundMarker: string | null;
+  source: "AleoTestnet";
+  network: "testnet";
+  programId: string;
+  mapping: "bounty_escrows";
+};
+
+export type OnChainClaimPayoutState = {
+  claimHash: string;
+  bountyId: string;
+  whitehatAddress: string;
+  rewardAmount: string;
+  status: "RewardLocked" | "Paid" | "Rejected";
+  lockedHeight: number;
+  paidHeight: number | null;
+  releaseMarker: string | null;
+  source: "AleoTestnet";
+  network: "testnet";
+  programId: string;
+  mapping: "claim_payouts";
+};
+
+export type OnChainClaimTriageState = {
+  claimHash: string;
+  bountyId: string;
+  status:
+    | "RewardLocked"
+    | "DetailsRequested"
+    | "EncryptedDetailsShared"
+    | "Patched"
+    | "Paid"
+    | "Rejected";
+  packageHash: string | null;
+  updatedHeight: number;
+  source: "AleoTestnet";
+  network: "testnet";
+  programId: string;
+  mapping: "claim_triage_states";
+};
+
 export type ProtocolVersion = {
   version: string;
   proofSystem: string;

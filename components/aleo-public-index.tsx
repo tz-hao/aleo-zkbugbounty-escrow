@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, ExternalLink, RefreshCw, ShieldCheck } from "lucide-react";
 
+import { getOnChainBountyOperationalStatus } from "@/lib/aleo-bounty-registry";
 import type { AleoPublicIndexPage } from "@/lib/aleo-public-index";
 
 type IndexKind = "bounties" | "claims";
@@ -13,24 +14,38 @@ export function AleoPublicIndex() {
   const [registry, setRegistry] = useState<AleoPublicIndexPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [currentHeight, setCurrentHeight] = useState<number | null>(null);
   const [requestVersion, setRequestVersion] = useState(0);
 
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
-    fetch(`/api/aleo/registry?kind=${kind}&page=${page}&limit=10`, {
-      method: "GET",
-      headers: { accept: "application/json" },
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then(async (response) => {
+    Promise.all([
+      fetch(`/api/aleo/registry?kind=${kind}&page=${page}&limit=10`, {
+        method: "GET",
+        headers: { accept: "application/json" },
+        cache: "no-store",
+        signal: controller.signal,
+      }),
+      fetch("/api/aleo/network", {
+        method: "GET",
+        headers: { accept: "application/json" },
+        cache: "no-store",
+        signal: controller.signal,
+      }),
+    ])
+      .then(async ([response, networkResponse]) => {
         const payload = await response.json();
         if (!response.ok || !payload.registry) {
           throw new Error("Aleo Testnet public index unavailable");
         }
+        const networkPayload = networkResponse.ok
+          ? await networkResponse.json() as { network?: { latestHeight?: number } }
+          : null;
         if (active) {
           setRegistry(payload.registry as AleoPublicIndexPage);
+          const latestHeight = networkPayload?.network?.latestHeight;
+          setCurrentHeight(Number.isSafeInteger(latestHeight) ? latestHeight! : null);
           setError("");
         }
       })
@@ -118,7 +133,11 @@ export function AleoPublicIndex() {
                 <p className="mt-3 break-all font-mono text-xs text-cyan-100">{item.bountyId}</p>
                 {item.bounty ? (
                   <p className="mt-2 text-sm text-slate-400">
-                    {item.bounty.ruleId} · {item.bounty.status} · Owner {shorten(item.bounty.owner)}
+                    {item.bounty.ruleId} ·{" "}
+                    {currentHeight === null
+                      ? item.bounty.status
+                      : getOnChainBountyOperationalStatus(item.bounty, currentHeight)}{" "}
+                    · Owner {shorten(item.bounty.owner)}
                   </p>
                 ) : (
                   <p className="mt-2 text-sm text-red-200">Mapping 未验证，不能作为有效 Bounty 展示。</p>
