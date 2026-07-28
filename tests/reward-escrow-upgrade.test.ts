@@ -10,6 +10,7 @@ import {
   REWARD_ESCROW_MAPPINGS,
   REWARD_ESCROW_UPGRADE_PLAN,
 } from "../lib/aleo-reward-escrow.ts";
+import { readCanonicalLeoSourceAbi } from "./helpers/leo-source-abi.ts";
 
 const OWNER = "aleo1owner";
 const WHITEHAT = "aleo1whitehat";
@@ -55,8 +56,9 @@ type SimEscrow = {
 };
 
 function readAbi() {
-  return JSON.parse(readFileSync("leo/bug_proof/build/abi.json", "utf8")) as {
+  return readCanonicalLeoSourceAbi() as {
     functions: AbiFunction[];
+    mappings: Array<{ name: string }>;
   };
 }
 

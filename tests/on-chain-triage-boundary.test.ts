@@ -6,10 +6,10 @@ import {
   inspectOnChainTriageAbi,
   ON_CHAIN_TRIAGE_CAPABILITY,
 } from "../lib/aleo-triage.ts";
+import { readCanonicalLeoSourceAbi } from "./helpers/leo-source-abi.ts";
 
 test("local upgrade ABI contains the full on-chain triage boundary", () => {
-  const abi = JSON.parse(readFileSync("leo/bug_proof/build/abi.json", "utf8"));
-  const inspection = inspectOnChainTriageAbi(abi);
+  const inspection = inspectOnChainTriageAbi(readCanonicalLeoSourceAbi());
   assert.equal(inspection.available, true);
   assert.deepEqual(inspection.missingFunctions, []);
   assert.deepEqual(inspection.missingMappings, []);

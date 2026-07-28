@@ -185,8 +185,40 @@ test("Escrow transaction builders reject legacy receipts and malformed public in
   );
 });
 
+function compiledEscrowCapabilitySource() {
+  const functions = [
+    ["fund_bounty", ["field", "u64", "field"]],
+    ["lock_reward", ["field", "field", "address", "u64", "field"]],
+    ["release_reward", ["field", "field", "address", "u64", "field"]],
+    ["refund_bounty", ["field", "u64", "field"]],
+    ["request_disclosure", ["field", "field", "field"]],
+    ["attest_encrypted_details", ["field", "field", "field", "field"]],
+    ["mark_patched", ["field", "field", "field"]],
+    ["reject_claim", ["field", "field", "field"]],
+  ] as const;
+  const mappings = [
+    ["bounty_escrows", "BountyEscrowState"],
+    ["claim_payouts", "ClaimPayoutState"],
+    ["bounty_claim_counts", "u64"],
+    ["claim_reporters", "address"],
+    ["claim_triage_states", "ClaimTriageState"],
+    ["bounty_protocol_versions", "u8"],
+    ["escrow_operation_markers", "boolean"],
+  ] as const;
+  return [
+    "program zkbugbounty_7f3c92.aleo;",
+    ...mappings.map(([name, value]) =>
+      `mapping ${name}:\n    key as field.public;\n    value as ${value}.public;`
+    ),
+    ...functions.map(([name, inputs]) =>
+      `function ${name}:\n${inputs.map((type, index) =>
+        `    input r${index} as ${type}.public;`
+      ).join("\n")}\n\nfinalize ${name}:\n`
+    ),
+  ].join("\n");
+}
 test("deployed Escrow capability requires matching Program source and current edition", async () => {
-  const upgradedSource = readFileSync("leo/bug_proof/build/main.aleo", "utf8");
+  const upgradedSource = readFileSync("leo/bug_proof/src/main.leo", "utf8");
   const legacySource =
     "program zkbugbounty_7f3c92.aleo;\nmapping bounties: field => field;\nfunction create_bounty:\n";
   const fetchCapabilityEvidence = (source: string, edition: number) =>
@@ -197,6 +229,9 @@ test("deployed Escrow capability requires matching Program source and current ed
   const available = await fetchRewardEscrowCapability(
     fetchCapabilityEvidence(upgradedSource, 1),
   );
+  const compiledAvailable = await fetchRewardEscrowCapability(
+    fetchCapabilityEvidence(compiledEscrowCapabilitySource(), 1),
+  );
   const notUpgraded = await fetchRewardEscrowCapability(
     fetchCapabilityEvidence(legacySource, 0),
   );
@@ -204,12 +239,12 @@ test("deployed Escrow capability requires matching Program source and current ed
     fetchCapabilityEvidence(upgradedSource, 0),
   );
   const incompatibleSignature = upgradedSource.replace(
-    "function lock_reward:\n    input r0 as field.public;\n    input r1 as field.public;\n    input r2 as address.public;\n    input r3 as u64.public;\n    input r4 as field.public;",
-    "function lock_reward:\n    input r0 as field.public;\n    input r1 as field.public;\n    input r2 as address.public;\n    input r3 as u64.public;\n    input r4 as u64.public;",
+    "public lock_marker: field,",
+    "public lock_marker: u64,",
   );
   const incompatibleMapping = upgradedSource.replace(
-    "mapping escrow_operation_markers:\n    key as field.public;\n    value as boolean.public;",
-    "mapping escrow_operation_markers:\n    key as field.public;\n    value as u64.public;",
+    "mapping escrow_operation_markers: field => bool;",
+    "mapping escrow_operation_markers: field => u64;",
   );
   assert.notEqual(incompatibleSignature, upgradedSource);
   assert.notEqual(incompatibleMapping, upgradedSource);
@@ -226,6 +261,8 @@ test("deployed Escrow capability requires matching Program source and current ed
   assert.equal(available.status, "Available");
   assert.equal(available.currentEdition, 1);
   assert.equal(available.walletRequestEnabled, true);
+  assert.equal(compiledAvailable.status, "Available");
+  assert.equal(compiledAvailable.walletRequestEnabled, true);
   assert.equal(notUpgraded.status, "ProgramUpgradeRequired");
   assert.equal(notUpgraded.currentEdition, 0);
   assert.equal(notUpgraded.walletRequestEnabled, false);

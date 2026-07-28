@@ -18,6 +18,7 @@ import { verifyCreateBountyMapping } from "../lib/aleo-create-bounty-verificatio
 import { fetchAleoTestnetStatus, parseAleoBlockHeight } from "../lib/aleo-network.ts";
 import type { OnChainBountyState } from "../lib/models.ts";
 import { assertNoPrivateFields } from "../lib/privacy-guards.ts";
+import { readCanonicalLeoSourceAbi } from "./helpers/leo-source-abi.ts";
 
 const transactionId = `at1${"a".repeat(58)}`;
 const blockHash = `ab1${"b".repeat(58)}`;
@@ -90,8 +91,7 @@ const mapping: OnChainBountyState = {
 };
 
 test("create_bounty builder follows the deployed ABI exactly", () => {
-  const abi = JSON.parse(readFileSync("leo/bug_proof/build/abi.json", "utf8"));
-  assert.equal(assertCreateBountyAbi(abi), true);
+  assert.equal(assertCreateBountyAbi(readCanonicalLeoSourceAbi()), true);
 
   const preview = buildCreateBountyTransaction(draft, 19_000_000);
   assert.deepEqual(preview.inputs, [

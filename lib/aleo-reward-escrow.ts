@@ -186,36 +186,59 @@ const SOURCE_MAPPING_VALUES: Record<(typeof REWARD_ESCROW_MAPPINGS)[number], str
 };
 
 function sourceEntryMatches(source: string, name: RewardEscrowFunctionName) {
-  const match = source.match(
+  const compiledMatch = source.match(
     new RegExp(`(?:^|\\n)function\\s+${name}:([\\s\\S]*?)(?=\\nfinalize\\s+${name}:)`),
   );
-  if (!match) return false;
-  const inputLines = match[1]
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith("input "));
-  const actualInputs = inputLines.map((line) =>
-    line.match(/^input r\d+ as ([A-Za-z0-9_./]+)\.public;$/)?.[1] ?? "invalid"
-  );
   const expectedInputs = SOURCE_FUNCTION_INPUTS[name];
+  if (compiledMatch) {
+    const inputLines = compiledMatch[1]
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith("input "));
+    const actualInputs = inputLines.map((line) =>
+      line.match(/^input r\d+ as ([A-Za-z0-9_./]+)\.public;$/)?.[1] ?? "invalid"
+    );
+    return actualInputs.length === expectedInputs.length &&
+      actualInputs.every((type, index) => type === expectedInputs[index]);
+  }
+
+  const leoMatch = source.match(
+    new RegExp(`\\bfn\\s+${name}\\s*\\(([\\s\\S]*?)\\)\\s*->\\s*Final\\s*\\{`),
+  );
+  if (!leoMatch) return false;
+  const actualInputs = leoMatch[1]
+    .split(",")
+    .map((input) => input.trim())
+    .filter(Boolean)
+    .map((input) =>
+      input.match(/^public\s+[a-z_][a-z0-9_]*:\s*([A-Za-z0-9_./]+)$/)?.[1] ??
+      "invalid"
+    );
   return actualInputs.length === expectedInputs.length &&
     actualInputs.every((type, index) => type === expectedInputs[index]);
 }
-
 function sourceMappingMatches(
   source: string,
   name: (typeof REWARD_ESCROW_MAPPINGS)[number],
 ) {
   const valueType = SOURCE_MAPPING_VALUES[name];
-  return new RegExp(
+  const leoValueType = valueType === "boolean" ? "bool" : valueType;
+  const compiledMapping = new RegExp(
     `(?:^|\\n)mapping\\s+${name}:\\s*\\n` +
       `\\s*key as field\\.public;\\s*\\n` +
       `\\s*value as ${valueType}\\.public;`,
   ).test(source);
+  const leoMapping = new RegExp(
+    `\\bmapping\\s+${name}:\\s*field\\s*=>\\s*${leoValueType}\\s*;`,
+  ).test(source);
+  return compiledMapping || leoMapping;
 }
-
 export function inspectRewardEscrowSource(source: string): RewardEscrowAbiInspection {
-  if (!source.includes(`program ${CANONICAL_ALEO_PROGRAM_ID};`)) {
+  const escapedProgramId = CANONICAL_ALEO_PROGRAM_ID.replace(
+    /[.*+?^${}()|[\]\\]/g,
+    "\\$&",
+  );
+  if (!new RegExp(`\\bprogram\\s+${escapedProgramId}(?:;|\\s*\\{)`).test(source)) {
     throw new Error("Reward escrow Program ID mismatch");
   }
   const requiredFunctions = [...REWARD_ESCROW_FUNCTIONS, ...RESPONSIBLE_DISCLOSURE_FUNCTIONS];
