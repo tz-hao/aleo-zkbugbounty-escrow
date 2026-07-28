@@ -4,43 +4,100 @@
   "network": "testnet",
   "currentIteration": 19,
   "iterations": {
-    "1": { "name": "Baseline and architecture audit", "status": "COMPLETED" },
-    "2": { "name": "Canonical Leo program and secure commitments", "status": "COMPLETED" },
-    "3": { "name": "On-chain Nullifier Registry", "status": "COMPLETED" },
-    "4": { "name": "On-chain Claim Receipt", "status": "COMPLETED" },
-    "5": { "name": "Wallet-signed create_bounty", "status": "COMPLETED" },
-    "6": { "name": "create_bounty Testnet acceptance", "status": "COMPLETED" },
-    "7": { "name": "Wallet-signed submit_claim", "status": "COMPLETED" },
-    "8": { "name": "Duplicate Nullifier rejection", "status": "COMPLETED" },
-    "9": { "name": "Device-side Private Proof", "status": "COMPLETED" },
-    "10": { "name": "Real Public Registry and Indexing", "status": "COMPLETED" },
-    "11": { "name": "Wallet compatibility and network handling", "status": "COMPLETED" },
-    "12": { "name": "Reward Escrow", "status": "BLOCKED_MANUAL_ACTION" },
-    "13": { "name": "Encrypted Disclosure", "status": "BLOCKED_EXTERNAL_SERVICE" },
-    "14": { "name": "On-chain Triage State Machine", "status": "BLOCKED_BY_DEPENDENCY" },
-    "15": { "name": "Four-rule Aleo support", "status": "COMPLETED" },
-    "16": { "name": "Real AI Triage Copilot", "status": "BLOCKED_EXTERNAL_SERVICE" },
-    "17": { "name": "Security privacy and supply-chain hardening", "status": "COMPLETED" },
-    "18": { "name": "Vercel E2E and productization", "status": "BLOCKED_MANUAL_ACTION" },
-    "19": { "name": "Final protocol regression and acceptance", "status": "BLOCKED_BY_DEPENDENCY" }
+    "1": {
+      "name": "Baseline and architecture audit",
+      "status": "COMPLETED"
+    },
+    "2": {
+      "name": "Canonical Leo program and secure commitments",
+      "status": "COMPLETED"
+    },
+    "3": {
+      "name": "On-chain Nullifier Registry",
+      "status": "COMPLETED"
+    },
+    "4": {
+      "name": "On-chain Claim Receipt",
+      "status": "COMPLETED"
+    },
+    "5": {
+      "name": "Wallet-signed create_bounty",
+      "status": "COMPLETED"
+    },
+    "6": {
+      "name": "create_bounty Testnet acceptance",
+      "status": "COMPLETED"
+    },
+    "7": {
+      "name": "Wallet-signed submit_claim",
+      "status": "COMPLETED"
+    },
+    "8": {
+      "name": "Duplicate Nullifier rejection",
+      "status": "COMPLETED"
+    },
+    "9": {
+      "name": "Device-side Private Proof",
+      "status": "COMPLETED"
+    },
+    "10": {
+      "name": "Real Public Registry and Indexing",
+      "status": "COMPLETED"
+    },
+    "11": {
+      "name": "Wallet compatibility and network handling",
+      "status": "COMPLETED"
+    },
+    "12": {
+      "name": "Reward Escrow",
+      "status": "BLOCKED_TECHNICAL_VALIDATION"
+    },
+    "13": {
+      "name": "Encrypted Disclosure",
+      "status": "BLOCKED_EXTERNAL_SERVICE"
+    },
+    "14": {
+      "name": "On-chain Triage State Machine",
+      "status": "BLOCKED_BY_DEPENDENCY"
+    },
+    "15": {
+      "name": "Four-rule Aleo support",
+      "status": "COMPLETED"
+    },
+    "16": {
+      "name": "Real AI Triage Copilot",
+      "status": "BLOCKED_EXTERNAL_SERVICE"
+    },
+    "17": {
+      "name": "Security privacy and supply-chain hardening",
+      "status": "COMPLETED"
+    },
+    "18": {
+      "name": "Vercel E2E and productization",
+      "status": "BLOCKED_MANUAL_ACTION"
+    },
+    "19": {
+      "name": "Final protocol regression and acceptance",
+      "status": "BLOCKED_BY_DEPENDENCY"
+    }
   },
   "blockedItems": [
     {
       "iteration": 12,
-      "status": "BLOCKED_MANUAL_ACTION",
-      "problem": "Reward Escrow upgrade code and tests are complete, but the upgraded Program has not been manually broadcast.",
-      "evidence": "Local Leo 4.0.2 build now exposes fund_bounty, lock_reward, release_reward, refund_bounty, bounty_escrows, claim_payouts, bounty_claim_counts, and claim_reporters; deployed Testnet Program still requires a manual upgrade before wallet escrow actions are enabled.",
+      "status": "BLOCKED_TECHNICAL_VALIDATION",
+      "problem": "Escrow v2 source candidate is hardened and compiles, but real local-devnet Credits E2E has not been executed.",
+      "evidence": "Node tests pass and Leo 4.0.2 builds the 29.47 KB candidate. leo test --offline reports No tests run because @test fn cannot seed external mappings, execute external Finals, or inject credits.aleo account state.",
       "attemptsMade": [
-        "Inspected the deployed-compatible ABI and canonical Leo source.",
-        "Implemented a read-only capability boundary that disables wallet actions and refuses API writes without parsing a body.",
-        "Implemented Credits escrow upgrade code in the canonical Leo Program without changing existing public entry signatures.",
-        "Added local ABI, source guard, valid flow, invalid actor, rejected claim, overdraft, duplicate payout, and malicious refund tests."
+        "Preserved all deployed v1 structs, mappings, and public entry signatures.",
+        "Implemented strict v2 isolation, disclosure sequencing, exact severity rewards, reporter binding, unresolved-claim accounting, one-shot refund, and eight context-bound replay markers.",
+        "Verified Program source and latest edition are both required before wallet actions can be enabled.",
+        "Attempted a Leo 4.0.2 VM test and removed it after the compiler proved external Mapping/Final state cannot be seeded from @test fn."
       ],
-      "whyItCannotContinue": "A compatible Program upgrade, user wallet signature, Testnet fee, and Testnet Credits are required; Codex must not broadcast the upgrade or handle private keys.",
-      "dependencyImpact": "Blocks real RewardLocked/Paid acceptance, on-chain triage, Testnet payout, and final P1 acceptance.",
-      "safeWorkThatCanContinue": "Compatibility design, Leo code, local ABI tests, disabled-action UI, and public capability reporting are complete.",
-      "requiredManualAction": "Explicitly approve a Program upgrade design, then sign the upgrade and subsequent escrow transactions in Leo Wallet.",
-      "resumeCondition": "An upgraded Program is confirmed on Testnet and its escrow mappings are verified."
+      "whyItCannotContinue": "The repository has no local devnode Mapping seed and real Credits transaction harness. TypeScript models and source assertions cannot substitute for runtime Credits acceptance.",
+      "dependencyImpact": "Blocks Upgrade Preview, manual Program Upgrade, real fund/release/refund acceptance, and completion of Iterations 12, 14, and 19.",
+      "safeWorkThatCanContinue": "Static compatibility audit, Node regressions, Leo build, capability gating, disabled-action UI, and public documentation are complete.",
+      "requiredManualAction": "Provide or approve an isolated local-devnet Credits E2E harness, run the complete valid/invalid matrix, and return only public test results.",
+      "resumeCondition": "Real local-devnet Credits balances and Mapping transitions pass the documented matrix with no P0/P1 findings."
     },
     {
       "iteration": 13,
@@ -107,17 +164,17 @@
     {
       "iteration": 19,
       "status": "BLOCKED_BY_DEPENDENCY",
-      "problem": "Final protocol acceptance cannot pass while P0 submit_claim/replay acceptance and P1 escrow/triage/payout remain incomplete.",
-      "evidence": "The live Testnet public index contains one Mapping Verified create_bounty and zero submit_claim transactions; the deployed ABI has no escrow or triage mappings.",
+      "problem": "Final protocol acceptance remains blocked by real Escrow/Triage/Credits runtime validation and the unbroadcast edition 1 candidate.",
+      "evidence": "Wallet-signed create_bounty and submit_claim plus duplicate-nullifier rejection are accepted on Testnet. Escrow v2 Node tests and Leo build pass, while real Credits E2E is not yet available.",
       "attemptsMade": [
         "Re-ran the full 176-test, lint, build, browser, privacy, secret, dependency, and live Testnet registry checks.",
         "Revisited every P0 and P1 blocker and confirmed each manual or upgrade dependency."
       ],
-      "whyItCannotContinue": "Wallet signatures, Testnet fees, a Program upgrade, Credits funding, and external ciphertext delivery cannot be performed by Codex.",
-      "dependencyImpact": "The project cannot be described as a complete privacy-preserving bounty protocol yet.",
-      "safeWorkThatCanContinue": "The existing Testnet bounty registry, device wallet boundary, Mock demo, local disclosure crypto, security hardening, and UI remain runnable.",
-      "requiredManualAction": "Resume Iteration 7 first, then approve Iteration 8 and the compatible Iteration 12/14 Program upgrade workflow.",
-      "resumeCondition": "All P0 and P1 public transactions and mappings are confirmed and independently verified."
+      "whyItCannotContinue": "Iteration 12 must complete local-devnet Credits E2E before any Upgrade Preview or manual Testnet upgrade.",
+      "dependencyImpact": "The project cannot claim live Credits Escrow, Paid, Refunded, or on-chain Triage acceptance.",
+      "safeWorkThatCanContinue": "Edition 0 registries and existing privacy boundaries remain operational; edition 1 wallet actions remain disabled.",
+      "requiredManualAction": "Complete the isolated devnet Credits matrix, then review a non-broadcast Upgrade Preview.",
+      "resumeCondition": "Iteration 12 technical validation passes and the user explicitly authorizes the next manual upgrade stage."
     }
   ],
   "publicTransactions": [
@@ -219,15 +276,40 @@
   },
   "iteration12Boundary": {
     "deployedStatus": "ProgramUpgradeRequired",
-    "requiredEntries": ["fund_bounty", "lock_reward", "release_reward", "refund_bounty"],
-    "requiredMappings": ["bounty_escrows", "claim_payouts", "bounty_claim_counts", "claim_reporters"],
+    "requiredEntries": [
+      "fund_bounty",
+      "lock_reward",
+      "request_disclosure",
+      "attest_encrypted_details",
+      "mark_patched",
+      "release_reward",
+      "reject_claim",
+      "refund_bounty"
+    ],
+    "requiredMappings": [
+      "bounty_escrows",
+      "claim_payouts",
+      "bounty_claim_counts",
+      "claim_reporters",
+      "claim_triage_states",
+      "bounty_protocol_versions",
+      "escrow_operation_markers"
+    ],
     "localUpgradeAbiReady": true,
     "localLeoBuildPassed": true,
     "existingEntrySignaturesPreserved": true,
     "creditsEscrowTransfers": true,
     "refundForLegacyBountiesWithoutClaimCount": "disabled",
     "walletActionsEnabled": false,
-    "demoCanClaimPaid": false
+    "demoCanClaimPaid": false,
+    "currentEdition": 0,
+    "targetEdition": 1,
+    "strictDisclosureFlow": true,
+    "severityRewardBinding": true,
+    "reporterMappingBinding": true,
+    "oneShotRefund": true,
+    "contextBoundReplayMarkers": 8,
+    "creditsE2E": "BLOCKED_TECHNICAL_VALIDATION"
   },
   "iteration13Acceptance": {
     "localEncryption": "ECDH-P256+HKDF-SHA256+A256GCM",
@@ -317,14 +399,30 @@
       "resumeCondition": "Git was initialized locally without overwriting current files."
     }
   ],
-  "lastTestResult": "196 of 196 tests passed",
+  "lastTestResult": "215 of 215 tests passed",
   "lastLintResult": "passed",
   "lastBuildResult": "Next.js 16.2.10 production build passed",
-  "lastLeoResult": "npm.cmd run leo:build passed through WSL Leo; Reward Escrow upgrade ABI generated successfully",
+  "lastLeoResult": "Leo 4.0.2 build passed through WSL; 895 statements, 29.47 KB; leo test --offline compiled but ran no tests",
   "lastAuditResult": "0 vulnerabilities across 440 dependencies",
   "lastBrowserResult": "Production 390px CDP checks passed for home, create-bounty, submit-proof, public-claims, and bounty detail; no overflow, runtime exception, console error, or Next error dialog",
   "lastTestnetResult": "one create_bounty transaction with Mapping Verified; two submit_claim transactions discovered: one controlled claim accepted and one duplicate-nullifier transaction rejected; nullifier and claim_receipt mappings verified unchanged after rejection",
   "nextRunnableIteration": null,
-  "nextResumeTargets": [18, 12],
-  "updatedAt": "2026-07-24T12:20:00+08:00"
+  "nextResumeTargets": [
+    12,
+    18
+  ],
+  "updatedAt": "2026-07-28T19:03:59+08:00",
+  "escrowV2CandidateReview": {
+    "status": "BLOCKED_TECHNICAL_VALIDATION",
+    "programId": "zkbugbounty_7f3c92.aleo",
+    "currentEdition": 0,
+    "targetEdition": 1,
+    "programSizeKb": 29.47,
+    "nodeTests": "215/215 passed",
+    "leoBuild": "passed",
+    "leoRuntimeTests": "No tests run",
+    "creditsE2E": "not validated",
+    "upgradePreviewAllowed": false,
+    "broadcastPerformed": false
+  }
 }

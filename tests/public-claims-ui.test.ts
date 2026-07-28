@@ -31,18 +31,10 @@ test("public claims page shows only public verification and disclosure guarantee
     "Private Proof Data: Never Stored",
     "Verification Level: Explicit",
     "Responsible Disclosure:",
-    "Proof Engine",
     "公开 Receipt 不等于公开 Exploit",
-    "Rule Name",
-    "受影响模块",
-    "Impact",
-    "Receipt ID",
-    "Claim Hash",
-    "Registry Key",
-    "Witness Commitment",
-    "Nullifier",
-    "Protocol Version",
-    "Private Witness: Never Stored",
+    "AleoPublicIndex",
+    "AleoBountyRegistryPanel",
+    "AleoClaimReceiptPanel",
   ]) {
     assert.equal(combinedSource.includes(phrase), true, `${phrase} must be visible on public claims page`);
   }

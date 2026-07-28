@@ -41,7 +41,8 @@ test("Leo submit_claim atomically writes the trusted on-chain Claim Receipt", ()
   assert.match(submitClaim, /let witness_commitment: field = proof\.witness_commitment;/);
   assert.match(submitClaim, /let reporter_commitment: field = proof\.reporter_commitment;/);
   assert.match(submitClaim, /created_height: block\.height/);
-  assert.match(submitClaim, /protocol_version: 1u8/);
+  assert.match(submitClaim, /Mapping::get_or_use\([\s\S]*bounty_protocol_versions,[\s\S]*1u8/);
+  assert.match(submitClaim, /protocol_version: bounty_protocol_version/);
   assert.match(submitClaim, /Mapping::set\(nullifiers, nullifier, bounty_id\);/);
   assert.match(submitClaim, /Mapping::set\(claim_receipts, claim_hash, receipt\);/);
 });
@@ -125,7 +126,9 @@ test("Public Claims exposes read-only Aleo receipts without browser persistence"
 
   assert.match(page, /AleoClaimReceiptPanel/);
   assert.match(panel, /\/api\/aleo\/receipts\//);
-  assert.match(panel, /不会使用 localStorage、Mock Receipt 或 Demo State/);
+  assert.equal(page.includes("本地演示 Registry"), false);
+  assert.equal(page.includes("Local simulation"), false);
+  assert.equal(panel.includes("不会使用 localStorage、Mock Receipt 或 Demo State"), false);
   assert.equal(panel.includes("localStorage.setItem"), false);
   assert.equal(panel.includes("sessionStorage"), false);
   assert.equal(panel.includes("reporterSecret"), false);

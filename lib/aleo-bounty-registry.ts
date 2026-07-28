@@ -36,6 +36,24 @@ const statusByLiteral: Record<string, OnChainBountyState["status"]> = {
   "3u8": "Closed",
 };
 
+export type OnChainBountyOperationalStatus =
+  | OnChainBountyState["status"]
+  | "Expired";
+
+export function getOnChainBountyOperationalStatus(
+  bounty: Pick<OnChainBountyState, "status" | "disclosureDeadline">,
+  currentHeight: number,
+): OnChainBountyOperationalStatus {
+  if (
+    bounty.status !== "Closed" &&
+    Number.isSafeInteger(currentHeight) &&
+    currentHeight > bounty.disclosureDeadline
+  ) {
+    return "Expired";
+  }
+  return bounty.status;
+}
+
 const requiredFields = [
   "owner_address",
   "scope_hash",

@@ -59,10 +59,6 @@ export function AleoClaimReceiptPanel() {
           <h2 id="aleo-claim-receipt-title" className="text-xl font-semibold text-white">
             独立核验链上 Claim Receipt
           </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            公开字段由 <span className="font-mono text-slate-300">submit_claim</span> Final
-            原子写入。查询失败时不会使用 localStorage、Mock Receipt 或 Demo State 伪装链上结果。
-          </p>
         </div>
 
         <form className="flex w-full max-w-xl flex-col gap-2 sm:flex-row" onSubmit={handleSubmit}>

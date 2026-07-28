@@ -123,8 +123,16 @@ export function buildCreateBountyTransaction(
   const high = parseUnsigned(draft.highReward, "High reward", MAX_U64);
   const medium = parseUnsigned(draft.mediumReward, "Medium reward", MAX_U64);
   const low = parseUnsigned(draft.lowReward, "Low reward", MAX_U64);
-  if (critical === 0n || critical < high || high < medium || medium < low) {
-    throw new Error("Rewards must satisfy Critical >= High >= Medium >= Low and Critical > 0");
+  if (
+    critical === 0n ||
+    medium === 0n ||
+    low !== 0n ||
+    critical < high ||
+    high < medium
+  ) {
+    throw new Error(
+      "Rewards must satisfy Critical >= High >= Medium > 0; Low must be 0 because Low proofs are not claimable",
+    );
   }
 
   const ruleField = getRuleFieldLiteral(draft.ruleId);

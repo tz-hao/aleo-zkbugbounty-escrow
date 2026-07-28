@@ -73,7 +73,7 @@ export function AleoCreateBountyForm() {
   const [criticalReward, setCriticalReward] = useState("5000000");
   const [highReward, setHighReward] = useState("2000000");
   const [mediumReward, setMediumReward] = useState("1000000");
-  const [lowReward, setLowReward] = useState("500000");
+  const lowReward = "0";
   const [deadlineBlocks, setDeadlineBlocks] = useState("100000");
   const [feeMicrocredits, setFeeMicrocredits] = useState(
     String(DEFAULT_CREATE_BOUNTY_FEE_MICROCREDITS),
@@ -188,25 +188,8 @@ export function AleoCreateBountyForm() {
           <h2 id="real-create-bounty-title" className="mt-3 text-xl font-semibold text-white">
             钱包签名创建链上 Bounty
           </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-            Owner 只来自 Program 的 <span className="font-mono text-slate-200">self.signer</span>。Vercel、WSL
-            和前端均不代签，也不会接收 Private Key。
-          </p>
         </div>
         <NetworkBadge network={network} onRefresh={() => void refreshNetwork()} />
-      </div>
-
-      <div className="mt-5 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.05] p-4">
-        <p className="text-sm font-semibold text-cyan-50">
-          {wallet.address && wallet.connectionState === "Connected"
-            ? "当前连接的钱包将作为 Bounty Owner 创建"
-            : "连接钱包后，该地址将作为 Bounty Owner 创建"}
-        </p>
-        <p className="mt-1 break-all text-xs leading-5 text-slate-400">
-          {wallet.address && wallet.connectionState === "Connected"
-            ? `${wallet.address} · Program 通过 self.signer 确认 Owner`
-            : "真实权限只取决于钱包签名者与链上 Program，不读取 Demo Preview 身份。"}
-        </p>
       </div>
 
       <form className="mt-5 grid gap-5" onSubmit={handlePreview}>
@@ -257,7 +240,7 @@ export function AleoCreateBountyForm() {
           <NumberField label="Critical Reward (microcredits)" value={criticalReward} onChange={setCriticalReward} />
           <NumberField label="High Reward (microcredits)" value={highReward} onChange={setHighReward} />
           <NumberField label="Medium Reward (microcredits)" value={mediumReward} onChange={setMediumReward} />
-          <NumberField label="Low Reward (microcredits)" value={lowReward} onChange={setLowReward} />
+          <ReadOnlyField label="Low Reward（不可领取）" value="0 microcredits" />
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">

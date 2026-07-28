@@ -58,9 +58,6 @@ export function AleoBountyRegistryPanel() {
           <h2 id="aleo-bounty-registry-title" className="text-xl font-semibold text-white">
             查询链上 Bounty 状态
           </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-          仅查询已部署 Program 的公开 mapping。未找到对应 key 时会明确返回空，不会回退到 localStorage Demo State。
-          </p>
         </div>
 
         <form className="flex w-full max-w-xl flex-col gap-2 sm:flex-row" onSubmit={handleSubmit}>

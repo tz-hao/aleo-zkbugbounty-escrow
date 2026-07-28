@@ -104,7 +104,7 @@ export function AleoDeploymentStatus() {
         : "unavailable";
 
   return (
-    <section className="surface-card rounded-lg p-5" aria-live="polite">
+    <section className="surface-card h-full rounded-lg p-5" aria-live="polite">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <div

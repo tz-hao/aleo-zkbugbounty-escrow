@@ -15,6 +15,11 @@ import {
 } from "@/lib/aleo-create-bounty";
 import { CANONICAL_ALEO_PROGRAM_ID } from "@/lib/aleo-program";
 import {
+  RESPONSIBLE_DISCLOSURE_FUNCTIONS,
+  REWARD_ESCROW_FUNCTIONS,
+  type RewardEscrowTransactionPreview,
+} from "@/lib/aleo-reward-escrow";
+import {
   assertSubmitClaimRawInputs,
   buildTransientSubmitClaimInputs,
   SUBMIT_CLAIM_FUNCTION,
@@ -57,18 +62,31 @@ export type WalletClaimSubmission = {
   statusText: string;
 };
 
+export type WalletProtocolSubmission = {
+  walletRequestId: string;
+  publicTransactionId: string | null;
+  functionName: RewardEscrowTransactionPreview["functionName"];
+  bountyId: string;
+  claimHash: string | null;
+  status: "Submitted" | "Processing" | "Finalized" | "Failed";
+  statusText: string;
+};
+
 type AleoWalletContextValue = {
   address: string | null;
   connectionState: WalletConnectionState;
   errorMessage: string | null;
   submission: WalletCreateBountySubmission | null;
   claimSubmission: WalletClaimSubmission | null;
+  protocolSubmission: WalletProtocolSubmission | null;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   submitCreateBounty: (preview: CreateBountyTransactionPreview) => Promise<string>;
   submitWalletClaim: (request: TransientSubmitClaimRequest) => Promise<string>;
+  submitProtocolTransaction: (preview: RewardEscrowTransactionPreview) => Promise<string>;
   refreshSubmission: () => Promise<void>;
   refreshClaimSubmission: () => Promise<void>;
+  refreshProtocolSubmission: () => Promise<void>;
   submitControlledDuplicateClaimInputs: (request: {
     bountyId: string;
     feeMicrocredits: number;
@@ -88,6 +106,8 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [submission, setSubmission] = useState<WalletCreateBountySubmission | null>(null);
   const [claimSubmission, setClaimSubmission] = useState<WalletClaimSubmission | null>(null);
+  const [protocolSubmission, setProtocolSubmission] =
+    useState<WalletProtocolSubmission | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -107,6 +127,7 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
       setAddress(null);
       setSubmission(null);
       setClaimSubmission(null);
+      setProtocolSubmission(null);
       setErrorMessage(null);
       setConnectionState(adapter?.readyState === "Installed" ? "Disconnected" : "NotInstalled");
     };
@@ -188,6 +209,7 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
     setAddress(null);
     setSubmission(null);
     setClaimSubmission(null);
+    setProtocolSubmission(null);
     setConnectionState(adapter?.readyState === "Installed" ? "Disconnected" : "NotInstalled");
   }
 
@@ -331,6 +353,76 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function submitProtocolTransaction(preview: RewardEscrowTransactionPreview) {
+    const adapter = adapterRef.current;
+    if (!adapter?.connected || !address) {
+      throw new Error("Connect Leo Wallet before requesting a protocol transaction");
+    }
+    const capabilityResponse = await fetch("/api/aleo/escrow", {
+      method: "GET",
+      headers: { accept: "application/json" },
+      cache: "no-store",
+    });
+    const capabilityPayload = await capabilityResponse.json().catch(() => null) as {
+      escrow?: { status?: string; walletRequestEnabled?: boolean };
+    } | null;
+    if (
+      !capabilityResponse.ok ||
+      capabilityPayload?.escrow?.status !== "Available" ||
+      capabilityPayload.escrow.walletRequestEnabled !== true
+    ) {
+      throw new Error("Reward Escrow is not available in the deployed Aleo Program");
+    }
+    const allowedFunctions = new Set<string>([
+      ...REWARD_ESCROW_FUNCTIONS,
+      ...RESPONSIBLE_DISCLOSURE_FUNCTIONS,
+    ]);
+    if (
+      preview.source !== "AleoTestnet" ||
+      preview.network !== "testnet" ||
+      preview.walletChainId !== ALEO_WALLET_TESTNET_CHAIN_ID ||
+      preview.programId !== CANONICAL_ALEO_PROGRAM_ID ||
+      !allowedFunctions.has(preview.functionName) ||
+      !Number.isSafeInteger(preview.feeMicrocredits) ||
+      preview.feeMicrocredits <= 0 ||
+      preview.inputs.length === 0
+    ) {
+      throw new Error("Protocol transaction preview is not canonical");
+    }
+    const { Transaction, WalletAdapterNetwork } = await import(
+      "@demox-labs/aleo-wallet-adapter-base"
+    );
+    const transaction = Transaction.createTransaction(
+      address,
+      WalletAdapterNetwork.TestnetBeta,
+      preview.programId,
+      preview.functionName,
+      [...preview.inputs],
+      preview.feeMicrocredits,
+      false,
+    );
+    let response;
+    try {
+      response = classifyWalletResponseId(await adapter.requestTransaction(transaction));
+    } catch (error) {
+      throw new Error(diagnoseLeoWalletTransactionError(error).message);
+    }
+    if (!response) throw new Error("Leo Wallet 未返回有效的 Wallet Request ID。");
+    const { walletRequestId, publicTransactionId } = response;
+    setProtocolSubmission({
+      walletRequestId,
+      publicTransactionId,
+      functionName: preview.functionName,
+      bountyId: preview.publicSummary.bountyId,
+      claimHash: preview.publicSummary.claimHash ?? null,
+      status: "Submitted",
+      statusText: publicTransactionId
+        ? "Wallet 已返回公开 Transaction ID；仍需等待 Confirmed 与 Mapping Verified。"
+        : "Wallet 已接收协议交易；当前返回值不能视为链上 Confirmed。",
+    });
+    return walletRequestId;
+  }
+
   async function refreshSubmission() {
     const adapter = adapterRef.current;
     if (!adapter?.connected || !submission) return;
@@ -381,19 +473,47 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function refreshProtocolSubmission() {
+    const adapter = adapterRef.current;
+    if (!adapter?.connected || !protocolSubmission) return;
+    try {
+      const walletStatus = await adapter.transactionStatus(protocolSubmission.walletRequestId);
+      const status = normalizeWalletTransactionStatus(walletStatus);
+      setProtocolSubmission({
+        ...protocolSubmission,
+        status,
+        statusText:
+          status === "Finalized"
+            ? "Wallet 处理已 Finalized；仍需核验公开 Transaction 与协议 Mapping。"
+            : status === "Failed"
+              ? "Wallet 报告协议交易失败或拒绝；不得更新链上状态。"
+              : `钱包状态：${walletStatus}`,
+      });
+    } catch {
+      setProtocolSubmission({
+        ...protocolSubmission,
+        status: "Processing",
+        statusText: "暂时无法读取 Wallet Request 状态，请稍后重试。",
+      });
+    }
+  }
+
   const value: AleoWalletContextValue = {
     address,
     connectionState,
     errorMessage,
     submission,
     claimSubmission,
+    protocolSubmission,
     connect,
     disconnect,
     submitCreateBounty,
     submitWalletClaim,
+    submitProtocolTransaction,
     submitControlledDuplicateClaimInputs,
     refreshSubmission,
     refreshClaimSubmission,
+    refreshProtocolSubmission,
   };
 
   return <AleoWalletContext.Provider value={value}>{children}</AleoWalletContext.Provider>;

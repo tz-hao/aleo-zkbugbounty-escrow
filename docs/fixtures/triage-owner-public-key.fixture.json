@@ -1,0 +1,13 @@
+{
+  "version": "zkbb-disclosure-key-v1",
+  "algorithm": "ECDH-P256",
+  "keyId": "0x2bef7a8a8faf66869ee901b4fd234d073cb2f6bb0a547bea7b52146a23e254e4",
+  "publicKey": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "DW6YBkBbAO3uL9VGrxRTqXoGApFzy4xbAsZsmUq7H2s",
+    "y": "hhurzGHzTRgI4Iff1QwHqifYLvXOENqM-MJRV6_AnQA",
+    "ext": true,
+    "key_ops": []
+  }
+}

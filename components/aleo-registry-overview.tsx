@@ -60,7 +60,7 @@ export function AleoRegistryOverview() {
 
   if (registry.kind === "loading") {
     return (
-      <section className="surface-card rounded-lg p-5" aria-live="polite">
+      <section className="surface-card h-full rounded-lg p-5" aria-live="polite">
         <div className="flex min-h-28 items-center justify-center gap-3 text-sm text-slate-400">
           <LoaderCircle className="animate-spin text-cyan-200" size={18} aria-hidden="true" />
           正在读取 Aleo Testnet Registry
@@ -71,7 +71,7 @@ export function AleoRegistryOverview() {
 
   if (registry.kind === "unavailable") {
     return (
-      <section className="surface-card rounded-lg p-5" aria-live="polite">
+      <section className="surface-card h-full rounded-lg p-5" aria-live="polite">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <ExecutionStatusBadge kind="unavailable" label="Registry unavailable" />
@@ -105,7 +105,7 @@ export function AleoRegistryOverview() {
   const recentClaims = verifiedClaims.slice(0, 3);
 
   return (
-    <section className="surface-card rounded-lg p-5 sm:p-6" aria-live="polite">
+    <section className="surface-card h-full rounded-lg p-5 sm:p-6" aria-live="polite">
       <div className="flex flex-col gap-3 border-b border-white/10 pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="page-kicker">链上 Registry</p>

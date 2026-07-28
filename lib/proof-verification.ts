@@ -10,7 +10,7 @@ export function getVerificationLabel(verification?: ProofVerification) {
 
 export function getVerificationStatement(verification?: ProofVerification) {
   if (verification?.level === "NetworkConfirmed") {
-    return "Proof: Aleo Network Confirmed｜已获得 Aleo 网络交易确认";
+    return "Proof: Aleo Network Confirmed｜DemoVault 约束执行已确认，未绑定目标合约 State Root";
   }
   if (verification?.level === "RemoteExecution") {
     return "Proof: Remote Leo Execution｜远程执行，尚非链上确认";

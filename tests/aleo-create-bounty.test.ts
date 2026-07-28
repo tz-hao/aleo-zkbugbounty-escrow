@@ -18,6 +18,7 @@ import { verifyCreateBountyMapping } from "../lib/aleo-create-bounty-verificatio
 import { fetchAleoTestnetStatus, parseAleoBlockHeight } from "../lib/aleo-network.ts";
 import type { OnChainBountyState } from "../lib/models.ts";
 import { assertNoPrivateFields } from "../lib/privacy-guards.ts";
+import { readCanonicalLeoSourceAbi } from "./helpers/leo-source-abi.ts";
 
 const transactionId = `at1${"a".repeat(58)}`;
 const blockHash = `ab1${"b".repeat(58)}`;
@@ -30,7 +31,7 @@ const draft: CreateBountyDraft = {
   criticalReward: "1000",
   highReward: "500",
   mediumReward: "100",
-  lowReward: "10",
+  lowReward: "0",
   disclosureDeadline: 20_000_000,
   feeMicrocredits: 1_000_000,
 };
@@ -46,7 +47,7 @@ function transition(overrides: Record<string, unknown> = {}) {
       { type: "public", value: "1000u64" },
       { type: "public", value: "500u64" },
       { type: "public", value: "100u64" },
-      { type: "public", value: "10u64" },
+      { type: "public", value: "0u64" },
       { type: "public", value: "20000000u32" },
     ],
     ...overrides,
@@ -80,7 +81,7 @@ const mapping: OnChainBountyState = {
   owner,
   scopeHash: "6001field",
   ruleId: "vault-accounting-safety",
-  rewards: { critical: "1000", high: "500", medium: "100", low: "10" },
+  rewards: { critical: "1000", high: "500", medium: "100", low: "0" },
   disclosureDeadline: 20_000_000,
   status: "Active",
   source: "AleoTestnet",
@@ -90,8 +91,7 @@ const mapping: OnChainBountyState = {
 };
 
 test("create_bounty builder follows the deployed ABI exactly", () => {
-  const abi = JSON.parse(readFileSync("leo/bug_proof/build/abi.json", "utf8"));
-  assert.equal(assertCreateBountyAbi(abi), true);
+  assert.equal(assertCreateBountyAbi(readCanonicalLeoSourceAbi()), true);
 
   const preview = buildCreateBountyTransaction(draft, 19_000_000);
   assert.deepEqual(preview.inputs, [
@@ -101,7 +101,7 @@ test("create_bounty builder follows the deployed ABI exactly", () => {
     "1000u64",
     "500u64",
     "100u64",
-    "10u64",
+    "0u64",
     "20000000u32",
   ]);
   assert.equal(preview.programId, "zkbugbounty_7f3c92.aleo");
@@ -122,6 +122,10 @@ test("create_bounty builder rejects malformed fields, reward order, deadline, an
   assert.throws(
     () => buildCreateBountyTransaction({ ...draft, highReward: "1001" }, 19_000_000),
     /Rewards must satisfy/,
+  );
+  assert.throws(
+    () => buildCreateBountyTransaction({ ...draft, lowReward: "1" }, 19_000_000),
+    /Low must be 0/,
   );
   assert.throws(
     () => buildCreateBountyTransaction({ ...draft, disclosureDeadline: 19_000_000 }, 19_000_000),
@@ -258,6 +262,7 @@ test("Real Mode wallet flow uses minimum permissions and never persists success"
   const result = readFileSync("components/create-bounty-result.tsx", "utf8");
   const publicView = readFileSync("components/public-bounty-view.tsx", "utf8");
   const workspace = readFileSync("components/bounty-creation-workspace.tsx", "utf8");
+  const transactionBuilder = readFileSync("lib/aleo-create-bounty.ts", "utf8");
   const combined = `${provider}\n${form}\n${result}\n${publicView}`;
 
   assert.match(provider, /DecryptPermission\.NoDecrypt/);
@@ -265,7 +270,7 @@ test("Real Mode wallet flow uses minimum permissions and never persists success"
   assert.match(provider, /requestTransaction/);
   assert.match(provider, /classifyWalletResponseId/);
   assert.match(provider, /preview\.feeMicrocredits,\s*false/);
-  assert.match(form, /self\.signer/);
+  assert.match(transactionBuilder, /ownerSource: "self\.signer"/);
   assert.match(result, /Submitted[\s\S]*Confirmed[\s\S]*Mapping Verified/);
   assert.match(publicView, /Data Source: Aleo Testnet/);
   assert.match(workspace, /Aleo Testnet/);

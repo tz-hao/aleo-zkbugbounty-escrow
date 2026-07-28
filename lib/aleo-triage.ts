@@ -9,13 +9,14 @@ export const ON_CHAIN_TRIAGE_FUNCTIONS = [
   "reject_claim",
 ] as const;
 
-export const ON_CHAIN_TRIAGE_MAPPINGS = ["triage_states", "claim_payouts"] as const;
+export const ON_CHAIN_TRIAGE_MAPPINGS = ["claim_triage_states", "claim_payouts"] as const;
 
 export const ON_CHAIN_TRIAGE_CAPABILITY = {
-  status: "BlockedByRewardEscrowUpgrade",
+  status: "ProgramUpgradeRequired",
   source: "AleoTestnet",
   network: "testnet",
   programId: CANONICAL_ALEO_PROGRAM_ID,
+  localUpgradeReady: true,
   walletActionsEnabled: false,
   roleAuthority: "self.signer",
   uiRoleSwitcherAuthority: false,

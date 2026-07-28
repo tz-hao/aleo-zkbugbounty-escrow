@@ -1,0 +1,16 @@
+Title: Testnet Responsible Disclosure Fixture
+
+Scope: Test Vault Accounting QA
+Claim category: Vault accounting invariant breach
+Severity target: Critical
+
+Summary:
+This is a fictional disclosure payload for testing the client-side encryption workflow.
+It contains no contract address or reproduction material.
+
+Requested handling:
+Please acknowledge receipt through the established responsible disclosure channel.
+The project owner should validate the public Claim Receipt before requesting any further details.
+
+Reporter note:
+This text is test data only. Do not treat it as a security finding.

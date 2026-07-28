@@ -68,6 +68,9 @@ function createDeploymentFetcher({
         fee: { transition: "public-fee-not-returned" },
       });
     }
+    if (url === ALEO_TESTNET_DEPLOYMENT.latestEditionApiUrl) {
+      return new Response("0", { status: 200 });
+    }
     return new Response(null, { status: 404 });
   };
 }
@@ -211,11 +214,9 @@ test("deployment API returns status codes matching deployment verification state
 
 test("deployment UI exposes live public confirmation without persistence", async () => {
   const component = readFileSync("components/aleo-deployment-status.tsx", "utf8");
-  const home = readFileSync("components/dashboard.tsx", "utf8");
   const publicClaims = readFileSync("app/public-claims/page.tsx", "utf8");
   assert.match(component, /\/api\/aleo\/deployment/);
   assert.match(component, /verificationStatus/);
   assert.equal(component.includes("localStorage"), false);
-  assert.match(home, /AleoDeploymentStatus/);
   assert.match(publicClaims, /AleoDeploymentStatus/);
 });

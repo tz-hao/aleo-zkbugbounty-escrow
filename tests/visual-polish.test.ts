@@ -2,21 +2,46 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-test("dashboard prioritizes the real registry and a concise protocol boundary", () => {
+test("dashboard is a single immersive protocol entry", () => {
   const source = readFileSync("components/dashboard.tsx", "utf8");
+  const heroSource = readFileSync("components/hero-proof-visual.tsx", "utf8");
+  const uiCopySource = readFileSync("lib/i18n/zh.ts", "utf8");
+  const combinedSource = `${source}\n${heroSource}\n${uiCopySource}`;
 
   for (const phrase of [
-    "professional-site-hero",
-    "AleoRegistryOverview",
-    "可信执行边界",
-    "Private Witness",
-    "Public Proof Artifacts",
-    "Aleo Testnet Program Mappings",
-    "协议说明",
+    "home-immersive",
+    "HeroProofVisual",
+    "Private Witness · Public Proof",
+    "证明漏洞存在",
+    "Exploit 保持私密",
+    "进入协议",
+    "/images/zkbugbounty-protocol-portal.webp",
   ]) {
-    assert.equal(source.includes(phrase), true, `${phrase} should be present on the dashboard`);
+    assert.equal(combinedSource.includes(phrase), true, `${phrase} should be present on the dashboard`);
+  }
+  assert.equal(source.includes("home-protocol-slogan"), false, "removed hero slogan must not remain on the homepage");
+  for (const removedCoverMetadata of [
+    "home-immersive-top",
+    "Aleo Testnet · Network confirmed",
+    "zkbugbounty_7f3c92.aleo",
+  ]) {
+    assert.equal(source.includes(removedCoverMetadata), false, `${removedCoverMetadata} must not appear on the homepage cover`);
+  }
+  for (const referenceCopy of ["ALEO GILT", "ENTER THE PROTOCOL", ">START<"]) {
+    assert.equal(combinedSource.includes(referenceCopy), false, `${referenceCopy} must not be copied from the reference`);
   }
   assert.equal(source.includes("useAppState"), false, "homepage metrics must not use local Demo state");
+  for (const removed of [
+    "AleoRegistryOverview",
+    "AleoDeploymentStatus",
+    "Multi-Invariant DemoVault",
+    "Architecture Comparison",
+    "stack-marquee",
+    "<details",
+  ]) {
+    assert.equal(source.includes(removed), false, `${removed} should not remain on the focused homepage`);
+  }
+  assert.equal(source.includes("home-immersive-mark"), false, "homepage corner icon must not remain");
 });
 
 test("global styles expose reusable professional surface primitives", () => {
@@ -35,10 +60,10 @@ test("global styles expose reusable professional surface primitives", () => {
   }
 });
 
-test("navigation is compact and keeps Demo roles out of the global header", () => {
+test("navigation stays off the immersive homepage and keeps Demo roles out of the global header", () => {
   const source = readFileSync("components/navigation.tsx", "utf8");
 
-  for (const phrase of ["h-16", "mobile-navigation", "WalletConnectionControl", "lg:hidden"]) {
+  for (const phrase of ["site-navigation", "pathname === \"/\"", "return null", "h-[3.75rem]", "mobile-navigation", "WalletConnectionControl", "lg:hidden"]) {
     assert.equal(source.includes(phrase), true, `${phrase} should be present in navigation`);
   }
   for (const forbidden of ["useAppState", "switchActor", "roleDisplayLabels", "<select"]) {
