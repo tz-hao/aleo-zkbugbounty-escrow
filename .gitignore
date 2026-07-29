@@ -20,3 +20,10 @@ leo/bug_proof/upgrade_result.json
 leo/bug_proof/upgrade_preview.json
 
 .vercel
+aleo-devnode-ledger/
+devnode/
+devnode-results/
+local-e2e-results/
+*.local-key
+*.local-private
+devnode-*.json

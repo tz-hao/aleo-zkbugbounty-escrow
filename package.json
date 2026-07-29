@@ -8,6 +8,7 @@
     "build": "next build",
     "lint": "eslint .",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test:escrow-devnode": "bash scripts/escrow-v2-devnode-e2e.sh",
     "leo:version": "node --experimental-strip-types scripts/leo-cli.ts version",
     "leo:build": "node --experimental-strip-types scripts/leo-cli.ts build",
     "leo:run:valid": "node --experimental-strip-types scripts/leo-cli.ts run-valid",
