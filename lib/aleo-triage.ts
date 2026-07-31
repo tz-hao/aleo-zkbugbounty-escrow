@@ -1,11 +1,11 @@
 import { CANONICAL_ALEO_PROGRAM_ID } from "./aleo-program.ts";
 
 export const ON_CHAIN_TRIAGE_FUNCTIONS = [
-  "lock_reward",
+  "lock_reward_v2",
   "request_disclosure",
   "attest_encrypted_details",
   "mark_patched",
-  "release_reward",
+  "release_reward_v2",
   "reject_claim",
 ] as const;
 

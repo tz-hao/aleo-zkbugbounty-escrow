@@ -12,6 +12,8 @@ upgrade_result.json
 upgrade_preview.json
 iteration18-*.png
 artifacts/
+tmp/
+temp/
 .codex/edge-cdp/
 .codex/*.png
 leo/bug_proof/deployment_result*.json

@@ -4,9 +4,8 @@ import test from "node:test";
 
 import {
   inspectRewardEscrowAbi,
-  RESPONSIBLE_DISCLOSURE_FUNCTIONS,
   REWARD_ESCROW_CAPABILITY,
-  REWARD_ESCROW_FUNCTIONS,
+  ESCROW_V2_REQUIRED_FUNCTIONS,
   REWARD_ESCROW_MAPPINGS,
   REWARD_ESCROW_UPGRADE_PLAN,
 } from "../lib/aleo-reward-escrow.ts";
@@ -263,8 +262,7 @@ test("local upgrade ABI exposes reward escrow entries while deployed capability 
 
   assert.equal(inspection.available, true);
   assert.deepEqual(inspection.presentFunctions, [
-    ...REWARD_ESCROW_FUNCTIONS,
-    ...RESPONSIBLE_DISCLOSURE_FUNCTIONS,
+    ...ESCROW_V2_REQUIRED_FUNCTIONS,
   ]);
   assert.deepEqual(inspection.missingFunctions, []);
   assert.deepEqual(inspection.presentMappings, [...REWARD_ESCROW_MAPPINGS]);
@@ -276,26 +274,44 @@ test("local upgrade ABI exposes reward escrow entries while deployed capability 
 });
 
 test("reward escrow upgrade keeps existing public entry signatures stable", () => {
-  assert.deepEqual(functionInputs("fund_bounty"), [
+  assert.deepEqual(functionInputs("submit_claim_v2"), [
+    { name: "bounty_id", mode: "Public", type: "field" },
+    { name: "scope_hash", mode: "Public", type: "field" },
+    { name: "rule_id", mode: "Public", type: "field" },
+    { name: "vault_balance_before", mode: "Private", type: "u64" },
+    { name: "total_deposits_before", mode: "Private", type: "u64" },
+    { name: "total_claims_before", mode: "Private", type: "u64" },
+    { name: "reserved_rewards_before", mode: "Private", type: "u64" },
+    { name: "withdraw_limit_before", mode: "Private", type: "u64" },
+    { name: "user_balance_before", mode: "Private", type: "u64" },
+    { name: "requested_withdraw_before", mode: "Private", type: "u64" },
+    { name: "hidden_delta_balance", mode: "Private", type: "u64" },
+    { name: "hidden_delta_claims", mode: "Private", type: "u64" },
+    { name: "hidden_delta_reserved_rewards", mode: "Private", type: "u64" },
+    { name: "hidden_delta_withdraw_amount", mode: "Private", type: "u64" },
+    { name: "hidden_delta_user_balance", mode: "Private", type: "u64" },
+    { name: "reporter_secret", mode: "Private", type: "field" },
+  ]);
+  assert.deepEqual(functionInputs("fund_bounty_v2"), [
     { name: "bounty_id", mode: "Public", type: "field" },
     { name: "amount", mode: "Public", type: "u64" },
     { name: "funding_marker", mode: "Public", type: "field" },
   ]);
-  assert.deepEqual(functionInputs("lock_reward"), [
+  assert.deepEqual(functionInputs("lock_reward_v2"), [
     { name: "bounty_id", mode: "Public", type: "field" },
     { name: "claim_hash", mode: "Public", type: "field" },
     { name: "whitehat_address", mode: "Public", type: "address" },
     { name: "reward_amount", mode: "Public", type: "u64" },
     { name: "lock_marker", mode: "Public", type: "field" },
   ]);
-  assert.deepEqual(functionInputs("release_reward"), [
+  assert.deepEqual(functionInputs("release_reward_v2"), [
     { name: "bounty_id", mode: "Public", type: "field" },
     { name: "claim_hash", mode: "Public", type: "field" },
     { name: "whitehat_address", mode: "Public", type: "address" },
     { name: "reward_amount", mode: "Public", type: "u64" },
     { name: "release_marker", mode: "Public", type: "field" },
   ]);
-  assert.deepEqual(functionInputs("refund_bounty"), [
+  assert.deepEqual(functionInputs("refund_bounty_v2"), [
     { name: "bounty_id", mode: "Public", type: "field" },
     { name: "amount", mode: "Public", type: "u64" },
     { name: "refund_marker", mode: "Public", type: "field" },
@@ -328,19 +344,24 @@ test("reward escrow upgrade keeps existing public entry signatures stable", () =
     "create_bounty",
     "pause_bounty",
     "close_bounty",
+    "fund_bounty",
+    "lock_reward",
+    "release_reward",
+    "refund_bounty",
   ]);
 });
 
 test("Leo source enforces real Credits escrow and payout guards", () => {
   const source = readFileSync("leo/bug_proof/src/main.leo", "utf8");
-  const fund = source.slice(source.indexOf("fn fund_bounty"), source.indexOf("fn lock_reward"));
-  const lock = source.slice(source.indexOf("fn lock_reward"), source.indexOf("fn request_disclosure"));
+  const fund = source.slice(source.indexOf("fn fund_bounty_v2"), source.indexOf("fn lock_reward"));
+  const lock = source.slice(source.indexOf("fn lock_reward_v2"), source.indexOf("fn request_disclosure"));
   const request = source.slice(source.indexOf("fn request_disclosure"), source.indexOf("fn attest_encrypted_details"));
   const share = source.slice(source.indexOf("fn attest_encrypted_details"), source.indexOf("fn mark_patched"));
   const patch = source.slice(source.indexOf("fn mark_patched"), source.indexOf("fn release_reward"));
-  const release = source.slice(source.indexOf("fn release_reward"), source.indexOf("fn reject_claim"));
+  const release = source.slice(source.indexOf("fn release_reward_v2"), source.indexOf("fn reject_claim"));
   const reject = source.slice(source.indexOf("fn reject_claim"), source.indexOf("fn refund_bounty"));
-  const refund = source.slice(source.indexOf("fn refund_bounty"), source.indexOf("@admin"));
+  const refund = source.slice(source.indexOf("fn refund_bounty_v2"), source.indexOf("@admin"));
+  const legacyFunctions = ["fund_bounty", "lock_reward", "release_reward", "refund_bounty"];
 
   assert.match(source, /import credits\.aleo;/);
   assert.match(source, /mapping bounty_escrows: field => BountyEscrowState;/);
@@ -361,6 +382,13 @@ test("Leo source enforces real Credits escrow and payout guards", () => {
   assert.match(source, /Mapping::set\(claim_reporters, claim_hash, signer\);/);
   assert.match(source, /Mapping::set\(bounty_claim_counts, bounty_id, 0u64\);/);
   assert.match(source, /Mapping::get_or_use\([\s\S]*bounty_protocol_versions,[\s\S]*1u8/);
+  for (const functionName of legacyFunctions) {
+    const start = source.indexOf(`fn ${functionName}(`);
+    const nextFunction = source.indexOf("\n    fn ", start + 1);
+    const legacy = source.slice(start, nextFunction);
+    assert.match(legacy, /assert_eq\((?:amount|reward_amount), 0u64\);/);
+    assert.match(legacy, /assert_neq\((?:amount|reward_amount), 0u64\);/);
+  }
 
   assert.match(fund, /credits\.aleo::transfer_public_as_signer/);
   assert.match(fund, /assert_eq\(bounty\.owner_address, signer\);/);

@@ -32,7 +32,7 @@ export function readCanonicalLeoSourceAbi() {
       .map((input) => input.trim())
       .filter(Boolean);
     const inputs = rawInputs.map((input) =>
-      input.match(/^(public|private)\s+([a-z_][a-z0-9_]*):\s*([A-Za-z0-9_]+)$/)
+      input.match(/^(?:(public|private)\s+)?([a-z_][a-z0-9_]*):\s*([A-Za-z0-9_]+)$/)
     );
     if (inputs.some((input) => !input)) return [];
 

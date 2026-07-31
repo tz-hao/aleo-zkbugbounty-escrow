@@ -32,7 +32,7 @@ const mappingValue = `{
 
 test("Leo submit_claim atomically writes the trusted on-chain Claim Receipt", () => {
   const source = readFileSync("leo/bug_proof/src/main.leo", "utf8");
-  const submitClaim = source.slice(source.indexOf("fn submit_claim"), source.indexOf("fn create_bounty"));
+  const submitClaim = source.slice(source.indexOf("fn submit_claim"), source.indexOf("fn submit_claim_v2"));
 
   assert.match(source, /struct ClaimReceiptState \{/);
   assert.match(source, /mapping claim_receipts: field => ClaimReceiptState;/);
@@ -41,10 +41,20 @@ test("Leo submit_claim atomically writes the trusted on-chain Claim Receipt", ()
   assert.match(submitClaim, /let witness_commitment: field = proof\.witness_commitment;/);
   assert.match(submitClaim, /let reporter_commitment: field = proof\.reporter_commitment;/);
   assert.match(submitClaim, /created_height: block\.height/);
-  assert.match(submitClaim, /Mapping::get_or_use\([\s\S]*bounty_protocol_versions,[\s\S]*1u8/);
-  assert.match(submitClaim, /protocol_version: bounty_protocol_version/);
+  assert.match(submitClaim, /protocol_version: 1u8/);
   assert.match(submitClaim, /Mapping::set\(nullifiers, nullifier, bounty_id\);/);
   assert.match(submitClaim, /Mapping::set\(claim_receipts, claim_hash, receipt\);/);
+  assert.doesNotMatch(submitClaim, /self\.signer|claim_reporters|bounty_claim_counts/);
+});
+
+test("submit_claim_v2 isolates reporter and unresolved-claim state from the edition 0 entry", () => {
+  const source = readFileSync("leo/bug_proof/src/main.leo", "utf8");
+  const submitClaimV2 = source.slice(source.indexOf("fn submit_claim_v2"), source.indexOf("fn create_bounty"));
+
+  assert.match(submitClaimV2, /let signer = self\.signer/);
+  assert.match(submitClaimV2, /assert_eq\(bounty_protocol_version, 2u8\)/);
+  assert.match(submitClaimV2, /Mapping::set\(claim_reporters, claim_hash, signer\)/);
+  assert.match(submitClaimV2, /Mapping::set\(bounty_claim_counts, bounty_id, claim_count \+ 1u64\)/);
 });
 
 test("strict Claim Receipt parser returns only verified public protocol fields", () => {

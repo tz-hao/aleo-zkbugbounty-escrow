@@ -109,14 +109,14 @@ test("Escrow transaction builders follow the local upgrade ABI and fixed reward 
   ];
 
   assert.deepEqual(previews.map((preview) => preview.functionName), [
-    "fund_bounty",
-    "lock_reward",
+    "fund_bounty_v2",
+    "lock_reward_v2",
     "request_disclosure",
     "attest_encrypted_details",
     "mark_patched",
-    "release_reward",
+    "release_reward_v2",
     "reject_claim",
-    "refund_bounty",
+    "refund_bounty_v2",
   ]);
   assert.deepEqual(previews[1].inputs, [
     "100field",
@@ -187,10 +187,18 @@ test("Escrow transaction builders reject legacy receipts and malformed public in
 
 function compiledEscrowCapabilitySource() {
   const functions = [
-    ["fund_bounty", ["field", "u64", "field"]],
-    ["lock_reward", ["field", "field", "address", "u64", "field"]],
-    ["release_reward", ["field", "field", "address", "u64", "field"]],
-    ["refund_bounty", ["field", "u64", "field"]],
+    [
+      "submit_claim_v2",
+      [
+        "field", "field", "field",
+        "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64",
+        "field",
+      ],
+    ],
+    ["fund_bounty_v2", ["field", "u64", "field"]],
+    ["lock_reward_v2", ["field", "field", "address", "u64", "field"]],
+    ["release_reward_v2", ["field", "field", "address", "u64", "field"]],
+    ["refund_bounty_v2", ["field", "u64", "field"]],
     ["request_disclosure", ["field", "field", "field"]],
     ["attest_encrypted_details", ["field", "field", "field", "field"]],
     ["mark_patched", ["field", "field", "field"]],

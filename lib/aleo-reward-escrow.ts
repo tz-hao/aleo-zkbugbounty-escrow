@@ -7,17 +7,25 @@ import type { OnChainBountyState, OnChainClaimReceipt } from "./models.ts";
 import { assertNoPrivateFields } from "./privacy-guards.ts";
 
 export const REWARD_ESCROW_FUNCTIONS = [
-  "fund_bounty",
-  "lock_reward",
-  "release_reward",
-  "refund_bounty",
+  "fund_bounty_v2",
+  "lock_reward_v2",
+  "release_reward_v2",
+  "refund_bounty_v2",
 ] as const;
+
+export const ESCROW_V2_CLAIM_FUNCTION = "submit_claim_v2";
 
 export const RESPONSIBLE_DISCLOSURE_FUNCTIONS = [
   "request_disclosure",
   "attest_encrypted_details",
   "mark_patched",
   "reject_claim",
+] as const;
+
+export const ESCROW_V2_REQUIRED_FUNCTIONS = [
+  ESCROW_V2_CLAIM_FUNCTION,
+  ...REWARD_ESCROW_FUNCTIONS,
+  ...RESPONSIBLE_DISCLOSURE_FUNCTIONS,
 ] as const;
 
 export const REWARD_ESCROW_MAPPINGS = [
@@ -31,7 +39,11 @@ export const REWARD_ESCROW_MAPPINGS = [
 ] as const;
 
 export const REWARD_ESCROW_UPGRADE_PLAN = {
-  newFunctions: [...REWARD_ESCROW_FUNCTIONS, ...RESPONSIBLE_DISCLOSURE_FUNCTIONS],
+  newFunctions: [
+    ESCROW_V2_CLAIM_FUNCTION,
+    ...REWARD_ESCROW_FUNCTIONS,
+    ...RESPONSIBLE_DISCLOSURE_FUNCTIONS,
+  ],
   newMappings: [...REWARD_ESCROW_MAPPINGS],
   preservedEntryFunctions: [
     "prove_vault_invariant_break",
@@ -39,17 +51,22 @@ export const REWARD_ESCROW_UPGRADE_PLAN = {
     "create_bounty",
     "pause_bounty",
     "close_bounty",
+    "fund_bounty",
+    "lock_reward",
+    "release_reward",
+    "refund_bounty",
   ],
   securityChecks: [
-    "fund_bounty transfers real public credits from self.signer to the program account",
-    "fund_bounty accepts only protocol-v2 bounties before their disclosure deadline",
+    "legacy economic entries are ABI-preserved and fail closed before any Credits call",
+    "fund_bounty_v2 transfers real public credits from self.signer to the program account",
+    "fund_bounty_v2 accepts only protocol-v2 bounties before their disclosure deadline",
     "all economic operation markers are unique and replay protected",
-    "lock_reward derives the exact reward from the verified receipt severity and advertised reward tier",
+    "lock_reward_v2 derives the exact reward from the verified receipt severity and advertised reward tier",
     "responsible disclosure advances strictly through requested, shared, and patched states",
-    "release_reward requires a patched claim and transfers public credits to the recorded reporter",
+    "release_reward_v2 requires a patched claim and transfers public credits to the recorded reporter",
     "reject_claim requires the protocol arbiter and cannot be authorized unilaterally by the Bounty owner",
     "reject_claim unlocks a locked reward and resolves the claim before refund accounting",
-    "refund_bounty requires a closed expired bounty, zero unresolved claims, and zero locked amount",
+    "refund_bounty_v2 requires a closed expired bounty, zero unresolved claims, and zero locked amount",
     "Paid state is represented only by confirmed mapping state, never by UI-only local state",
   ],
 } as const;
@@ -95,7 +112,7 @@ export const REWARD_ESCROW_CAPABILITY: RewardEscrowCapability = {
   currentEdition: 0,
   requiredEdition: 1,
   presentFunctions: [],
-  missingFunctions: [...REWARD_ESCROW_FUNCTIONS, ...RESPONSIBLE_DISCLOSURE_FUNCTIONS],
+  missingFunctions: [...ESCROW_V2_REQUIRED_FUNCTIONS],
   presentMappings: [],
   missingMappings: [...REWARD_ESCROW_MAPPINGS],
 };
@@ -109,6 +126,7 @@ export type RewardEscrowAbiInspection = {
 };
 
 export type RewardEscrowFunctionName =
+  | typeof ESCROW_V2_CLAIM_FUNCTION
   | (typeof REWARD_ESCROW_FUNCTIONS)[number]
   | (typeof RESPONSIBLE_DISCLOSURE_FUNCTIONS)[number];
 
@@ -149,7 +167,7 @@ export function inspectRewardEscrowAbi(abi: unknown): RewardEscrowAbiInspection 
       .map((entry) => recordOf(entry)?.name)
       .filter((name): name is string => typeof name === "string"),
   );
-  const requiredFunctions = [...REWARD_ESCROW_FUNCTIONS, ...RESPONSIBLE_DISCLOSURE_FUNCTIONS];
+  const requiredFunctions = ESCROW_V2_REQUIRED_FUNCTIONS;
   const presentFunctions = requiredFunctions.filter((name) => functionNames.has(name));
   const presentMappings = REWARD_ESCROW_MAPPINGS.filter((name) => mappingNames.has(name));
   const missingFunctions = requiredFunctions.filter((name) => !functionNames.has(name));
@@ -165,14 +183,19 @@ export function inspectRewardEscrowAbi(abi: unknown): RewardEscrowAbiInspection 
 }
 
 const SOURCE_FUNCTION_INPUTS: Record<RewardEscrowFunctionName, readonly string[]> = {
-  fund_bounty: ["field", "u64", "field"],
-  lock_reward: ["field", "field", "address", "u64", "field"],
+  submit_claim_v2: [
+    "field", "field", "field",
+    "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64",
+    "field",
+  ],
+  fund_bounty_v2: ["field", "u64", "field"],
+  lock_reward_v2: ["field", "field", "address", "u64", "field"],
   request_disclosure: ["field", "field", "field"],
   attest_encrypted_details: ["field", "field", "field", "field"],
   mark_patched: ["field", "field", "field"],
-  release_reward: ["field", "field", "address", "u64", "field"],
+  release_reward_v2: ["field", "field", "address", "u64", "field"],
   reject_claim: ["field", "field", "field"],
-  refund_bounty: ["field", "u64", "field"],
+  refund_bounty_v2: ["field", "u64", "field"],
 };
 
 const SOURCE_MAPPING_VALUES: Record<(typeof REWARD_ESCROW_MAPPINGS)[number], string> = {
@@ -196,14 +219,16 @@ function sourceEntryMatches(source: string, name: RewardEscrowFunctionName) {
       .map((line) => line.trim())
       .filter((line) => line.startsWith("input "));
     const actualInputs = inputLines.map((line) =>
-      line.match(/^input r\d+ as ([A-Za-z0-9_./]+)\.public;$/)?.[1] ?? "invalid"
+      line.match(/^input r\d+ as ([A-Za-z0-9_./]+)\.(?:public|private);$/)?.[1] ?? "invalid"
     );
     return actualInputs.length === expectedInputs.length &&
       actualInputs.every((type, index) => type === expectedInputs[index]);
   }
 
   const leoMatch = source.match(
-    new RegExp(`\\bfn\\s+${name}\\s*\\(([\\s\\S]*?)\\)\\s*->\\s*Final\\s*\\{`),
+    new RegExp(
+      `\\bfn\\s+${name}\\s*\\(([\\s\\S]*?)\\)\\s*->\\s*(?:Final|\\([^)]*\\bFinal\\b[^)]*\\))\\s*\\{`,
+    ),
   );
   if (!leoMatch) return false;
   const actualInputs = leoMatch[1]
@@ -211,7 +236,7 @@ function sourceEntryMatches(source: string, name: RewardEscrowFunctionName) {
     .map((input) => input.trim())
     .filter(Boolean)
     .map((input) =>
-      input.match(/^public\s+[a-z_][a-z0-9_]*:\s*([A-Za-z0-9_./]+)$/)?.[1] ??
+      input.match(/^(?:(?:public|private)\s+)?[a-z_][a-z0-9_]*:\s*([A-Za-z0-9_./]+)$/)?.[1] ??
       "invalid"
     );
   return actualInputs.length === expectedInputs.length &&
@@ -241,7 +266,7 @@ export function inspectRewardEscrowSource(source: string): RewardEscrowAbiInspec
   if (!new RegExp(`\\bprogram\\s+${escapedProgramId}(?:;|\\s*\\{)`).test(source)) {
     throw new Error("Reward escrow Program ID mismatch");
   }
-  const requiredFunctions = [...REWARD_ESCROW_FUNCTIONS, ...RESPONSIBLE_DISCLOSURE_FUNCTIONS];
+  const requiredFunctions = ESCROW_V2_REQUIRED_FUNCTIONS;
   const presentFunctions = requiredFunctions.filter((name) => sourceEntryMatches(source, name));
   const presentMappings = REWARD_ESCROW_MAPPINGS.filter((name) =>
     sourceMappingMatches(source, name)
@@ -409,7 +434,7 @@ export function buildFundBountyTransaction(input: {
   const amount = requireU64(input.amount, "Funding amount");
   const marker = requireField(input.fundingMarker, "Funding marker");
   return buildPreview(
-    "fund_bounty",
+    "fund_bounty_v2",
     [bountyId, `${amount}u64`, marker],
     input.feeMicrocredits,
     { bountyId, amount, operationMarker: marker },
@@ -443,7 +468,7 @@ export function buildLockRewardTransaction(input: {
   const amount = rewardForSeverity(input.bounty, input.receipt.severity);
   const marker = requireField(input.lockMarker, "Lock marker");
   return buildPreview(
-    "lock_reward",
+    "lock_reward_v2",
     [
       input.bounty.bountyId,
       input.receipt.claimHash,
@@ -527,7 +552,7 @@ export function buildReleaseRewardTransaction(input: {
   const marker = requireField(input.releaseMarker, "Release marker");
   const amount = rewardForSeverity(input.bounty, input.receipt.severity);
   return buildPreview(
-    "release_reward",
+    "release_reward_v2",
     [
       input.bounty.bountyId,
       input.receipt.claimHash,
@@ -573,7 +598,7 @@ export function buildRefundBountyTransaction(input: {
   const amount = requireU64(input.amount, "Refund amount");
   const marker = requireField(input.refundMarker, "Refund marker");
   return buildPreview(
-    "refund_bounty",
+    "refund_bounty_v2",
     [bountyId, `${amount}u64`, marker],
     input.feeMicrocredits,
     { bountyId, amount, operationMarker: marker },

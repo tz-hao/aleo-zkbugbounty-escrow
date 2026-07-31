@@ -3,6 +3,7 @@ import {
   runLeoBuild,
   runLeoCommand,
 } from "../lib/leo-cli.ts";
+import { verifyCompiledAleoUpgradeCompatibility } from "./verify-aleo-upgrade-compatibility.ts";
 
 const actions: Record<string, string> = {
   "run-valid": "bash ./scripts/run-valid.sh",
@@ -41,6 +42,22 @@ async function main() {
   }
   if (!result.ok) {
     process.exit(result.exitCode ?? 1);
+  }
+  if (action === "build") {
+    const compatibility = await verifyCompiledAleoUpgradeCompatibility();
+    if (!compatibility.compatible) {
+      console.error("Aleo upgrade interface compatibility: FAILED");
+      for (const mismatch of compatibility.mismatches) {
+        console.error(
+          `- ${mismatch.component}${mismatch.name ? ` ${mismatch.name}` : ""}: ${mismatch.reason}`,
+        );
+      }
+      process.exit(1);
+    }
+    const checked = Object.entries(compatibility.checked)
+      .map(([component, count]) => `${component}=${count}`)
+      .join(", ");
+    console.log(`Aleo upgrade interface compatibility: PASS (${checked})`);
   }
 }
 

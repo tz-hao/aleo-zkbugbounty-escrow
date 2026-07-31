@@ -252,10 +252,10 @@ Real Mode 的 Bug Type、Rule 与 Scope Hash 由已读取的 Bounty 和 Program 
 
 尚未启用链上操作：
 
-- `fund_bounty`
-- `lock_reward`
-- `release_reward`
-- `refund_bounty`
+- `fund_bounty_v2`
+- `lock_reward_v2`
+- `release_reward_v2`
+- `refund_bounty_v2`
 - 链上 Escrow 与真实付款
 
 在这些功能完成 Program Upgrade、人工广播并通过 Testnet 验收之前，不能将网页中的奖励状态解释为链上资金状态。

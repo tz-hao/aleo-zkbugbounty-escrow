@@ -323,6 +323,77 @@ program zkbugbounty_7f3c92.aleo {
         hidden_delta_user_balance: u64,
         reporter_secret: field,
     ) -> (public ProofResult, Final) {
+        let proof: ProofResult = compute_vault_invariant_break(
+            bounty_id,
+            scope_hash,
+            rule_id,
+            vault_balance_before,
+            total_deposits_before,
+            total_claims_before,
+            reserved_rewards_before,
+            withdraw_limit_before,
+            user_balance_before,
+            requested_withdraw_before,
+            hidden_delta_balance,
+            hidden_delta_claims,
+            hidden_delta_reserved_rewards,
+            hidden_delta_withdraw_amount,
+            hidden_delta_user_balance,
+            reporter_secret,
+        );
+        let claim_hash: field = proof.claim_hash;
+        let severity: u8 = proof.severity;
+        let witness_commitment: field = proof.witness_commitment;
+        let nullifier: field = proof.nullifier;
+        let reporter_commitment: field = proof.reporter_commitment;
+
+        return (proof, final {
+            assert(Mapping::contains(bounties, bounty_id));
+            let bounty: BountyState = Mapping::get(bounties, bounty_id);
+            assert_eq(bounty.scope_hash, scope_hash);
+            assert_eq(bounty.rule_id, rule_id);
+            assert_eq(bounty.status, 1u8);
+            assert(block.height <= bounty.disclosure_deadline);
+
+            assert(!Mapping::contains(nullifiers, nullifier));
+            assert(!Mapping::contains(claim_receipts, claim_hash));
+
+            let receipt: ClaimReceiptState = ClaimReceiptState {
+                claim_hash: claim_hash,
+                bounty_id: bounty_id,
+                rule_id: rule_id,
+                scope_hash: scope_hash,
+                severity: severity,
+                witness_commitment: witness_commitment,
+                nullifier: nullifier,
+                reporter_commitment: reporter_commitment,
+                proof_status: 1u8,
+                created_height: block.height,
+                protocol_version: 1u8,
+            };
+            Mapping::set(nullifiers, nullifier, bounty_id);
+            Mapping::set(claim_receipts, claim_hash, receipt);
+        });
+    }
+
+    fn submit_claim_v2(
+        public bounty_id: field,
+        public scope_hash: field,
+        public rule_id: field,
+        vault_balance_before: u64,
+        total_deposits_before: u64,
+        total_claims_before: u64,
+        reserved_rewards_before: u64,
+        withdraw_limit_before: u64,
+        user_balance_before: u64,
+        requested_withdraw_before: u64,
+        hidden_delta_balance: u64,
+        hidden_delta_claims: u64,
+        hidden_delta_reserved_rewards: u64,
+        hidden_delta_withdraw_amount: u64,
+        hidden_delta_user_balance: u64,
+        reporter_secret: field,
+    ) -> (public ProofResult, Final) {
         let signer = self.signer;
         let proof: ProofResult = compute_vault_invariant_break(
             bounty_id,
@@ -355,14 +426,14 @@ program zkbugbounty_7f3c92.aleo {
             assert_eq(bounty.rule_id, rule_id);
             assert_eq(bounty.status, 1u8);
             assert(block.height <= bounty.disclosure_deadline);
-            let bounty_protocol_version: u8 = Mapping::get_or_use(
-                bounty_protocol_versions,
-                bounty_id,
-                1u8,
-            );
+            assert(Mapping::contains(bounty_protocol_versions, bounty_id));
+            let bounty_protocol_version: u8 = Mapping::get(bounty_protocol_versions, bounty_id);
+            assert_eq(bounty_protocol_version, 2u8);
 
             assert(!Mapping::contains(nullifiers, nullifier));
             assert(!Mapping::contains(claim_receipts, claim_hash));
+            assert(!Mapping::contains(claim_reporters, claim_hash));
+            assert(Mapping::contains(bounty_claim_counts, bounty_id));
 
             let receipt: ClaimReceiptState = ClaimReceiptState {
                 claim_hash: claim_hash,
@@ -377,10 +448,10 @@ program zkbugbounty_7f3c92.aleo {
                 created_height: block.height,
                 protocol_version: bounty_protocol_version,
             };
+            let claim_count: u64 = Mapping::get(bounty_claim_counts, bounty_id);
             Mapping::set(nullifiers, nullifier, bounty_id);
             Mapping::set(claim_receipts, claim_hash, receipt);
             Mapping::set(claim_reporters, claim_hash, signer);
-            let claim_count: u64 = Mapping::get_or_use(bounty_claim_counts, bounty_id, 0u64);
             Mapping::set(bounty_claim_counts, bounty_id, claim_count + 1u64);
         });
     }
@@ -477,7 +548,63 @@ program zkbugbounty_7f3c92.aleo {
         };
     }
 
+    // Edition 0 ABI is preserved but disabled before any Credits call.
     fn fund_bounty(
+        public bounty_id: field,
+        public amount: u64,
+        public funding_marker: field,
+    ) -> Final {
+        let signer = self.signer;
+        assert_eq(amount, 0u64);
+        assert_neq(amount, 0u64);
+        let transfer: Final = credits.aleo::transfer_public_as_signer(
+            zkbugbounty_7f3c92.aleo,
+            amount,
+        );
+        return final {
+            transfer.run();
+            assert(amount > 0u64);
+            assert(funding_marker != 0field);
+            assert(Mapping::contains(bounties, bounty_id));
+            let bounty: BountyState = Mapping::get(bounties, bounty_id);
+            assert_eq(bounty.owner_address, signer);
+            assert(bounty.status == 1u8 || bounty.status == 2u8);
+
+            let empty: BountyEscrowState = BountyEscrowState {
+                owner_address: signer,
+                total_funded: 0u64,
+                available_balance: 0u64,
+                locked_amount: 0u64,
+                paid_amount: 0u64,
+                refunded_amount: 0u64,
+                status: 1u8,
+                last_funding_height: 0u32,
+                last_funding_marker: 0field,
+                last_refund_marker: 0field,
+            };
+            let current: BountyEscrowState = Mapping::get_or_use(
+                bounty_escrows,
+                bounty_id,
+                empty,
+            );
+            assert_eq(current.owner_address, signer);
+            let updated: BountyEscrowState = BountyEscrowState {
+                owner_address: signer,
+                total_funded: current.total_funded + amount,
+                available_balance: current.available_balance + amount,
+                locked_amount: current.locked_amount,
+                paid_amount: current.paid_amount,
+                refunded_amount: current.refunded_amount,
+                status: 1u8,
+                last_funding_height: block.height,
+                last_funding_marker: funding_marker,
+                last_refund_marker: current.last_refund_marker,
+            };
+            Mapping::set(bounty_escrows, bounty_id, updated);
+        };
+    }
+
+    fn fund_bounty_v2(
         public bounty_id: field,
         public amount: u64,
         public funding_marker: field,
@@ -544,7 +671,66 @@ program zkbugbounty_7f3c92.aleo {
         };
     }
 
+    // Edition 0 ABI is preserved but disabled before any state mutation.
     fn lock_reward(
+        public bounty_id: field,
+        public claim_hash: field,
+        public whitehat_address: address,
+        public reward_amount: u64,
+    ) -> Final {
+        let signer = self.signer;
+        assert_eq(reward_amount, 0u64);
+        assert_neq(reward_amount, 0u64);
+        return final {
+            assert(reward_amount > 0u64);
+            assert(Mapping::contains(bounties, bounty_id));
+            let bounty: BountyState = Mapping::get(bounties, bounty_id);
+            assert_eq(bounty.owner_address, signer);
+            assert(bounty.status == 1u8 || bounty.status == 2u8);
+
+            assert(Mapping::contains(claim_receipts, claim_hash));
+            let receipt: ClaimReceiptState = Mapping::get(claim_receipts, claim_hash);
+            assert_eq(receipt.claim_hash, claim_hash);
+            assert_eq(receipt.bounty_id, bounty_id);
+            assert_eq(receipt.proof_status, 1u8);
+            assert(Mapping::contains(claim_reporters, claim_hash));
+            let reporter: address = Mapping::get(claim_reporters, claim_hash);
+            assert_eq(reporter, whitehat_address);
+
+            assert(Mapping::contains(bounty_escrows, bounty_id));
+            let escrow: BountyEscrowState = Mapping::get(bounty_escrows, bounty_id);
+            assert_eq(escrow.owner_address, signer);
+            assert(escrow.available_balance >= reward_amount);
+            assert(!Mapping::contains(claim_payouts, claim_hash));
+
+            let updated_escrow: BountyEscrowState = BountyEscrowState {
+                owner_address: escrow.owner_address,
+                total_funded: escrow.total_funded,
+                available_balance: escrow.available_balance - reward_amount,
+                locked_amount: escrow.locked_amount + reward_amount,
+                paid_amount: escrow.paid_amount,
+                refunded_amount: escrow.refunded_amount,
+                status: escrow.status,
+                last_funding_height: escrow.last_funding_height,
+                last_funding_marker: escrow.last_funding_marker,
+                last_refund_marker: escrow.last_refund_marker,
+            };
+            let payout: ClaimPayoutState = ClaimPayoutState {
+                claim_hash: claim_hash,
+                bounty_id: bounty_id,
+                whitehat_address: whitehat_address,
+                reward_amount: reward_amount,
+                status: 1u8,
+                locked_height: block.height,
+                paid_height: 0u32,
+                release_marker: 0field,
+            };
+            Mapping::set(bounty_escrows, bounty_id, updated_escrow);
+            Mapping::set(claim_payouts, claim_hash, payout);
+        };
+    }
+
+    fn lock_reward_v2(
         public bounty_id: field,
         public claim_hash: field,
         public whitehat_address: address,
@@ -773,7 +959,80 @@ program zkbugbounty_7f3c92.aleo {
         };
     }
 
+    // Edition 0 ABI is preserved but disabled before any Credits call.
     fn release_reward(
+        public bounty_id: field,
+        public claim_hash: field,
+        public whitehat_address: address,
+        public reward_amount: u64,
+        public release_marker: field,
+    ) -> Final {
+        let signer = self.signer;
+        assert_eq(reward_amount, 0u64);
+        assert_neq(reward_amount, 0u64);
+        let transfer: Final = credits.aleo::transfer_public(
+            whitehat_address,
+            reward_amount,
+        );
+        return final {
+            assert(reward_amount > 0u64);
+            assert(release_marker != 0field);
+            assert(Mapping::contains(bounties, bounty_id));
+            let bounty: BountyState = Mapping::get(bounties, bounty_id);
+            assert_eq(bounty.owner_address, signer);
+            assert(bounty.status == 1u8 || bounty.status == 2u8 || bounty.status == 3u8);
+
+            assert(Mapping::contains(claim_receipts, claim_hash));
+            let receipt: ClaimReceiptState = Mapping::get(claim_receipts, claim_hash);
+            assert_eq(receipt.claim_hash, claim_hash);
+            assert_eq(receipt.bounty_id, bounty_id);
+            assert_eq(receipt.proof_status, 1u8);
+            assert(Mapping::contains(claim_reporters, claim_hash));
+            let reporter: address = Mapping::get(claim_reporters, claim_hash);
+            assert_eq(reporter, whitehat_address);
+
+            assert(Mapping::contains(claim_payouts, claim_hash));
+            let payout: ClaimPayoutState = Mapping::get(claim_payouts, claim_hash);
+            assert_eq(payout.claim_hash, claim_hash);
+            assert_eq(payout.bounty_id, bounty_id);
+            assert_eq(payout.whitehat_address, whitehat_address);
+            assert_eq(payout.reward_amount, reward_amount);
+            assert_eq(payout.status, 1u8);
+
+            assert(Mapping::contains(bounty_escrows, bounty_id));
+            let escrow: BountyEscrowState = Mapping::get(bounty_escrows, bounty_id);
+            assert_eq(escrow.owner_address, signer);
+            assert(escrow.locked_amount >= reward_amount);
+            transfer.run();
+
+            let updated_escrow: BountyEscrowState = BountyEscrowState {
+                owner_address: escrow.owner_address,
+                total_funded: escrow.total_funded,
+                available_balance: escrow.available_balance,
+                locked_amount: escrow.locked_amount - reward_amount,
+                paid_amount: escrow.paid_amount + reward_amount,
+                refunded_amount: escrow.refunded_amount,
+                status: escrow.status,
+                last_funding_height: escrow.last_funding_height,
+                last_funding_marker: escrow.last_funding_marker,
+                last_refund_marker: escrow.last_refund_marker,
+            };
+            let paid_payout: ClaimPayoutState = ClaimPayoutState {
+                claim_hash: payout.claim_hash,
+                bounty_id: payout.bounty_id,
+                whitehat_address: payout.whitehat_address,
+                reward_amount: payout.reward_amount,
+                status: 2u8,
+                locked_height: payout.locked_height,
+                paid_height: block.height,
+                release_marker: release_marker,
+            };
+            Mapping::set(bounty_escrows, bounty_id, updated_escrow);
+            Mapping::set(claim_payouts, claim_hash, paid_payout);
+        };
+    }
+
+    fn release_reward_v2(
         public bounty_id: field,
         public claim_hash: field,
         public whitehat_address: address,
@@ -991,7 +1250,55 @@ program zkbugbounty_7f3c92.aleo {
         };
     }
 
+    // Edition 0 ABI is preserved but disabled before any Credits call.
     fn refund_bounty(
+        public bounty_id: field,
+        public amount: u64,
+        public refund_marker: field,
+    ) -> Final {
+        let signer = self.signer;
+        assert_eq(amount, 0u64);
+        assert_neq(amount, 0u64);
+        let transfer: Final = credits.aleo::transfer_public(
+            signer,
+            amount,
+        );
+        return final {
+            assert(amount > 0u64);
+            assert(refund_marker != 0field);
+            assert(Mapping::contains(bounties, bounty_id));
+            let bounty: BountyState = Mapping::get(bounties, bounty_id);
+            assert_eq(bounty.owner_address, signer);
+            assert_eq(bounty.status, 3u8);
+            assert(block.height > bounty.disclosure_deadline);
+
+            assert(Mapping::contains(bounty_escrows, bounty_id));
+            let escrow: BountyEscrowState = Mapping::get(bounty_escrows, bounty_id);
+            assert(Mapping::contains(bounty_claim_counts, bounty_id));
+            let claim_count: u64 = Mapping::get(bounty_claim_counts, bounty_id);
+            assert_eq(escrow.owner_address, signer);
+            assert_eq(escrow.locked_amount, 0u64);
+            assert_eq(claim_count, 0u64);
+            assert(escrow.available_balance >= amount);
+            transfer.run();
+
+            let updated_escrow: BountyEscrowState = BountyEscrowState {
+                owner_address: escrow.owner_address,
+                total_funded: escrow.total_funded,
+                available_balance: escrow.available_balance - amount,
+                locked_amount: escrow.locked_amount,
+                paid_amount: escrow.paid_amount,
+                refunded_amount: escrow.refunded_amount + amount,
+                status: 3u8,
+                last_funding_height: escrow.last_funding_height,
+                last_funding_marker: escrow.last_funding_marker,
+                last_refund_marker: refund_marker,
+            };
+            Mapping::set(bounty_escrows, bounty_id, updated_escrow);
+        };
+    }
+
+    fn refund_bounty_v2(
         public bounty_id: field,
         public amount: u64,
         public refund_marker: field,

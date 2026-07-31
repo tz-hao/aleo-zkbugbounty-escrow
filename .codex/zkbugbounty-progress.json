@@ -3,6 +3,37 @@
   "programId": "zkbugbounty_7f3c92.aleo",
   "network": "testnet",
   "currentIteration": 19,
+  "localDevnodeBootstrap": {
+    "status": "COMPLETED",
+    "creditsBootstrap": "PASS",
+    "fullEscrowE2E": "COMPLETED_LOCAL_DEVNODE",
+    "readyForFullLocalE2E": true,
+    "readyForTestnetUpgradePreview": true,
+    "readyForTestnetBroadcast": false,
+    "network": "local-devnode",
+    "ownerFunded": true,
+    "whitehat": {
+      "mainTransactionId": "at1hen2t6a8zxd0gk2t3t529ptagew0kvq2kmx9685dlyx44m0dl5xszk3r4g",
+      "feeId": "au13u8vcwwg9mfdylrs99wzhsqlrt8l5egcsmsmls9h4pkgstchhc8q7fdgt5",
+      "feeTransactionId": "at17etecz9ev82fdw5rr9m9q4dun6knv2z0ngcxnjwlxgcr9e3vk5gqqc50hn",
+      "stateConfirmation": "PASS"
+    },
+    "arbiter": {
+      "mainTransactionId": "at1xse5zmuh85gfv7e5hyq842kfvxxn6txxzy6t0rerdf9vy7spz5zs0lz58m",
+      "feeId": "au14rnrxqmquqmxj83dfeve85x2jnufl3ca3wgte7l0ygy7xmfpdsqqhnjjtc",
+      "feeTransactionId": "at1uguqfh097mws8etswv3wamdtmc478a26t0nkg3hfx56xwe6rjyysrhu5y0",
+      "stateConfirmation": "PASS"
+    },
+    "freshLedgerCreditsAcceptance": {
+      "fundingDelta": "10000000",
+      "releaseProgramDelta": "-3000000",
+      "releaseWhitehatDelta": "3000000",
+      "refundProgramDelta": "-7000000",
+      "finalProgramConservationDelta": "0",
+      "replayProtection": "PASS",
+      "status": "COMPLETED_LOCAL_DEVNODE"
+    }
+  },
   "iterations": {
     "1": {
       "name": "Baseline and architecture audit",
@@ -50,7 +81,7 @@
     },
     "12": {
       "name": "Reward Escrow",
-      "status": "BLOCKED_TECHNICAL_VALIDATION"
+      "status": "BLOCKED_INSUFFICIENT_PUBLIC_CREDITS"
     },
     "13": {
       "name": "Encrypted Disclosure",
@@ -84,20 +115,22 @@
   "blockedItems": [
     {
       "iteration": 12,
-      "status": "BLOCKED_TECHNICAL_VALIDATION",
-      "problem": "Escrow v2 source candidate is hardened and compiles, but real local-devnet Credits E2E has not been executed.",
-      "evidence": "Node tests pass and Leo 4.0.2 builds the 29.47 KB candidate. leo test --offline reports No tests run because @test fn cannot seed external mappings, execute external Finals, or inject credits.aleo account state.",
+      "status": "BLOCKED_INSUFFICIENT_PUBLIC_CREDITS",
+      "problem": "The real Testnet edition 0 fixture-derived Local Devnode Escrow v2 E2E and no-broadcast Preview passed, but the current admin public Credits balance is below the public-fee requirement.",
+      "evidence": "Fixture SHA256 is pinned; Candidate ABI matches the real edition 0 interface; full Local Devnode E2E passed with Credits conservation delta 0; and no-broadcast Preview returned the public transaction ID recorded below.",
       "attemptsMade": [
         "Preserved all deployed v1 structs, mappings, and public entry signatures.",
         "Implemented strict v2 isolation, disclosure sequencing, exact severity rewards, reporter binding, unresolved-claim accounting, one-shot refund, and eight context-bound replay markers.",
         "Verified Program source and latest edition are both required before wallet actions can be enabled.",
-        "Attempted a Leo 4.0.2 VM test and removed it after the compiler proved external Mapping/Final state cannot be seeded from @test fn."
+        "Completed isolated Local Devnode Credits Bootstrap with distinct main and fee transaction IDs plus public balance confirmation.",
+        "Completed the full fresh-ledger Escrow v2 E2E: fund, lock, disclosure, patch, release, reject, close, refund, replay, and integer Credits conservation.",
+        "Replaced the unsafe u64 suffix-stripping parser with strict literal parsing and BigInt regressions."
       ],
-      "whyItCannotContinue": "The repository has no local devnode Mapping seed and real Credits transaction harness. TypeScript models and source assertions cannot substitute for runtime Credits acceptance.",
-      "dependencyImpact": "Blocks Upgrade Preview, manual Program Upgrade, real fund/release/refund acceptance, and completion of Iterations 12, 14, and 19.",
-      "safeWorkThatCanContinue": "Static compatibility audit, Node regressions, Leo build, capability gating, disabled-action UI, and public documentation are complete.",
-      "requiredManualAction": "Provide or approve an isolated local-devnet Credits E2E harness, run the complete valid/invalid matrix, and return only public test results.",
-      "resumeCondition": "Real local-devnet Credits balances and Mapping transitions pass the documented matrix with no P0/P1 findings."
+      "whyItCannotContinue": "A Testnet upgrade requires the admin to use a private key in a personal interactive terminal and approve the irreversible broadcast. Codex must not access that credential or broadcast the upgrade.",
+      "dependencyImpact": "Allows a non-broadcast Upgrade Preview now; blocks the Testnet upgrade, real escrow actions, and final protocol acceptance until manual approval and post-upgrade acceptance.",
+      "safeWorkThatCanContinue": "The isolated Local Devnode Harness, compatibility audit, Node regressions, Leo build, disabled-action UI, and a non-broadcast Upgrade Preview are ready.",
+      "requiredManualAction": "Fund the admin public Credits balance to at least the required fee threshold, then explicitly authorize a separate Testnet broadcast.",
+      "resumeCondition": "The admin public Credits balance meets the public-fee threshold and the user explicitly authorizes a separate manual Testnet broadcast stage."
     },
     {
       "iteration": 13,
@@ -309,7 +342,7 @@
     "reporterMappingBinding": true,
     "oneShotRefund": true,
     "contextBoundReplayMarkers": 8,
-    "creditsE2E": "BLOCKED_TECHNICAL_VALIDATION"
+    "creditsE2E": "COMPLETED_LOCAL_DEVNODE"
   },
   "iteration13Acceptance": {
     "localEncryption": "ECDH-P256+HKDF-SHA256+A256GCM",
@@ -399,30 +432,45 @@
       "resumeCondition": "Git was initialized locally without overwriting current files."
     }
   ],
-  "lastTestResult": "215 of 215 tests passed",
-  "lastLintResult": "passed",
-  "lastBuildResult": "Next.js 16.2.10 production build passed",
-  "lastLeoResult": "Leo 4.0.2 build passed through WSL; 895 statements, 29.47 KB; leo test --offline compiled but ran no tests",
+  "lastTestResult": "264 of 264 tests passed after the real Testnet edition 0 baseline repair",
+  "lastLintResult": "passed with no warnings after the real-chain submit_claim ABI repair",
+  "lastBuildResult": "Next.js 16.2.10 production build passed after the real-chain submit_claim ABI repair",
+  "lastLeoResult": "Leo 4.0.2 build passed through WSL; 1183 statements, 38.36 KB; real Testnet edition 0 compatibility, full Local Devnode E2E, Credits conservation delta 0, and no-broadcast Upgrade Preview passed.",
   "lastAuditResult": "0 vulnerabilities across 440 dependencies",
   "lastBrowserResult": "Production 390px CDP checks passed for home, create-bounty, submit-proof, public-claims, and bounty detail; no overflow, runtime exception, console error, or Next error dialog",
   "lastTestnetResult": "one create_bounty transaction with Mapping Verified; two submit_claim transactions discovered: one controlled claim accepted and one duplicate-nullifier transaction rejected; nullifier and claim_receipt mappings verified unchanged after rejection",
-  "nextRunnableIteration": null,
+  "nextRunnableIteration": 12,
   "nextResumeTargets": [
     12,
     18
   ],
-  "updatedAt": "2026-07-28T19:03:59+08:00",
+  "updatedAt": "2026-07-31T00:00:00+08:00",
   "escrowV2CandidateReview": {
-    "status": "BLOCKED_TECHNICAL_VALIDATION",
+    "status": "BLOCKED_INSUFFICIENT_PUBLIC_CREDITS",
     "programId": "zkbugbounty_7f3c92.aleo",
     "currentEdition": 0,
     "targetEdition": 1,
-    "programSizeKb": 29.47,
-    "nodeTests": "215/215 passed",
-    "leoBuild": "passed",
-    "leoRuntimeTests": "No tests run",
-    "creditsE2E": "not validated",
-    "upgradePreviewAllowed": false,
-    "broadcastPerformed": false
+    "programSizeKb": 38.36,
+    "nodeTests": "264/264 passed",
+    "leoBuild": "passed with real-chain edition 0 compatibility gate",
+    "leoRuntimeTests": "Completed against the real Testnet edition 0 fixture-derived baseline with local-only Devnode identities",
+    "creditsE2E": "COMPLETED_LOCAL_DEVNODE",
+    "upgradePreviewAllowed": true,
+    "testnetBroadcastAllowed": false,
+    "broadcastPerformed": false,
+    "noBroadcastUpgradePreview": {
+      "status": "PASS",
+      "transactionId": "at14av4ja5q9j4pzt9dtzshju0z6pcqs3jw0fuxnvjenkvek4y9xuqs7gw6vk",
+      "estimatedFeeCredits": "38.166340",
+      "broadcast": false
+    },
+    "publicTestnetPrecheck": {
+      "edition": 0,
+      "adminPublicMicrocredits": "9944178",
+      "adminPublicCredits": "9.944178",
+      "estimatedFeeCredits": "38.166340",
+      "recommendedMinimumCredits": "50",
+      "publicFeeReady": false
+    }
   }
 }

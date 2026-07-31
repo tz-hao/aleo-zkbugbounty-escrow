@@ -48,10 +48,10 @@
 ## 剩余风险
 
 - 固定 Arbiter 是中心化治理点，地址轮换需要后续 Upgrade。
-- `release_reward` 因 Leo transition 在 Final 前不能读取 Mapping，必须接收 recipient/amount hint；Final 会从 Mapping 与公开 tier 重新核对，不能信任前端值。
-- 本地 Leo 4.0.2 可编译 Credits 调用，但现有项目没有可执行的 devnet Mapping seed/E2E harness。
-- 未完成真实 Credits E2E 前，无法证明运行时转账来源、余额变化与 Mapping 原子性。
+- `release_reward_v2` 因 Leo transition 在 Final 前不能读取 Mapping，必须接收 recipient/amount hint；Final 会从 Mapping 与公开 tier 重新核对，不能信任前端值。
+- 本地 Leo 4.0.2 通过独立 fresh-ledger Local Devnode Harness 验证 Credits 调用、Mapping transition 与 E2E。
+- 已完成 fresh-ledger Local Devnode Credits E2E，覆盖运行时转账来源、整数余额变化、Mapping 原子性与 replay protection；Testnet 仍未执行 upgrade。
 - Program Upgrade 无链上 rollback，错误 edition 只能通过后续升级修复。
 - 加密披露的跨设备 ciphertext delivery 仍依赖未配置的外部服务。
 
-当前未发现已知 P0/P1 源码漏洞，但缺失真实 Credits E2E 是阻止 Upgrade Preview 的技术验收项。
+当前未发现已知 P0/P1 源码漏洞。Credits E2E 不再阻止 Upgrade Preview；不可逆 Testnet upgrade 仍是需要 Admin 人工确认的安全边界。

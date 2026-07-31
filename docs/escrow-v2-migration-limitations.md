@@ -28,7 +28,7 @@
 - Upgrade 尚未广播，线上仍必须返回 ProgramUpgradeRequired。
 - Aleo Program Upgrade 没有恢复到旧 edition 的 rollback 路径。
 - 若 edition 1 产生错误，只能发布兼容的后续 edition；已有 Mapping 数据不能删除或改型。
-- 在真实 devnet Credits E2E 完成前，不生成 Upgrade Preview、费率估算或广播命令。
+- 真实 devnet Credits E2E 与无广播 `leo upgrade --print` Preview 已完成。不得生成或执行自动广播命令；Testnet broadcast 仍需要 Admin 在个人交互终端中明确确认。
 
 ## 非目标
 

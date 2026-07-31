@@ -32,13 +32,17 @@ test("Leo submit_claim enforces the authoritative nullifier mapping in Final", (
 
 test("submit_claim validates the canonical active bounty before consuming a nullifier", () => {
   const source = readFileSync("leo/bug_proof/src/main.leo", "utf8");
-  const submitClaim = source.slice(source.indexOf("fn submit_claim"), source.indexOf("fn create_bounty"));
+  const submitClaim = source.slice(
+    source.indexOf("fn submit_claim"),
+    source.indexOf("fn submit_claim_v2"),
+  );
 
   assert.match(submitClaim, /Mapping::contains\(bounties, bounty_id\)/);
   assert.match(submitClaim, /assert_eq\(bounty\.scope_hash, scope_hash\)/);
   assert.match(submitClaim, /assert_eq\(bounty\.rule_id, rule_id\)/);
   assert.match(submitClaim, /assert_eq\(bounty\.status, 1u8\)/);
   assert.match(submitClaim, /block\.height <= bounty\.disclosure_deadline/);
+  assert.doesNotMatch(submitClaim, /self\.signer|claim_reporters|bounty_claim_counts/);
 });
 
 test("strict Aleo nullifier parser returns public mapping state", () => {
