@@ -126,7 +126,7 @@ export const zh = {
     kicker: "Triage",
     title: "漏洞分诊与负责任披露",
     description: "核验 Claim，推进披露与修复；链上支付等待 Program Upgrade。",
-    roleNotice: "本页角色仅用于 Local Demo；链上权限以 Wallet self.signer 与 Program Mapping 为准。",
+    roleNotice: "本页角色仅用于 Local Demo；链上权限以 Wallet std::ctx::signer() 与 Program Mapping 为准。",
     noAccessTitle: "公开用户无法访问 Triage 操作。",
     noAccessBody: "Public User 在本地流程中为只读；Demo Preview 不代表钱包或链上权限。",
     noClaims: "当前 Demo Preview 视角没有可处理的 Claims。",

@@ -40,7 +40,7 @@ test("Leo submit_claim atomically writes the trusted on-chain Claim Receipt", ()
   assert.match(submitClaim, /let severity: u8 = proof\.severity;/);
   assert.match(submitClaim, /let witness_commitment: field = proof\.witness_commitment;/);
   assert.match(submitClaim, /let reporter_commitment: field = proof\.reporter_commitment;/);
-  assert.match(submitClaim, /created_height: block\.height/);
+  assert.match(submitClaim, /created_height: std::ctx::block_height\(\)/);
   assert.match(submitClaim, /protocol_version: 1u8/);
   assert.match(submitClaim, /Mapping::set\(nullifiers, nullifier, bounty_id\);/);
   assert.match(submitClaim, /Mapping::set\(claim_receipts, claim_hash, receipt\);/);
@@ -51,7 +51,7 @@ test("submit_claim_v2 isolates reporter and unresolved-claim state from the edit
   const source = readFileSync("leo/bug_proof/src/main.leo", "utf8");
   const submitClaimV2 = source.slice(source.indexOf("fn submit_claim_v2"), source.indexOf("fn create_bounty"));
 
-  assert.match(submitClaimV2, /let signer = self\.signer/);
+  assert.match(submitClaimV2, /let signer = std::ctx::signer\(\)/);
   assert.match(submitClaimV2, /assert_eq\(bounty_protocol_version, 2u8\)/);
   assert.match(submitClaimV2, /Mapping::set\(claim_reporters, claim_hash, signer\)/);
   assert.match(submitClaimV2, /Mapping::set\(bounty_claim_counts, bounty_id, claim_count \+ 1u64\)/);

@@ -18,7 +18,7 @@ export const ON_CHAIN_TRIAGE_CAPABILITY = {
   programId: CANONICAL_ALEO_PROGRAM_ID,
   localUpgradeReady: true,
   walletActionsEnabled: false,
-  roleAuthority: "self.signer",
+  roleAuthority: "std::ctx::signer()",
   uiRoleSwitcherAuthority: false,
   stateAuthority: "AleoMapping",
   transactionIdRequired: true,

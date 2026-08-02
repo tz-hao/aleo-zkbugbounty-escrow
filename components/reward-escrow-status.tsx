@@ -96,7 +96,7 @@ export function RewardEscrowStatus() {
           </p>
           <p>
             On-chain Triage: {capability.status}. Real Mode 权限来自
-            <span className="mx-1 font-mono text-slate-300">self.signer</span>与 Program Mapping；
+            <span className="mx-1 font-mono text-slate-300">std::ctx::signer()</span>与 Program Mapping；
             Demo Preview 不具备链上授权能力。
           </p>
         </div>

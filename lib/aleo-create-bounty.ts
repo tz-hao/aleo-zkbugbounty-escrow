@@ -59,7 +59,7 @@ export type CreateBountyTransactionPreview = {
   walletChainId: typeof ALEO_WALLET_TESTNET_CHAIN_ID;
   programId: typeof CANONICAL_ALEO_PROGRAM_ID;
   functionName: typeof CREATE_BOUNTY_FUNCTION;
-  ownerSource: "self.signer";
+  ownerSource: "std::ctx::signer()";
   feeMode: "Public";
   feeMicrocredits: number;
   fundingStatus: "NotEscrowed";
@@ -153,7 +153,7 @@ export function buildCreateBountyTransaction(
     walletChainId: ALEO_WALLET_TESTNET_CHAIN_ID,
     programId: CANONICAL_ALEO_PROGRAM_ID,
     functionName: CREATE_BOUNTY_FUNCTION,
-    ownerSource: "self.signer",
+    ownerSource: "std::ctx::signer()",
     feeMode: "Public",
     feeMicrocredits: draft.feeMicrocredits,
     fundingStatus: "NotEscrowed",

@@ -107,7 +107,7 @@ test("create_bounty builder follows the deployed ABI exactly", () => {
   assert.equal(preview.programId, "zkbugbounty_7f3c92.aleo");
   assert.equal(preview.functionName, "create_bounty");
   assert.equal(preview.walletChainId, "testnetbeta");
-  assert.equal(preview.ownerSource, "self.signer");
+  assert.equal(preview.ownerSource, "std::ctx::signer()");
   assert.equal(preview.feeMode, "Public");
   assert.equal(preview.fundingStatus, "NotEscrowed");
   assert.equal(Object.hasOwn(preview, "ownerId"), false);
@@ -270,7 +270,7 @@ test("Real Mode wallet flow uses minimum permissions and never persists success"
   assert.match(provider, /requestTransaction/);
   assert.match(provider, /classifyWalletResponseId/);
   assert.match(provider, /preview\.feeMicrocredits,\s*false/);
-  assert.match(transactionBuilder, /ownerSource: "self\.signer"/);
+  assert.match(transactionBuilder, /ownerSource: "std::ctx::signer\(\)"/);
   assert.match(result, /Submitted[\s\S]*Confirmed[\s\S]*Mapping Verified/);
   assert.match(publicView, /Data Source: Aleo Testnet/);
   assert.match(workspace, /Aleo Testnet/);

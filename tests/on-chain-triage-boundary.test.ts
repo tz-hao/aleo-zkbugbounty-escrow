@@ -18,7 +18,7 @@ test("local upgrade ABI contains the full on-chain triage boundary", () => {
 test("Demo Preview cannot authorize or persist a Real Mode triage transition", () => {
   assert.equal(ON_CHAIN_TRIAGE_CAPABILITY.walletActionsEnabled, false);
   assert.equal(ON_CHAIN_TRIAGE_CAPABILITY.uiRoleSwitcherAuthority, false);
-  assert.equal(ON_CHAIN_TRIAGE_CAPABILITY.roleAuthority, "self.signer");
+  assert.equal(ON_CHAIN_TRIAGE_CAPABILITY.roleAuthority, "std::ctx::signer()");
   assert.equal(ON_CHAIN_TRIAGE_CAPABILITY.stateAuthority, "AleoMapping");
   assert.equal(ON_CHAIN_TRIAGE_CAPABILITY.transactionIdRequired, true);
   assert.equal(ON_CHAIN_TRIAGE_CAPABILITY.mappingVerificationRequired, true);

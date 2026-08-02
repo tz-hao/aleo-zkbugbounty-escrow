@@ -3,6 +3,8 @@
 set -euo pipefail
 set +x
 
+LEO_BIN="${LEO_BIN:-leo}"
+
 # This harness only exercises a disposable localhost Devnode. It never accepts a
 # live endpoint, persists a local-only key, or emits private witness inputs.
 
@@ -11,6 +13,7 @@ readonly ALEO_E2E_NETWORK="testnet"
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly BASELINE_DIR="${ZKBB_DEVNODE_BASELINE_DIR:-${ROOT_DIR}/../aleo-devnode-baseline}"
 readonly CANDIDATE_DIR="${ZKBB_DEVNODE_CANDIDATE_DIR:-${ROOT_DIR}/../aleo-devnode-candidate}"
+readonly CANDIDATE_REF="${ZKBB_DEVNODE_CANDIDATE_REF:-escrow-v2-leo-4.4-migration}"
 readonly ROOT_CANDIDATE_SOURCE="${ROOT_DIR}/leo/bug_proof/src/main.leo"
 readonly TESTNET_EDITION_ZERO_FIXTURE="${ROOT_DIR}/audit/testnet-edition-0/zkbugbounty_7f3c92.edition-0.aleo"
 readonly TESTNET_EDITION_ZERO_FIXTURE_SHA256="5f60a222cc989a55285258d1fa89ae46a6aa9e4487a396898e28cf94aa7afdf2"
@@ -150,7 +153,7 @@ validate_local_private_key() {
       ;;
   esac
 
-  [[ "${#value}" -eq "${LOCAL_PRIVATE_KEY_LENGTH}" ]] || die "${label} does not match the Leo 4.0.2 private-key format. Enter only the 59-character local account key token"
+  [[ "${#value}" -eq "${LOCAL_PRIVATE_KEY_LENGTH}" ]] || die "${label} does not match the Leo account private-key format. Enter only the local account key token"
   [[ "${value}" =~ ${private_key_pattern} ]] || die "${label} contains unsupported characters. Enter only the unencrypted local account key token"
 }
 
@@ -322,7 +325,7 @@ verify_testnet_edition_zero_interface() {
   local workspace="$1"
   local label="$2"
   local constructor_mode="${3:-strict}"
-  local build_path="${workspace}/leo/bug_proof/build/main.aleo"
+  local build_path="${workspace}/leo/bug_proof/build/zkbugbounty_7f3c92/zkbugbounty_7f3c92.aleo"
   local verifier=(node --experimental-strip-types "${ROOT_DIR}/scripts/verify-aleo-upgrade-compatibility.ts" "${TESTNET_EDITION_ZERO_FIXTURE}" "${build_path}")
 
   [[ -f "${build_path}" ]] || die "${label} build output is missing: ${build_path}"
@@ -470,7 +473,7 @@ generate_preflight_devnode_key() {
   local key=""
   local private_key_prefix="A""Private""Key"
 
-  account_output="$(leo account new --network "${ALEO_E2E_NETWORK}" 2>/dev/null)" || die "could not generate an ephemeral local Devnode key"
+  account_output="$("${LEO_BIN}" account new --network "${ALEO_E2E_NETWORK}" 2>/dev/null)" || die "could not generate an ephemeral local Devnode key"
   key="$(printf '%s\n' "${account_output}" | tr -cs '[:alnum:]_' '\n' | awk -v prefix="${private_key_prefix}" 'index($0, prefix) == 1 { print; exit }')"
   account_output=""
   validate_local_private_key "generated local Devnode account" "${key}"
@@ -491,9 +494,8 @@ start_devnode() {
       "NETWORK=${ALEO_E2E_NETWORK}" \
       "ENDPOINT=${ALEO_E2E_ENDPOINT}" \
       "PRIVATE_KEY=${preflight_key}" \
-      leo devnode start --devnet --network "${ALEO_E2E_NETWORK}" \
-        --endpoint "${ALEO_E2E_ENDPOINT}" --socket-addr 127.0.0.1:3030 \
-        --home "${ALEO_E2E_LEDGER}" --manual-block-creation \
+      "${LEO_BIN}" devnode start --socket-addr 127.0.0.1:3030 \
+        --storage "${ALEO_E2E_LEDGER}" --clear-storage --manual-block-creation \
         -q >"${ALEO_E2E_DEVNODE_LOG}" 2>&1 &
     DEVNODE_PRIVATE_KEY="${preflight_key}"
     preflight_key=""
@@ -502,9 +504,8 @@ start_devnode() {
       "NETWORK=${ALEO_E2E_NETWORK}" \
       "ENDPOINT=${ALEO_E2E_ENDPOINT}" \
       "PRIVATE_KEY=${DEVNODE_PRIVATE_KEY}" \
-      leo devnode start --devnet --network "${ALEO_E2E_NETWORK}" \
-        --endpoint "${ALEO_E2E_ENDPOINT}" --socket-addr 127.0.0.1:3030 \
-        --home "${ALEO_E2E_LEDGER}" --manual-block-creation \
+      "${LEO_BIN}" devnode start --socket-addr 127.0.0.1:3030 \
+        --storage "${ALEO_E2E_LEDGER}" --clear-storage --manual-block-creation \
         -q >"${ALEO_E2E_DEVNODE_LOG}" 2>&1 &
   fi
   ALEO_E2E_DEVNODE_PID=$!
@@ -638,7 +639,7 @@ run_leo() {
   local actor_key="$2"
   shift 2
   local output
-  if ! output="$(cd "${workspace}/leo/bug_proof" && env "NETWORK=${ALEO_E2E_NETWORK}" "ENDPOINT=${ALEO_E2E_ENDPOINT}" "PRIVATE_KEY=${actor_key}" "DEVNET=1" leo "$@" --endpoint "${ALEO_E2E_ENDPOINT}" --network "${ALEO_E2E_NETWORK}" --devnet 2>&1)"; then
+  if ! output="$(cd "${workspace}/leo/bug_proof" && env "NETWORK=${ALEO_E2E_NETWORK}" "ENDPOINT=${ALEO_E2E_ENDPOINT}" "PRIVATE_KEY=${actor_key}" "DEVNET=1" "${LEO_BIN}" "$@" --endpoint "${ALEO_E2E_ENDPOINT}" --network "${ALEO_E2E_NETWORK}" --devnet 2>&1)"; then
     LAST_OUTPUT="${output}"
     LAST_BROADCAST_OUTPUT="${output}"
     print_sanitized_leo_failure
@@ -1314,8 +1315,7 @@ advance_blocks() {
 
   for ((i = 1; i <= count; i++)); do
     if ! env "NETWORK=${ALEO_E2E_NETWORK}" "ENDPOINT=${ALEO_E2E_ENDPOINT}" "PRIVATE_KEY=${DEVNODE_PRIVATE_KEY}" \
-      leo devnode advance 1 --endpoint "${ALEO_E2E_ENDPOINT}" \
-        --network "${ALEO_E2E_NETWORK}" --devnet -q >/dev/null; then
+      "${LEO_BIN}" devnode advance 1 --socket-addr 127.0.0.1:3030 -q >/dev/null; then
       die "local Devnode could not advance block ${i}/${count}"
     fi
     next_height="$(current_height)"
@@ -1342,7 +1342,7 @@ build_program() {
   local workspace="$1"
   local output=""
 
-  if ! output="$(cd "${workspace}/leo/bug_proof" && leo build 2>&1)"; then
+  if ! output="$(cd "${workspace}/leo/bug_proof" && "${LEO_BIN}" build 2>&1)"; then
     LAST_OUTPUT="${output}"
     print_sanitized_leo_failure
     die "Leo build failed: ${workspace}"
@@ -1420,13 +1420,13 @@ NODE
 main() {
   assert_local_endpoint
   assert_supported_stage
-  require_tool leo
+  require_tool "${LEO_BIN}"
   require_tool curl
   require_tool node
   assert_no_direct_network_mutation
   require_directory "${BASELINE_DIR}/leo/bug_proof"
   require_directory "${CANDIDATE_DIR}/leo/bug_proof"
-  assert_worktree_ref "${CANDIDATE_DIR}" "escrow-v2-upgrade-candidate"
+  assert_worktree_ref "${CANDIDATE_DIR}" "${CANDIDATE_REF}"
 
   mkdir -p "${REPORT_DIR}"
   rm -f -- "${REPORT_FILE}"

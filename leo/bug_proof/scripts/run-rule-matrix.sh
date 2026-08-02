@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+LEO_BIN="${LEO_BIN:-leo}"
+
 cd "$(dirname "$0")/.."
 
 expect_pass() {
   local label="$1"
   shift
-  if ! leo run prove_vault_invariant_break "$@" >/dev/null; then
+  if ! "${LEO_BIN}" run prove_vault_invariant_break "$@" >/dev/null; then
     echo "Expected ${label} to verify." >&2
     exit 1
   fi
@@ -15,7 +17,7 @@ expect_pass() {
 expect_reject() {
   local label="$1"
   shift
-  if leo run prove_vault_invariant_break "$@" >/dev/null 2>&1; then
+  if "${LEO_BIN}" run prove_vault_invariant_break "$@" >/dev/null 2>&1; then
     echo "Expected ${label} to be rejected." >&2
     exit 1
   fi

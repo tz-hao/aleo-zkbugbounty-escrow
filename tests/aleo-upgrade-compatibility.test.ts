@@ -12,7 +12,7 @@ const baselineSource = readFileSync(
   "utf8",
 ).replace(/\r/g, "");
 const baseline = parseAleoProgramInterface(baselineSource);
-const candidateSource = readFileSync("leo/bug_proof/build/main.aleo", "utf8").replace(/\r/g, "");
+const candidateSource = readFileSync("leo/bug_proof/build/zkbugbounty_7f3c92/zkbugbounty_7f3c92.aleo", "utf8").replace(/\r/g, "");
 const candidate = parseAleoProgramInterface(candidateSource);
 
 test("real Testnet edition 0 fixture is the sole preserved-interface baseline", () => {

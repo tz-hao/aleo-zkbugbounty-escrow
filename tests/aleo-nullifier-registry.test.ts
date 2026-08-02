@@ -41,7 +41,7 @@ test("submit_claim validates the canonical active bounty before consuming a null
   assert.match(submitClaim, /assert_eq\(bounty\.scope_hash, scope_hash\)/);
   assert.match(submitClaim, /assert_eq\(bounty\.rule_id, rule_id\)/);
   assert.match(submitClaim, /assert_eq\(bounty\.status, 1u8\)/);
-  assert.match(submitClaim, /block\.height <= bounty\.disclosure_deadline/);
+  assert.match(submitClaim, /std::ctx::block_height\(\) <= bounty\.disclosure_deadline/);
   assert.doesNotMatch(submitClaim, /self\.signer|claim_reporters|bounty_claim_counts/);
 });
 

@@ -22,8 +22,8 @@ test("Aleo Testnet deployment script completes public checks before reading a ke
   const readIndex = script.indexOf('read -rsp "Aleo Testnet deployer private key: " PRIVATE_KEY');
 
   for (const requiredCheck of [
-    "leo clean",
-    "leo build",
+    "\"${LEO_BIN}\" clean",
+    "\"${LEO_BIN}\" build",
     "block/height/latest",
     "stateRoot/latest",
     "PROGRAM_STATUS",

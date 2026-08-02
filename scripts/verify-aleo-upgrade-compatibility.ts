@@ -12,13 +12,7 @@ const TESTNET_EDITION_ZERO_FIXTURE = path.join(
   "testnet-edition-0",
   "zkbugbounty_7f3c92.edition-0.aleo",
 );
-const CANDIDATE_BUILD = path.join(
-  process.cwd(),
-  "leo",
-  "bug_proof",
-  "build",
-  "main.aleo",
-);
+const CANDIDATE_BUILD = path.join(process.cwd(), "leo", "bug_proof", "build", "zkbugbounty_7f3c92", "zkbugbounty_7f3c92.aleo");
 
 type VerificationOptions = {
   ignoreConstructor?: boolean;

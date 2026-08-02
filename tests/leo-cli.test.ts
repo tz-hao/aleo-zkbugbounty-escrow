@@ -29,10 +29,10 @@ test("detectLeoCli does not crash when native and WSL Leo are unavailable", asyn
   assert.equal(detection.available, false);
   assert.equal(detection.mode, "unavailable");
   assert.match(detection.reason, /Leo CLI is not available/);
-  assert.deepEqual(calls, [
-    "leo --version",
-    "wsl bash -lc which leo && leo --version",
-  ]);
+  assert.equal(calls[0], "leo --version");
+  assert.equal(calls.at(-1), "wsl bash -lc which leo && leo --version");
+  assert.equal(calls.length, 3);
+  assert.match(calls[1], /leo-toolchains\/4\.4\.0\/bin\/leo/);
 });
 
 test("detectLeoCli selects WSL when native Leo is unavailable but WSL Leo works", async () => {
@@ -59,6 +59,7 @@ test("package Leo scripts use dynamic helper and do not affect core scripts", ()
   assert.equal(pkg.scripts.lint, "eslint .");
   assert.equal(pkg.scripts.build, "next build");
   assert.equal(pkg.scripts["leo:version"], "node --experimental-strip-types scripts/leo-cli.ts version");
+  assert.equal(pkg.scripts["leo:doctor"], "node --experimental-strip-types scripts/leo-cli.ts doctor");
   assert.equal(pkg.scripts["leo:build"], "node --experimental-strip-types scripts/leo-cli.ts build");
   assert.equal(pkg.scripts["leo:run:valid"], "node --experimental-strip-types scripts/leo-cli.ts run-valid");
   assert.equal(pkg.scripts["leo:run:invalid"], "node --experimental-strip-types scripts/leo-cli.ts run-invalid");
@@ -72,7 +73,7 @@ test("runLeoCommand treats Leo error output as a failed command", async () => {
     stderr: "",
   });
   const result = await runLeoCommand("leo build", {
-    detection: { available: true, mode: "wsl", version: "leo 4.0.2" },
+    detection: { available: true, mode: "wsl", version: "leo 4.4.0" },
     projectPath: "C:\\Users\\71546\\Desktop\\aleo\\leo\\bug_proof",
     runner,
   });
@@ -80,6 +81,29 @@ test("runLeoCommand treats Leo error output as a failed command", async () => {
   assert.equal(result.ok, false);
 });
 
+test("runLeoCommand forwards the selected WSL binary to Leo shell scripts", async () => {
+  const calls: string[][] = [];
+  const result = await runLeoCommand("bash ./scripts/run-valid.sh", {
+    detection: {
+      available: true,
+      mode: "wsl",
+      version: "leo 4.4.0",
+      executable: "/home/demo/.local/leo-toolchains/4.4.0/bin/leo",
+    },
+    projectPath: "C:\\Users\\71546\\Desktop\\aleo\\leo\\bug_proof",
+    runner: async (command, args) => {
+      calls.push([command, ...args]);
+      return { exitCode: 0, stdout: "ok", stderr: "" };
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(calls.length, 1);
+  assert.match(
+    calls[0][3],
+    /LEO_BIN='\/home\/demo\/.local\/leo-toolchains\/4\.4\.0\/bin\/leo' bash/,
+  );
+});
 test("Leo CLI output never exposes a private key warning or literal", () => {
   const keyLikeValue = `A${"PrivateKey1"}exampleSecret123`;
   const output = sanitizeLeoCliOutput(

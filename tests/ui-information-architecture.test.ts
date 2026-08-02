@@ -12,7 +12,7 @@ test("Real Mode identity is derived from wallet and mapping, not Demo Preview", 
   assert.equal(navigation.includes("switchActor"), false);
   assert.equal(createForm.includes("canCreateBounty"), false);
   assert.equal(createForm.includes("currentActor"), false);
-  assert.match(transactionBuilder, /ownerSource: "self\.signer"/);
+  assert.match(transactionBuilder, /ownerSource: "std::ctx::signer\(\)"/);
 
   const walletRequest = submitPage.slice(
     submitPage.indexOf("async function requestWalletSignedClaim"),
@@ -57,8 +57,8 @@ test("workflow pages avoid duplicated mode and local demo explanations", () => {
   const receiptPanel = readFileSync("components/aleo-claim-receipt-panel.tsx", "utf8");
 
   for (const [source, removedCopy] of [
-    [createPage, "Real Mode 中，连接钱包将通过 self.signer"],
-    [createForm, "Owner 只来自 Program 的 self.signer"],
+    [createPage, "Real Mode 中，连接钱包将通过 std::ctx::signer()"],
+    [createForm, "Owner 只来自 Program 的 std::ctx::signer()"],
     [createForm, "连接钱包后，该地址将作为 Bounty Owner 创建"],
     [triagePage, "Triage & Responsible Disclosure"],
     [triagePage, "当前 Demo 视角可推进所属 Bounty"],

@@ -2,6 +2,8 @@
 set -euo pipefail
 set +x
 
+LEO_BIN="${LEO_BIN:-leo}"
+
 umask 077
 
 EXPECTED_PROGRAM_ID="zkbugbounty_7f3c92.aleo"
@@ -117,14 +119,14 @@ scan_for_private_key_literals() {
 [[ ! -d "${PROJECT_ROOT}/aleo" ]] || fail "A second Aleo project container exists at ${PROJECT_ROOT}/aleo."
 [[ ! -e "$RESULT_PATH" ]] || fail "A previous ${RESULT_FILENAME} exists. Move it before starting a new deployment."
 
-require_command leo
+require_command "${LEO_BIN}"
 require_command curl
 require_command python3
 require_command grep
 require_command find
 
-LEO_VERSION="$(leo --version)"
-[[ "$LEO_VERSION" == "leo 4.0.2"* ]] || fail "Leo 4.0.2 is required; found: ${LEO_VERSION}"
+LEO_VERSION="$("${LEO_BIN}" --version)"
+[[ "$LEO_VERSION" == "leo 4.4.0"* ]] || fail "Leo 4.4.0 is required; found: ${LEO_VERSION}"
 printf 'Leo CLI: %s\n' "$LEO_VERSION"
 
 mapfile -d '' SOURCE_MANIFESTS < <(
@@ -140,8 +142,8 @@ printf 'Private-key project scan: clear\n'
 
 (
     cd "$LEO_PROJECT_DIR"
-    leo clean
-    leo build
+    "${LEO_BIN}" clean
+    "${LEO_BIN}" build
 )
 
 SOURCE_PROGRAM_ID="$(json_program_id "${LEO_PROJECT_DIR}/program.json")"
@@ -156,7 +158,7 @@ grep -F -q "@admin(address = \"${EXPECTED_ADMIN_ADDRESS}\")" "${LEO_PROJECT_DIR}
 if grep -F -q '@noupgrade' "${LEO_PROJECT_DIR}/src/main.leo"; then
     fail "The canonical program unexpectedly contains @noupgrade."
 fi
-grep -F -q "assert.eq program_owner ${EXPECTED_ADMIN_ADDRESS};" "${LEO_PROJECT_DIR}/build/main.aleo" || fail "Compiled admin constructor guard mismatch."
+grep -F -q "assert.eq program_owner ${EXPECTED_ADMIN_ADDRESS};" "${LEO_PROJECT_DIR}/build/zkbugbounty_7f3c92/zkbugbounty_7f3c92.aleo" || fail "Compiled admin constructor guard mismatch."
 printf 'Program and constructor checks: clear\n'
 
 HEIGHT_STATUS="$(http_status "$HEIGHT_URL")" || fail "Unable to query the Testnet block-height endpoint."
@@ -195,7 +197,7 @@ if ! (
     PRIVATE_KEY="$PRIVATE_KEY" \
     NETWORK="$NETWORK" \
     ENDPOINT="$ENDPOINT" \
-    leo deploy \
+    "${LEO_BIN}" deploy \
         --broadcast \
         --network-retries 6 \
         --json-output="$RESULT_FILENAME"

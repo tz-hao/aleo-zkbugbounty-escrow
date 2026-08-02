@@ -16,7 +16,7 @@ zkBugBounty 是运行在 Aleo Testnet 上的隐私漏洞披露协议原型。当
 
 候选版本新增真实 Credits 充值、严格披露状态机、Severity 奖励绑定、Reporter 绑定、未解决 Claim 计数、一次性退款和八类上下文绑定 Marker。现有 v1 structs、mappings 与 public entry signatures 保持不变。
 
-当前候选已通过 Node 测试、ESLint、Next.js build、Leo 4.0.2 build、完整 fresh-ledger Local Devnode Credits E2E 与无广播 Testnet Upgrade Preview。验收覆盖 legacy fail-closed、v2 Credits funding、披露与 payout 状态机、replay protection、refund 和整数 Credits conservation（delta 0）。Preview 仅用于审核，未广播；Testnet broadcast 仍必须由 Admin 在个人终端明确批准。
+当前候选已通过 Node 测试、ESLint、Next.js build、Leo 4.4.0 build、完整 fresh-ledger Local Devnode Credits E2E 与无广播 Testnet Upgrade Preview。验收覆盖 legacy fail-closed、v2 Credits funding、披露与 payout 状态机、replay protection、refund 和整数 Credits conservation（delta 0）。Preview 仅用于审核，未广播；Testnet broadcast 仍必须由 Admin 在个人终端明确批准。
 
 ## 验证
 

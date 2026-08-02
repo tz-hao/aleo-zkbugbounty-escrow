@@ -58,7 +58,7 @@ export const REWARD_ESCROW_UPGRADE_PLAN = {
   ],
   securityChecks: [
     "legacy economic entries are ABI-preserved and fail closed before any Credits call",
-    "fund_bounty_v2 transfers real public credits from self.signer to the program account",
+    "fund_bounty_v2 transfers real public credits from std::ctx::signer() to the program account",
     "fund_bounty_v2 accepts only protocol-v2 bounties before their disclosure deadline",
     "all economic operation markers are unique and replay protected",
     "lock_reward_v2 derives the exact reward from the verified receipt severity and advertised reward tier",

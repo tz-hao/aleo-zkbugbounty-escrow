@@ -62,10 +62,10 @@ test("Escrow Devnode harness is localhost-only and starts from an isolated ledge
   assert.match(harness, /aleo-devnode-baseline/);
   assert.match(harness, /aleo-devnode-candidate/);
   assert.match(harness, /aleo-devnode-ledger/);
-  assert.match(harness, /leo devnode start --devnet/);
-  assert.match(harness, /--home "\$\{ALEO_E2E_LEDGER\}"/);
+  assert.match(harness, /"\$\{LEO_BIN\}" devnode start --socket-addr 127\.0\.0\.1:3030/);
+  assert.match(harness, /--storage "\$\{ALEO_E2E_LEDGER\}"/);
   assert.doesNotMatch(harness, /api\.explorer\.provable\.com/);
-  assert.doesNotMatch(harness, /--storage|--clear-storage/);
+  assert.match(harness, /--clear-storage/);
 });
 
 test("Escrow Devnode harness never embeds or persists private credentials", () => {
@@ -487,7 +487,7 @@ test("Bootstrap failure stops the full E2E before deployment and exposes public 
 test("Escrow Devnode harness validates Windows-created worktrees from the root repository", () => {
   assert.match(harness, /git -C "\$\{ROOT_DIR\}" worktree list --porcelain/);
   assert.match(harness, /wslpath -w/);
-  assert.match(harness, /assert_worktree_ref "\$\{CANDIDATE_DIR\}" "escrow-v2-upgrade-candidate"/);
+  assert.match(harness, /assert_worktree_ref "\$\{CANDIDATE_DIR\}" "\$\{CANDIDATE_REF\}"/);
   assert.match(harness, /materialize_real_testnet_edition_zero_baseline/);
   assert.doesNotMatch(harness, /assert_worktree_ref "\$\{BASELINE_DIR\}" "pre-escrow-upgrade"/);
   assert.doesNotMatch(harness, /git -C "\$\{BASELINE_DIR\}"/);
@@ -544,7 +544,7 @@ test("Escrow Devnode harness rejects malformed local key input before Devnode st
   assert.match(harness, /must be a single key token/);
   assert.match(harness, /received an Aleo address/);
   assert.match(harness, /received a View Key/);
-  assert.match(harness, /59-character local account key token/);
+  assert.match(harness, /local account key token/);
   assert.match(harness, /validate_local_private_key "\$\{prompt\}" "\$\{value\}"/);
   assert.match(harness, /Leo rejected the Devnode startup key before readiness/);
   assert.match(harness, /private_key_pattern="\^\$\{private_key_prefix\}1\[\[:alnum:\]_\]\+\$"/);
@@ -571,7 +571,7 @@ test("Escrow Devnode harness reports interrupted interactive input instead of co
 test("Escrow Devnode harness supports a no-account local preflight", () => {
   assert.match(harness, /ESCROW_DEVNODE_PREFLIGHT_ONLY/);
   assert.match(harness, /generate_preflight_devnode_key/);
-  assert.match(harness, /leo account new/);
+  assert.match(harness, /"\$\{LEO_BIN\}" account new/);
   assert.match(harness, /devnode-launch\.XXXXXX/);
   assert.match(harness, /Local Devnode preflight passed/);
   assert.match(harness, /No user-provided accounts, deployments, or transactions were used/);
@@ -586,7 +586,7 @@ test("Escrow Devnode harness requires a funded local deployment owner before dep
 });
 
 test("Escrow Devnode harness advances blocks sequentially before a V9 deployment", () => {
-  assert.match(harness, /leo devnode advance 1/);
+  assert.match(harness, /"\$\{LEO_BIN\}" devnode advance 1/);
   assert.match(harness, /local Devnode could not advance block/);
   assert.match(harness, /local Devnode did not advance block/);
   assert.match(harness, /10#\$\{next_height\} > 10#\$\{previous_height\}/);

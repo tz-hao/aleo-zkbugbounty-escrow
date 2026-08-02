@@ -53,7 +53,7 @@ export function materializeTestnetEditionZeroSource(candidateSource) {
   let source = candidateSource.replace(/\r\n/g, "\n");
 
   for (const name of ["BountyEscrowState", "ClaimPayoutState", "ClaimTriageState"]) {
-    source = removeBalancedBlock(source, new RegExp(`^    struct ${name} \\{`, "m"));
+    source = removeBalancedBlock(source, new RegExp(`^(?:    )?struct ${name} \\{`, "m"));
   }
 
   for (const name of [

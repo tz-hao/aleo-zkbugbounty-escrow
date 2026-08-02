@@ -11,6 +11,64 @@ struct ProofResult {
     rule_id: field,
 }
 
+struct BountyState {
+    owner_address: address,
+    scope_hash: field,
+    rule_id: field,
+    critical_reward: u64,
+    high_reward: u64,
+    medium_reward: u64,
+    low_reward: u64,
+    disclosure_deadline: u32,
+    status: u8,
+}
+
+struct ClaimReceiptState {
+    claim_hash: field,
+    bounty_id: field,
+    rule_id: field,
+    scope_hash: field,
+    severity: u8,
+    witness_commitment: field,
+    nullifier: field,
+    reporter_commitment: field,
+    proof_status: u8,
+    created_height: u32,
+    protocol_version: u8,
+}
+
+struct BountyEscrowState {
+    owner_address: address,
+    total_funded: u64,
+    available_balance: u64,
+    locked_amount: u64,
+    paid_amount: u64,
+    refunded_amount: u64,
+    status: u8,
+    last_funding_height: u32,
+    last_funding_marker: field,
+    last_refund_marker: field,
+}
+
+struct ClaimPayoutState {
+    claim_hash: field,
+    bounty_id: field,
+    whitehat_address: address,
+    reward_amount: u64,
+    status: u8,
+    locked_height: u32,
+    paid_height: u32,
+    release_marker: field,
+}
+
+struct ClaimTriageState {
+    claim_hash: field,
+    bounty_id: field,
+    status: u8,
+    package_hash: field,
+    updated_height: u32,
+}
+
 fn compute_vault_invariant_break(
         bounty_id: field,
         scope_hash: field,
@@ -198,63 +256,10 @@ fn derive_operation_marker(
     }
 
 program zkbugbounty_7f3c92.aleo {
-    struct BountyState {
-        owner_address: address,
-        scope_hash: field,
-        rule_id: field,
-        critical_reward: u64,
-        high_reward: u64,
-        medium_reward: u64,
-        low_reward: u64,
-        disclosure_deadline: u32,
-        status: u8,
-    }
 
-    struct ClaimReceiptState {
-        claim_hash: field,
-        bounty_id: field,
-        rule_id: field,
-        scope_hash: field,
-        severity: u8,
-        witness_commitment: field,
-        nullifier: field,
-        reporter_commitment: field,
-        proof_status: u8,
-        created_height: u32,
-        protocol_version: u8,
-    }
 
-    struct BountyEscrowState {
-        owner_address: address,
-        total_funded: u64,
-        available_balance: u64,
-        locked_amount: u64,
-        paid_amount: u64,
-        refunded_amount: u64,
-        status: u8,
-        last_funding_height: u32,
-        last_funding_marker: field,
-        last_refund_marker: field,
-    }
 
-    struct ClaimPayoutState {
-        claim_hash: field,
-        bounty_id: field,
-        whitehat_address: address,
-        reward_amount: u64,
-        status: u8,
-        locked_height: u32,
-        paid_height: u32,
-        release_marker: field,
-    }
 
-    struct ClaimTriageState {
-        claim_hash: field,
-        bounty_id: field,
-        status: u8,
-        package_hash: field,
-        updated_height: u32,
-    }
 
     mapping bounties: field => BountyState;
     mapping nullifiers: field => field;
@@ -353,7 +358,7 @@ program zkbugbounty_7f3c92.aleo {
             assert_eq(bounty.scope_hash, scope_hash);
             assert_eq(bounty.rule_id, rule_id);
             assert_eq(bounty.status, 1u8);
-            assert(block.height <= bounty.disclosure_deadline);
+            assert(std::ctx::block_height() <= bounty.disclosure_deadline);
 
             assert(!Mapping::contains(nullifiers, nullifier));
             assert(!Mapping::contains(claim_receipts, claim_hash));
@@ -368,7 +373,7 @@ program zkbugbounty_7f3c92.aleo {
                 nullifier: nullifier,
                 reporter_commitment: reporter_commitment,
                 proof_status: 1u8,
-                created_height: block.height,
+                created_height: std::ctx::block_height(),
                 protocol_version: 1u8,
             };
             Mapping::set(nullifiers, nullifier, bounty_id);
@@ -394,7 +399,7 @@ program zkbugbounty_7f3c92.aleo {
         hidden_delta_user_balance: u64,
         reporter_secret: field,
     ) -> (public ProofResult, Final) {
-        let signer = self.signer;
+        let signer = std::ctx::signer();
         let proof: ProofResult = compute_vault_invariant_break(
             bounty_id,
             scope_hash,
@@ -425,7 +430,7 @@ program zkbugbounty_7f3c92.aleo {
             assert_eq(bounty.scope_hash, scope_hash);
             assert_eq(bounty.rule_id, rule_id);
             assert_eq(bounty.status, 1u8);
-            assert(block.height <= bounty.disclosure_deadline);
+            assert(std::ctx::block_height() <= bounty.disclosure_deadline);
             assert(Mapping::contains(bounty_protocol_versions, bounty_id));
             let bounty_protocol_version: u8 = Mapping::get(bounty_protocol_versions, bounty_id);
             assert_eq(bounty_protocol_version, 2u8);
@@ -445,7 +450,7 @@ program zkbugbounty_7f3c92.aleo {
                 nullifier: nullifier,
                 reporter_commitment: reporter_commitment,
                 proof_status: 1u8,
-                created_height: block.height,
+                created_height: std::ctx::block_height(),
                 protocol_version: bounty_protocol_version,
             };
             let claim_count: u64 = Mapping::get(bounty_claim_counts, bounty_id);
@@ -466,7 +471,7 @@ program zkbugbounty_7f3c92.aleo {
         public low_reward: u64,
         public disclosure_deadline: u32,
     ) -> Final {
-        let signer = self.signer;
+        let signer = std::ctx::signer();
         return final {
             assert(!Mapping::contains(bounties, bounty_id));
 
@@ -483,7 +488,7 @@ program zkbugbounty_7f3c92.aleo {
                 low_reward == 0u64;
             assert(supported_rule);
             assert(valid_rewards);
-            assert(disclosure_deadline > block.height);
+            assert(disclosure_deadline > std::ctx::block_height());
 
             let bounty: BountyState = BountyState {
                 owner_address: signer,
@@ -503,7 +508,7 @@ program zkbugbounty_7f3c92.aleo {
     }
 
     fn pause_bounty(public bounty_id: field) -> Final {
-        let signer = self.signer;
+        let signer = std::ctx::signer();
         return final {
             assert(Mapping::contains(bounties, bounty_id));
             let current: BountyState = Mapping::get(bounties, bounty_id);
@@ -526,7 +531,7 @@ program zkbugbounty_7f3c92.aleo {
     }
 
     fn close_bounty(public bounty_id: field) -> Final {
-        let signer = self.signer;
+        let signer = std::ctx::signer();
         return final {
             assert(Mapping::contains(bounties, bounty_id));
             let current: BountyState = Mapping::get(bounties, bounty_id);
@@ -554,7 +559,7 @@ program zkbugbounty_7f3c92.aleo {
         public amount: u64,
         public funding_marker: field,
     ) -> Final {
-        let signer = self.signer;
+        let signer = std::ctx::signer();
         assert_eq(amount, 0u64);
         assert_neq(amount, 0u64);
         let transfer: Final = credits.aleo::transfer_public_as_signer(
@@ -596,7 +601,7 @@ program zkbugbounty_7f3c92.aleo {
                 paid_amount: current.paid_amount,
                 refunded_amount: current.refunded_amount,
                 status: 1u8,
-                last_funding_height: block.height,
+                last_funding_height: std::ctx::block_height(),
                 last_funding_marker: funding_marker,
                 last_refund_marker: current.last_refund_marker,
             };
@@ -609,7 +614,7 @@ program zkbugbounty_7f3c92.aleo {
         public amount: u64,
         public funding_marker: field,
     ) -> Final {
-        let signer = self.signer;
+        let signer = std::ctx::signer();
         let transfer: Final = credits.aleo::transfer_public_as_signer(
             zkbugbounty_7f3c92.aleo,
             amount,
@@ -620,7 +625,7 @@ program zkbugbounty_7f3c92.aleo {
             let bounty: BountyState = Mapping::get(bounties, bounty_id);
             assert_eq(bounty.owner_address, signer);
             assert(bounty.status == 1u8 || bounty.status == 2u8);
-            assert(block.height <= bounty.disclosure_deadline);
+            assert(std::ctx::block_height() <= bounty.disclosure_deadline);
             assert(Mapping::contains(bounty_protocol_versions, bounty_id));
             let bounty_protocol_version: u8 = Mapping::get(bounty_protocol_versions, bounty_id);
             assert_eq(bounty_protocol_version, 2u8);
@@ -662,7 +667,7 @@ program zkbugbounty_7f3c92.aleo {
                 paid_amount: current.paid_amount,
                 refunded_amount: current.refunded_amount,
                 status: 1u8,
-                last_funding_height: block.height,
+                last_funding_height: std::ctx::block_height(),
                 last_funding_marker: operation_marker,
                 last_refund_marker: current.last_refund_marker,
             };
@@ -678,7 +683,7 @@ program zkbugbounty_7f3c92.aleo {
         public whitehat_address: address,
         public reward_amount: u64,
     ) -> Final {
-        let signer = self.signer;
+        let signer = std::ctx::signer();
         assert_eq(reward_amount, 0u64);
         assert_neq(reward_amount, 0u64);
         return final {
@@ -721,7 +726,7 @@ program zkbugbounty_7f3c92.aleo {
                 whitehat_address: whitehat_address,
                 reward_amount: reward_amount,
                 status: 1u8,
-                locked_height: block.height,
+                locked_height: std::ctx::block_height(),
                 paid_height: 0u32,
                 release_marker: 0field,
             };
@@ -737,7 +742,7 @@ program zkbugbounty_7f3c92.aleo {
         public reward_amount: u64,
         public lock_marker: field,
     ) -> Final {
-        let signer = self.signer;
+        let signer = std::ctx::signer();
         return final {
             assert(reward_amount > 0u64);
             assert(Mapping::contains(bounties, bounty_id));
@@ -801,7 +806,7 @@ program zkbugbounty_7f3c92.aleo {
                 whitehat_address: whitehat_address,
                 reward_amount: reward_amount,
                 status: 1u8,
-                locked_height: block.height,
+                locked_height: std::ctx::block_height(),
                 paid_height: 0u32,
                 release_marker: 0field,
             };
@@ -810,7 +815,7 @@ program zkbugbounty_7f3c92.aleo {
                 bounty_id: bounty_id,
                 status: 1u8,
                 package_hash: 0field,
-                updated_height: block.height,
+                updated_height: std::ctx::block_height(),
             };
             Mapping::set(bounty_escrows, bounty_id, updated_escrow);
             Mapping::set(claim_payouts, claim_hash, payout);
@@ -824,7 +829,7 @@ program zkbugbounty_7f3c92.aleo {
         public claim_hash: field,
         public request_marker: field,
     ) -> Final {
-        let signer = self.signer;
+        let signer = std::ctx::signer();
         return final {
             assert(Mapping::contains(bounties, bounty_id));
             let bounty: BountyState = Mapping::get(bounties, bounty_id);
@@ -859,7 +864,7 @@ program zkbugbounty_7f3c92.aleo {
                 bounty_id: current.bounty_id,
                 status: 2u8,
                 package_hash: 0field,
-                updated_height: block.height,
+                updated_height: std::ctx::block_height(),
             };
             Mapping::set(claim_triage_states, claim_hash, requested);
             Mapping::set(escrow_operation_markers, operation_marker, true);
@@ -872,7 +877,7 @@ program zkbugbounty_7f3c92.aleo {
         public package_hash: field,
         public share_marker: field,
     ) -> Final {
-        let signer = self.signer;
+        let signer = std::ctx::signer();
         return final {
             assert(package_hash != 0field);
             assert(Mapping::contains(bounties, bounty_id));
@@ -910,7 +915,7 @@ program zkbugbounty_7f3c92.aleo {
                 bounty_id: current.bounty_id,
                 status: 3u8,
                 package_hash: package_hash,
-                updated_height: block.height,
+                updated_height: std::ctx::block_height(),
             };
             Mapping::set(claim_triage_states, claim_hash, shared);
             Mapping::set(escrow_operation_markers, operation_marker, true);
@@ -922,7 +927,7 @@ program zkbugbounty_7f3c92.aleo {
         public claim_hash: field,
         public patched_marker: field,
     ) -> Final {
-        let signer = self.signer;
+        let signer = std::ctx::signer();
         return final {
             assert(Mapping::contains(bounties, bounty_id));
             let bounty: BountyState = Mapping::get(bounties, bounty_id);
@@ -952,7 +957,7 @@ program zkbugbounty_7f3c92.aleo {
                 bounty_id: current.bounty_id,
                 status: 4u8,
                 package_hash: current.package_hash,
-                updated_height: block.height,
+                updated_height: std::ctx::block_height(),
             };
             Mapping::set(claim_triage_states, claim_hash, patched);
             Mapping::set(escrow_operation_markers, operation_marker, true);
@@ -967,7 +972,7 @@ program zkbugbounty_7f3c92.aleo {
         public reward_amount: u64,
         public release_marker: field,
     ) -> Final {
-        let signer = self.signer;
+        let signer = std::ctx::signer();
         assert_eq(reward_amount, 0u64);
         assert_neq(reward_amount, 0u64);
         let transfer: Final = credits.aleo::transfer_public(
@@ -1024,7 +1029,7 @@ program zkbugbounty_7f3c92.aleo {
                 reward_amount: payout.reward_amount,
                 status: 2u8,
                 locked_height: payout.locked_height,
-                paid_height: block.height,
+                paid_height: std::ctx::block_height(),
                 release_marker: release_marker,
             };
             Mapping::set(bounty_escrows, bounty_id, updated_escrow);
@@ -1039,7 +1044,7 @@ program zkbugbounty_7f3c92.aleo {
         public reward_amount: u64,
         public release_marker: field,
     ) -> Final {
-        let signer = self.signer;
+        let signer = std::ctx::signer();
         let transfer: Final = credits.aleo::transfer_public(
             whitehat_address,
             reward_amount,
@@ -1115,7 +1120,7 @@ program zkbugbounty_7f3c92.aleo {
                 reward_amount: payout.reward_amount,
                 status: 2u8,
                 locked_height: payout.locked_height,
-                paid_height: block.height,
+                paid_height: std::ctx::block_height(),
                 release_marker: operation_marker,
             };
             let paid_triage: ClaimTriageState = ClaimTriageState {
@@ -1123,7 +1128,7 @@ program zkbugbounty_7f3c92.aleo {
                 bounty_id: triage.bounty_id,
                 status: 5u8,
                 package_hash: triage.package_hash,
-                updated_height: block.height,
+                updated_height: std::ctx::block_height(),
             };
             Mapping::set(bounty_escrows, bounty_id, updated_escrow);
             Mapping::set(claim_payouts, claim_hash, paid_payout);
@@ -1138,7 +1143,7 @@ program zkbugbounty_7f3c92.aleo {
         public claim_hash: field,
         public rejection_marker: field,
     ) -> Final {
-        let signer = self.signer;
+        let signer = std::ctx::signer();
         return final {
             assert(Mapping::contains(bounties, bounty_id));
             let bounty: BountyState = Mapping::get(bounties, bounty_id);
@@ -1241,7 +1246,7 @@ program zkbugbounty_7f3c92.aleo {
                 bounty_id: bounty_id,
                 status: 6u8,
                 package_hash: triage.package_hash,
-                updated_height: block.height,
+                updated_height: std::ctx::block_height(),
             };
             Mapping::set(claim_payouts, claim_hash, rejected_payout);
             Mapping::set(claim_triage_states, claim_hash, rejected_triage);
@@ -1256,7 +1261,7 @@ program zkbugbounty_7f3c92.aleo {
         public amount: u64,
         public refund_marker: field,
     ) -> Final {
-        let signer = self.signer;
+        let signer = std::ctx::signer();
         assert_eq(amount, 0u64);
         assert_neq(amount, 0u64);
         let transfer: Final = credits.aleo::transfer_public(
@@ -1270,7 +1275,7 @@ program zkbugbounty_7f3c92.aleo {
             let bounty: BountyState = Mapping::get(bounties, bounty_id);
             assert_eq(bounty.owner_address, signer);
             assert_eq(bounty.status, 3u8);
-            assert(block.height > bounty.disclosure_deadline);
+            assert(std::ctx::block_height() > bounty.disclosure_deadline);
 
             assert(Mapping::contains(bounty_escrows, bounty_id));
             let escrow: BountyEscrowState = Mapping::get(bounty_escrows, bounty_id);
@@ -1303,7 +1308,7 @@ program zkbugbounty_7f3c92.aleo {
         public amount: u64,
         public refund_marker: field,
     ) -> Final {
-        let signer = self.signer;
+        let signer = std::ctx::signer();
         let transfer: Final = credits.aleo::transfer_public(
             signer,
             amount,
@@ -1314,7 +1319,7 @@ program zkbugbounty_7f3c92.aleo {
             let bounty: BountyState = Mapping::get(bounties, bounty_id);
             assert_eq(bounty.owner_address, signer);
             assert_eq(bounty.status, 3u8);
-            assert(block.height > bounty.disclosure_deadline);
+            assert(std::ctx::block_height() > bounty.disclosure_deadline);
             assert(Mapping::contains(bounty_protocol_versions, bounty_id));
             let bounty_protocol_version: u8 = Mapping::get(bounty_protocol_versions, bounty_id);
             assert_eq(bounty_protocol_version, 2u8);

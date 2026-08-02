@@ -393,7 +393,7 @@ test("Leo source enforces real Credits escrow and payout guards", () => {
   assert.match(fund, /credits\.aleo::transfer_public_as_signer/);
   assert.match(fund, /assert_eq\(bounty\.owner_address, signer\);/);
   assert.match(fund, /assert\(bounty\.status == 1u8 \|\| bounty\.status == 2u8\);/);
-  assert.match(fund, /assert\(block\.height <= bounty\.disclosure_deadline\);/);
+  assert.match(fund, /assert\(std::ctx::block_height\(\) <= bounty\.disclosure_deadline\);/);
   assert.match(fund, /escrow_operation_markers/);
 
   assert.match(lock, /assert_eq\(receipt\.proof_status, 1u8\);/);
@@ -429,7 +429,7 @@ test("Leo source enforces real Credits escrow and payout guards", () => {
   assert.match(reject, /Mapping::set\(bounty_claim_counts, bounty_id, unresolved_claims - 1u64\);/);
 
   assert.match(refund, /assert_eq\(bounty\.status, 3u8\);/);
-  assert.match(refund, /assert\(block\.height > bounty\.disclosure_deadline\);/);
+  assert.match(refund, /assert\(std::ctx::block_height\(\) > bounty\.disclosure_deadline\);/);
   assert.match(refund, /assert\(Mapping::contains\(bounty_claim_counts, bounty_id\)\);/);
   assert.match(refund, /assert_eq\(escrow\.locked_amount, 0u64\);/);
   assert.match(refund, /assert_eq\(claim_count, 0u64\);/);
