@@ -255,10 +255,29 @@ worktree_head_from_root() {
 assert_worktree_ref() {
   local workspace="$1"
   local ref="$2"
-  local expected actual
-  expected="$(git -C "${ROOT_DIR}" rev-parse "${ref}^{commit}")"
-  actual="$(worktree_head_from_root "${workspace}")" || die "worktree is not registered: ${workspace}"
-  [[ "${actual}" == "${expected}" ]] || die "worktree is not ${ref}: ${workspace}"
+  local expected candidate_head candidate_common_dir root_common_dir
+
+  expected="$(git -C "${ROOT_DIR}" rev-parse "${ref}^{commit}")" \
+    || die "could not resolve candidate ref: ${ref}"
+  [[ -f "${workspace}/.git" ]] \
+    || die "candidate is not a linked Git worktree: ${workspace}"
+  grep -q "^gitdir: " "${workspace}/.git" \
+    || die "candidate Git metadata is invalid: ${workspace}"
+  candidate_common_dir="$(cd "${workspace}" && realpath "$(git rev-parse --git-common-dir)")" \
+    || die "could not resolve candidate Git common directory: ${workspace}"
+  root_common_dir="$(cd "${ROOT_DIR}" && realpath "$(git rev-parse --git-common-dir)")" \
+    || die "could not resolve root Git common directory"
+  [[ "${candidate_common_dir}" == "${root_common_dir}" ]] \
+    || die "candidate is not registered by the root Git worktree: ${workspace}"
+  candidate_head="$(git -C "${workspace}" rev-parse HEAD)" \
+    || die "could not resolve candidate HEAD: ${workspace}"
+
+  if [[ "${candidate_head}" != "${expected}" ]]; then
+    printf 'escrow-devnode-e2e: candidate HEAD mismatch\n' >&2
+    printf 'expected: %s\n' "${expected}" >&2
+    printf 'actual:   %s\n' "${candidate_head}" >&2
+    exit 1
+  fi
 }
 
 backup_test_sources() {
