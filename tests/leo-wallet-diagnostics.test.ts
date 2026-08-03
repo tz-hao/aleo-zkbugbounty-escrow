@@ -34,7 +34,7 @@ test("Leo Wallet connection errors are classified without exposing raw messages"
   assert.equal(unknown.message.includes("internal secret detail"), false);
 });
 
-test("wallet connection code uses Testnet minimum permission without persistence or logging", () => {
+test("wallet connection code uses Testnet minimum permission and public-only pending polling", () => {
   const provider = readFileSync("components/aleo-wallet-provider.tsx", "utf8");
   const diagnostics = readFileSync("lib/leo-wallet-diagnostics.ts", "utf8");
   const combined = `${provider}\n${diagnostics}`;
@@ -44,5 +44,7 @@ test("wallet connection code uses Testnet minimum permission without persistence
   assert.match(provider, /CANONICAL_ALEO_PROGRAM_ID/);
   assert.equal(combined.includes("console.log"), false);
   assert.equal(combined.includes("localStorage"), false);
-  assert.equal(combined.includes("sessionStorage"), false);
+  assert.match(provider, /PUBLIC_PENDING_TRANSACTION_STORAGE_KEY/);
+  assert.match(provider, /PUBLIC_TRANSACTION_ID_PATTERN/);
+  assert.equal(provider.includes("console.log"), false);
 });

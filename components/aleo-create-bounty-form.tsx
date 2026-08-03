@@ -160,8 +160,12 @@ export function AleoCreateBountyForm() {
       setPreview(currentPreview);
       await wallet.submitCreateBounty(currentPreview);
       router.push(`/create-bounty/result?bountyId=${encodeURIComponent(currentPreview.publicInputs.bountyId)}`);
-    } catch {
-      setMessage("Wallet 未接受交易请求。没有任何链上成功状态被写入本地。");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Transaction could not be completed. No on-chain success state was recorded.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -171,7 +175,8 @@ export function AleoCreateBountyForm() {
     wallet.connectionState === "Connected" &&
     network.kind === "available" &&
     preview !== null &&
-    !submitting;
+    !submitting &&
+    !wallet.transactionSubmissionBlocked;
 
   return (
     <section className="surface-card rounded-lg p-5 sm:p-6" aria-labelledby="real-create-bounty-title">

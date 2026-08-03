@@ -297,7 +297,12 @@ test("Wallet protocol submission verifies live capability before opening a reque
   assert.match(boundary, /fetch\("\/api\/aleo\/escrow"/);
   assert.match(boundary, /status !== "Available"/);
   assert.match(boundary, /walletRequestEnabled !== true/);
-  assert.ok(boundary.indexOf("/api/aleo/escrow") < boundary.indexOf("requestTransaction"));
+  assert.ok(boundary.indexOf("/api/aleo/escrow") < boundary.indexOf("requestWalletTransaction"));
+  const helperStart = provider.indexOf("async function requestWalletTransaction");
+  const helperEnd = provider.indexOf("async function submitCreateBounty", helperStart);
+  const helper = provider.slice(helperStart, helperEnd);
+  assert.match(helper, /adapter.requestTransaction/);
+  assert.match(helper, /isTransactionSubmissionBlocked/);
   assert.equal(boundary.includes("localStorage"), false);
   assert.equal(boundary.includes("console."), false);
   assert.match(workspace, /claim_reporters/);

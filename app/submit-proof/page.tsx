@@ -239,6 +239,10 @@ export default function SubmitProofPage() {
       setWalletClaimError("请先连接 Aleo Testnet 上的 Leo Wallet。");
       return;
     }
+    if (wallet.transactionSubmissionBlocked) {
+      setWalletClaimError("已有公开 Transaction 正在等待签名、广播或确认。请勿重复提交同一操作。");
+      return;
+    }
 
     setIsRequestingWallet(true);
     try {
@@ -275,7 +279,11 @@ export default function SubmitProofPage() {
             ? "Private Witness 数值必须是有效的非负 u64。"
             : message.includes("Reporter secret")
               ? "Reporter Secret 不能为空。"
-              : "Leo Wallet 未接受 submit_claim 请求；未创建任何链上 Claim Receipt。",
+              : message.includes("交易已取消") || message.includes("签名被拒绝")
+                ? "Transaction cancelled / Signature rejected. 未创建任何链上 Claim Receipt。"
+                : message.includes("Testnet")
+                  ? "Wallet 当前不在 Aleo Testnet。请切换网络后重新生成 Preview。"
+                  : "Transaction could not be completed. 未创建任何链上 Claim Receipt。",
       );
     } finally {
       clearPrivateInputState();
@@ -610,7 +618,8 @@ export default function SubmitProofPage() {
                       className="focus-ring primary-action disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-slate-600"
                       disabled={
                         wallet.connectionState !== "Connected" ||
-                        isRequestingWallet
+                        isRequestingWallet ||
+                        wallet.transactionSubmissionBlocked
                       }
                       onClick={() => void requestWalletSignedClaim()}
                       type="button"

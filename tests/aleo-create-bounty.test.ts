@@ -256,7 +256,7 @@ test("Aleo Testnet network check parses and exposes the wallet chain ID", async 
   assert.equal(status.latestHeight, 19_000_000);
 });
 
-test("Real Mode wallet flow uses minimum permissions and never persists success", () => {
+test("Real Mode wallet flow uses minimum permissions and restores only public pending transaction IDs", () => {
   const provider = readFileSync("components/aleo-wallet-provider.tsx", "utf8");
   const form = readFileSync("components/aleo-create-bounty-form.tsx", "utf8");
   const result = readFileSync("components/create-bounty-result.tsx", "utf8");
@@ -277,5 +277,10 @@ test("Real Mode wallet flow uses minimum permissions and never persists success"
   assert.match(workspace, /Demo Local/);
   assert.equal(combined.includes("localStorage"), true);
   assert.equal(combined.includes("localStorage.setItem"), false);
-  assert.equal(combined.includes("sessionStorage"), false);
+  assert.match(provider, /PUBLIC_PENDING_TRANSACTION_STORAGE_KEY/);
+  assert.match(provider, /PUBLIC_TRANSACTION_ID_PATTERN/);
+  assert.equal(
+    provider.includes("sessionStorage.setItem(PUBLIC_PENDING_TRANSACTION_STORAGE_KEY, response.publicTransactionId)"),
+    true,
+  );
 });

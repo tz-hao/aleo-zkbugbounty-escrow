@@ -9,7 +9,16 @@ function shortAddress(address: string) {
 }
 
 export function WalletConnectionControl() {
-  const { address, connectionState, errorMessage, connect, disconnect } = useAleoWallet();
+  const {
+    address,
+    connectionState,
+    errorMessage,
+    transactionStatus,
+    transactionSubmissionBlocked,
+    pendingPublicTransactionId,
+    connect,
+    disconnect,
+  } = useAleoWallet();
   const busy = connectionState === "Initializing" || connectionState === "Connecting";
   const diagnosticText =
     address && connectionState === "Connected"
@@ -92,6 +101,17 @@ export function WalletConnectionControl() {
           <p className="mt-2 border-t border-white/10 pt-2 text-slate-500">
             Expected network: Aleo Testnet / testnetbeta
           </p>
+          {transactionStatus.state !== "idle" ? (
+            <p className="mt-2 border-t border-white/10 pt-2 text-slate-400">
+              Transaction: {transactionStatus.code} · {transactionStatus.message}
+              {transactionSubmissionBlocked ? " Do not resubmit while pending." : ""}
+            </p>
+          ) : null}
+          {pendingPublicTransactionId ? (
+            <p className="mt-2 break-all border-t border-white/10 pt-2 font-mono text-xs text-slate-500">
+              Public transaction: {pendingPublicTransactionId}
+            </p>
+          ) : null}
         </div>
       </details>
     </div>

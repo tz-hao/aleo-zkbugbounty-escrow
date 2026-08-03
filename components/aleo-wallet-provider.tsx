@@ -27,7 +27,6 @@ import {
 } from "@/lib/aleo-submit-claim";
 import {
   diagnoseLeoWalletConnectionError,
-  diagnoseLeoWalletTransactionError,
   getInjectedLeoWallet,
   inspectLeoWalletProvider,
 } from "@/lib/leo-wallet-diagnostics";
@@ -35,6 +34,13 @@ import {
   classifyWalletResponseId,
   normalizeWalletTransactionStatus,
 } from "@/lib/wallet-compatibility";
+import {
+  classifyWalletTransactionFailure,
+  isTransactionSubmissionBlocked,
+  pollPublicTransaction,
+  transactionFeedback,
+  type PublicTransactionFeedback,
+} from "@/lib/aleo-transaction-status";
 
 type LeoAdapter = import("@demox-labs/aleo-wallet-adapter-leo").LeoWalletAdapter;
 
@@ -76,6 +82,9 @@ type AleoWalletContextValue = {
   address: string | null;
   connectionState: WalletConnectionState;
   errorMessage: string | null;
+  transactionStatus: PublicTransactionFeedback;
+  transactionSubmissionBlocked: boolean;
+  pendingPublicTransactionId: string | null;
   submission: WalletCreateBountySubmission | null;
   claimSubmission: WalletClaimSubmission | null;
   protocolSubmission: WalletProtocolSubmission | null;
@@ -98,12 +107,27 @@ const AleoWalletContext = createContext<AleoWalletContextValue | null>(null);
 const ALEO_ADDRESS_PATTERN = /^aleo1[0-9a-z]{58}$/;
 const LEO_WALLET_NOT_DETECTED_MESSAGE =
   "当前浏览器未检测到 Leo Wallet 扩展。请使用已安装该扩展的 Chrome 或 Edge 打开本站。";
+const PUBLIC_PENDING_TRANSACTION_STORAGE_KEY = "zkbugbounty.public-pending-transaction.v1";
+const PUBLIC_TRANSACTION_ID_PATTERN = /^at1[0-9a-z]{50,80}$/;
 
 export function AleoWalletProvider({ children }: { children: ReactNode }) {
   const adapterRef = useRef<LeoAdapter | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<WalletConnectionState>("Initializing");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [transactionStatus, setTransactionStatus] = useState<PublicTransactionFeedback>(() =>
+    transactionFeedback("idle"),
+  );
+  const transactionRequestActiveRef = useRef(false);
+  const pollingControllerRef = useRef<AbortController | null>(null);
+  const [pendingPublicTransactionId, setPendingPublicTransactionId] = useState<string | null>(() => {
+    try {
+      const stored = window.sessionStorage.getItem(PUBLIC_PENDING_TRANSACTION_STORAGE_KEY);
+      return stored && PUBLIC_TRANSACTION_ID_PATTERN.test(stored) ? stored : null;
+    } catch {
+      return null;
+    }
+  });
   const [submission, setSubmission] = useState<WalletCreateBountySubmission | null>(null);
   const [claimSubmission, setClaimSubmission] = useState<WalletClaimSubmission | null>(null);
   const [protocolSubmission, setProtocolSubmission] =
@@ -128,6 +152,8 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
       setSubmission(null);
       setClaimSubmission(null);
       setProtocolSubmission(null);
+      transactionRequestActiveRef.current = false;
+      setTransactionStatus(transactionFeedback("idle"));
       setErrorMessage(null);
       setConnectionState(adapter?.readyState === "Installed" ? "Disconnected" : "NotInstalled");
     };
@@ -154,6 +180,49 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
       adapterRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!pendingPublicTransactionId) return;
+    const controller = new AbortController();
+    transactionRequestActiveRef.current = true;
+    pollingControllerRef.current?.abort();
+    pollingControllerRef.current = controller;
+    void pollPublicTransaction({
+      signal: controller.signal,
+      maxAttempts: 10,
+      intervalMs: 2_000,
+      lookup: async () => {
+        const response = await fetch(
+          "/api/aleo/transactions/" + encodeURIComponent(pendingPublicTransactionId),
+          { cache: "no-store", signal: controller.signal },
+        );
+        const payload = await response.json().catch(() => null) as {
+          transactionStatus?: string;
+          rejectionSummary?: string;
+        } | null;
+        return {
+          httpStatus: response.status,
+          status: payload?.transactionStatus,
+          rejectionReason: payload?.rejectionSummary,
+        };
+      },
+      onUpdate: setTransactionStatus,
+    }).then((result) => {
+      if (controller.signal.aborted) return;
+      if (["confirmed", "rejected", "timeout"].includes(result.state)) {
+        transactionRequestActiveRef.current = false;
+        setPendingPublicTransactionId(null);
+        try {
+          window.sessionStorage.removeItem(PUBLIC_PENDING_TRANSACTION_STORAGE_KEY);
+        } catch {
+          // Public state cleanup is best-effort.
+        }
+      }
+    }).catch(() => {
+      // Abort and transient lookup failures are already represented by the polling state.
+    });
+    return () => controller.abort();
+  }, [pendingPublicTransactionId]);
 
   async function connect() {
     const adapter = adapterRef.current;
@@ -190,9 +259,10 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
       setAddress(publicKey);
       setConnectionState("Connected");
     } catch (error) {
+      const diagnostic = diagnoseLeoWalletConnectionError(error);
       setAddress(null);
-      setConnectionState("Error");
-      setErrorMessage(diagnoseLeoWalletConnectionError(error).message);
+      setConnectionState(diagnostic.issue === "AuthorizationRejected" ? "Disconnected" : "Error");
+      setErrorMessage(diagnostic.message);
     }
   }
 
@@ -210,7 +280,39 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
     setSubmission(null);
     setClaimSubmission(null);
     setProtocolSubmission(null);
+    transactionRequestActiveRef.current = false;
+    setTransactionStatus(transactionFeedback("idle"));
     setConnectionState(adapter?.readyState === "Installed" ? "Disconnected" : "NotInstalled");
+  }
+
+  async function requestWalletTransaction(
+    adapter: LeoAdapter,
+    transaction: Parameters<LeoAdapter["requestTransaction"]>[0],
+  ) {
+    if (transactionRequestActiveRef.current || isTransactionSubmissionBlocked(transactionStatus.state)) {
+      throw new Error("A public transaction is already pending. Do not resubmit the same operation.");
+    }
+    transactionRequestActiveRef.current = true;
+    setTransactionStatus(transactionFeedback("awaiting_signature"));
+    try {
+      const response = classifyWalletResponseId(await adapter.requestTransaction(transaction));
+      if (!response) throw new Error("INVALID_WALLET_RESPONSE");
+      setTransactionStatus(transactionFeedback("pending"));
+      if (response.publicTransactionId && PUBLIC_TRANSACTION_ID_PATTERN.test(response.publicTransactionId)) {
+        setPendingPublicTransactionId(response.publicTransactionId);
+        try {
+          window.sessionStorage.setItem(PUBLIC_PENDING_TRANSACTION_STORAGE_KEY, response.publicTransactionId);
+        } catch {
+          // A storage failure never changes transaction handling or causes a retry.
+        }
+      }
+      return response;
+    } catch (error) {
+      transactionRequestActiveRef.current = false;
+      const feedback = classifyWalletTransactionFailure(error);
+      setTransactionStatus(feedback);
+      throw new Error(feedback.message);
+    }
   }
 
   async function submitCreateBounty(preview: CreateBountyTransactionPreview) {
@@ -238,13 +340,7 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
       preview.feeMicrocredits,
       false,
     );
-    let response;
-    try {
-      response = classifyWalletResponseId(await adapter.requestTransaction(transaction));
-    } catch (error) {
-      throw new Error(diagnoseLeoWalletTransactionError(error).message);
-    }
-    if (!response) throw new Error("Leo Wallet 未返回有效的 Wallet Request ID。");
+    const response = await requestWalletTransaction(adapter, transaction);
     const { walletRequestId, publicTransactionId } = response;
     setSubmission({
       walletRequestId,
@@ -277,13 +373,7 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
         request.feeMicrocredits,
         false,
       );
-      let response;
-      try {
-        response = classifyWalletResponseId(await adapter.requestTransaction(transaction));
-      } catch (error) {
-        throw new Error(diagnoseLeoWalletTransactionError(error).message);
-      }
-      if (!response) throw new Error("Leo Wallet 未返回有效的 Wallet Request ID。");
+      const response = await requestWalletTransaction(adapter, transaction);
       const { walletRequestId, publicTransactionId } = response;
       setClaimSubmission({
         walletRequestId,
@@ -330,13 +420,7 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
         request.feeMicrocredits,
         false,
       );
-      let response;
-      try {
-        response = classifyWalletResponseId(await adapter.requestTransaction(transaction));
-      } catch (error) {
-        throw new Error(diagnoseLeoWalletTransactionError(error).message);
-      }
-      if (!response) throw new Error("Leo Wallet 未返回有效的 Wallet Request ID。");
+      const response = await requestWalletTransaction(adapter, transaction);
       const { walletRequestId, publicTransactionId } = response;
       setClaimSubmission({
         walletRequestId,
@@ -373,6 +457,23 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
     ) {
       throw new Error("Reward Escrow is not available in the deployed Aleo Program");
     }
+    const operationMarker = preview.publicSummary.operationMarker;
+    if (operationMarker) {
+      const markerResponse = await fetch(
+        "/api/aleo/mappings/escrow_operation_markers/" + encodeURIComponent(operationMarker),
+        { method: "GET", headers: { accept: "application/json" }, cache: "no-store" },
+      );
+      const markerPayload = await markerResponse.json().catch(() => null) as {
+        verification?: { status?: string };
+      } | null;
+      const markerStatus = markerPayload?.verification?.status;
+      if (!markerResponse.ok || markerStatus === "HTTP_ERROR" || markerStatus === "PARSE_ERROR") {
+        throw new Error("Operation marker could not be verified against the public registry");
+      }
+      if (markerStatus === "FOUND") {
+        throw new Error("Operation marker already exists. Do not resubmit this operation.");
+      }
+    }
     const allowedFunctions = new Set<string>([
       ...REWARD_ESCROW_FUNCTIONS,
       ...RESPONSIBLE_DISCLOSURE_FUNCTIONS,
@@ -401,13 +502,7 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
       preview.feeMicrocredits,
       false,
     );
-    let response;
-    try {
-      response = classifyWalletResponseId(await adapter.requestTransaction(transaction));
-    } catch (error) {
-      throw new Error(diagnoseLeoWalletTransactionError(error).message);
-    }
-    if (!response) throw new Error("Leo Wallet 未返回有效的 Wallet Request ID。");
+    const response = await requestWalletTransaction(adapter, transaction);
     const { walletRequestId, publicTransactionId } = response;
     setProtocolSubmission({
       walletRequestId,
@@ -429,6 +524,12 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
     try {
       const walletStatus = await adapter.transactionStatus(submission.walletRequestId);
       const status = normalizeWalletTransactionStatus(walletStatus);
+      if (status === "Failed") {
+        transactionRequestActiveRef.current = false;
+        setTransactionStatus(transactionFeedback("failed"));
+      } else if (status === "Finalized") {
+        setTransactionStatus(transactionFeedback("accepted"));
+      }
       setSubmission({
         ...submission,
         status,
@@ -454,6 +555,12 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
     try {
       const walletStatus = await adapter.transactionStatus(claimSubmission.walletRequestId);
       const status = normalizeWalletTransactionStatus(walletStatus);
+      if (status === "Failed") {
+        transactionRequestActiveRef.current = false;
+        setTransactionStatus(transactionFeedback("failed"));
+      } else if (status === "Finalized") {
+        setTransactionStatus(transactionFeedback("accepted"));
+      }
       setClaimSubmission({
         ...claimSubmission,
         status,
@@ -479,6 +586,12 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
     try {
       const walletStatus = await adapter.transactionStatus(protocolSubmission.walletRequestId);
       const status = normalizeWalletTransactionStatus(walletStatus);
+      if (status === "Failed") {
+        transactionRequestActiveRef.current = false;
+        setTransactionStatus(transactionFeedback("failed"));
+      } else if (status === "Finalized") {
+        setTransactionStatus(transactionFeedback("accepted"));
+      }
       setProtocolSubmission({
         ...protocolSubmission,
         status,
@@ -502,6 +615,10 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
     address,
     connectionState,
     errorMessage,
+    transactionStatus,
+    transactionSubmissionBlocked:
+      pendingPublicTransactionId !== null || isTransactionSubmissionBlocked(transactionStatus.state),
+    pendingPublicTransactionId,
     submission,
     claimSubmission,
     protocolSubmission,

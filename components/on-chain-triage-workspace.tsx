@@ -90,6 +90,8 @@ export function OnChainTriageWorkspace() {
     connectionState,
     connect,
     protocolSubmission,
+    transactionStatus,
+    transactionSubmissionBlocked,
     submitProtocolTransaction,
   } = useAleoWallet();
   const [capability, setCapability] = useState<RewardEscrowCapability>(
@@ -436,7 +438,7 @@ export function OnChainTriageWorkspace() {
       setPendingPreview(buildActionPreview(action));
       setMessage("Transaction Preview 已生成。核对公开输入后再请求 Wallet 签名。");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Wallet 请求失败。");
+      setMessage(error instanceof Error ? error.message : "Transaction could not be completed.");
     }
   }
 
@@ -555,7 +557,7 @@ export function OnChainTriageWorkspace() {
                       className="secondary-action"
                       type="button"
                       key={action}
-                      disabled={busy}
+                      disabled={busy || transactionSubmissionBlocked}
                       onClick={() => prepareAction(action)}
                     >
                       {actionLabels[action]}
@@ -669,7 +671,7 @@ export function OnChainTriageWorkspace() {
                     className={action === "release" ? "primary-action" : "secondary-action"}
                     type="button"
                     key={action}
-                    disabled={busy}
+                    disabled={busy || transactionSubmissionBlocked}
                     onClick={() => prepareAction(action)}
                   >
                     {actionLabels[action]}
@@ -695,6 +697,10 @@ export function OnChainTriageWorkspace() {
                   value={`${pendingPreview.feeMicrocredits} microcredits`}
                 />
               </div>
+              <ChainField
+                label="Operation Marker"
+                value={pendingPreview.publicSummary.operationMarker ?? "Unavailable"}
+              />
               <details className="mt-3 border-t border-white/10 pt-3">
                 <summary className="focus-ring cursor-pointer text-xs font-semibold text-slate-400">
                   查看公开输入
@@ -707,11 +713,14 @@ export function OnChainTriageWorkspace() {
                   ))}
                 </ol>
               </details>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <p className="mt-4 text-xs leading-5 text-amber-100/80">
+                Do not resubmit the same operation while the transaction is pending.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   className="primary-action"
                   type="button"
-                  disabled={busy}
+                  disabled={busy || transactionSubmissionBlocked}
                   onClick={() => void requestPreparedAction()}
                 >
                   <WalletCards size={16} />
@@ -739,6 +748,7 @@ export function OnChainTriageWorkspace() {
           Wallet Request: <span className="font-mono">{protocolSubmission.walletRequestId}</span>
           {" · "}
           {protocolSubmission.statusText}
+          <span className="block text-amber-100/80">{transactionStatus.message}</span>
         </div>
       ) : null}
     </section>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { ExternalLink, Radio, ShieldCheck } from "lucide-react";
 
-import { ALEO_TESTNET_DEPLOYMENT } from "@/lib/aleo-program";
+import { ALEO_TESTNET_DEPLOYMENT, ALEO_TESTNET_EDITION_ONE_UPGRADE } from "@/lib/aleo-program";
 
 type LiveDeployment = {
   status: "Confirmed" | "Partial" | "Unavailable" | "NotDeployed" | "ConfigurationError";
@@ -23,6 +23,10 @@ type LiveDeployment = {
   verifyingKeyCount: number | null;
   programFound: boolean;
   transactionFound: boolean;
+  editionOne?: {
+    upgradeStatus: "confirmed" | "unavailable" | "invalid";
+    feeIndexStatus: "FOUND" | "INDEX_UNAVAILABLE" | "HTTP_ERROR";
+  };
 };
 
 type LiveState =
@@ -102,6 +106,16 @@ export function AleoDeploymentStatus() {
       : escrowV2Live
         ? "Escrow v2: Live"
         : "Escrow v2: Awaiting upgrade";
+  const editionOne =
+    liveState.kind === "confirmed" || liveState.kind === "partial" || liveState.kind === "problem"
+      ? liveState.deployment.editionOne
+      : undefined;
+  const upgradeLabel =
+    editionOne?.upgradeStatus === "confirmed"
+      ? editionOne.feeIndexStatus === "INDEX_UNAVAILABLE"
+        ? "Upgrade confirmed / Fee transaction index unavailable"
+        : "Upgrade confirmed / Fee transaction indexed"
+      : "Upgrade: public verification pending";
   const keyCountLabel =
     liveState.kind === "confirmed" || liveState.kind === "partial" || liveState.kind === "problem"
       ? String(liveState.deployment.verifyingKeyCount ?? "unknown")
@@ -170,6 +184,7 @@ export function AleoDeploymentStatus() {
             mono
           />
           <DeploymentField label="Escrow status" value={escrowLabel} />
+          <DeploymentField label="Edition 1 upgrade" value={upgradeLabel} />
           <div className="flex flex-wrap gap-2">
           <a
             className="focus-ring secondary-action"
@@ -187,6 +202,14 @@ export function AleoDeploymentStatus() {
             rel="noreferrer"
           >
             部署交易
+            <ExternalLink size={15} aria-hidden="true" />
+          </a>          <a
+            className="focus-ring secondary-action"
+            href={ALEO_TESTNET_EDITION_ONE_UPGRADE.transactionExplorerUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Edition 1 Upgrade
             <ExternalLink size={15} aria-hidden="true" />
           </a>
         </div>

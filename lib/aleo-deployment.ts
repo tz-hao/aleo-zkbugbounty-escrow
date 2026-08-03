@@ -1,9 +1,14 @@
 import {
   ALEO_TESTNET_DEPLOYMENT,
   ALEO_TESTNET_PROGRAM_OWNER,
+  ALEO_TESTNET_EXPECTED_EDITION,
   CANONICAL_ALEO_PROGRAM_ID,
 } from "./aleo-program.ts";
 import { assertNoPrivateFields } from "./privacy-guards.ts";
+import {
+  verifyTestnetEditionOne,
+  type EditionOneVerification,
+} from "./testnet-edition-one.ts";
 
 export type DeploymentVerificationStatus =
   | "verified"
@@ -43,6 +48,7 @@ export type AleoDeploymentStatus = {
     transaction?: DeploymentEndpointError;
     latestEdition?: DeploymentEndpointError;
   };
+  editionOne?: EditionOneVerification;
 };
 
 export type DeploymentFetch = (
@@ -312,7 +318,14 @@ export async function fetchAleoDeploymentStatus(
     verifyTransactionEndpoint(fetcher),
     verifyLatestEditionEndpoint(fetcher),
   ]);
-  return deploymentStatusFrom(program, transaction, latestEdition);
+  const deployment = deploymentStatusFrom(program, transaction, latestEdition);
+  if (deployment.currentEdition === null || deployment.currentEdition < ALEO_TESTNET_EXPECTED_EDITION) {
+    return deployment;
+  }
+  const editionOne = await verifyTestnetEditionOne(undefined, fetcher);
+  const result = { ...deployment, editionOne };
+  assertNoPrivateFields(result);
+  return result;
 }
 
 export function deploymentHttpStatus(deployment: AleoDeploymentStatus): number {
