@@ -1,0 +1,46 @@
+{
+  "program_id": "zkbugbounty_7f3c92.aleo",
+  "network": "testnet",
+  "previous_edition": 0,
+  "current_edition": 1,
+  "consensus_version": 18,
+  "upgrade_transaction_id": "at1jlz849t23sdyc58kdxevxl50x6kpjq8ypcf9253d825vvkeu9c8sshk78x",
+  "fee_transaction_id": "at15c8j82u3mpxj0c6fq3kq9873rmzly0h8gegumypjtafz4wlg8s8q6k0c5r",
+  "candidate_commit": "e6bf874a744f1913b1b6a30ca7db47a4f1215043",
+  "candidate_tag": "escrow-v2-testnet-v18-candidate",
+  "leo_version": "4.4.0",
+  "snarkvm_version": "4.9.0",
+  "base_fee_credits": "40.433866",
+  "priority_fee_credits": "8.000000",
+  "total_fee_credits": "48.433866",
+  "result": "accepted",
+  "wcei_decision": "ACCEPTED",
+  "candidate_source_changed": false,
+  "broadcast_timestamp_utc": null,
+  "upgrade_transaction_query": {
+    "status": "verified",
+    "type": "deploy",
+    "edition": 1,
+    "program_id_verified": true,
+    "owner_verified": true
+  },
+  "fee_transaction_query": {
+    "status": "not_indexed_at_query_time",
+    "http_status": 404,
+    "relationship_verified_by_public_api": false
+  },
+  "post_broadcast_public_balance": {
+    "query_timestamp_utc": "2026-08-03T13:15:19Z",
+    "microcredits": "21510312",
+    "credits": "21.510312"
+  },
+  "production_frontend": {
+    "url": "https://aleo-gilt.vercel.app",
+    "query_timestamp_utc": "2026-08-03T13:28:13Z",
+    "home_http_status": 200,
+    "deployed_api_current_edition": 0,
+    "deployed_api_escrow_status": "ProgramUpgradeRequired",
+    "source_update_ready": true,
+    "redeployment_required": true
+  }
+}
