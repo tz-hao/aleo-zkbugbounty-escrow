@@ -41,6 +41,10 @@
     "deployed_api_current_edition": 0,
     "deployed_api_escrow_status": "ProgramUpgradeRequired",
     "source_update_ready": true,
-    "redeployment_required": true
+    "redeployment_required": false,
+    "deployment_id": "dpl_C4PpvBH63hHBPJ1z1uDDGGcQe12w",
+    "ready_state": "READY",
+    "production_alias": "https://aleo-gilt.vercel.app",
+    "verification_method": "Vercel CLI production READY and alias confirmation; no post-deployment URL fetch performed"
   }
 }

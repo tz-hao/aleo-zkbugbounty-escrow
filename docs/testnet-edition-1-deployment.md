@@ -52,4 +52,4 @@ Aleo Testnet reports Program edition `1`. Escrow v2 capability is read from the 
 
 ## Production Frontend Status
 
-At `2026-08-03T13:28:13Z`, `https://aleo-gilt.vercel.app` returned HTTP 200. Its deployed public APIs still reported edition `0` and `ProgramUpgradeRequired`, which identifies the prior Vercel build as stale. The local source now verifies edition `1` and Escrow v2 capability from public endpoints, but this repository change has not been redeployed to Vercel in this task. A separate frontend deployment is required before production UI can present the updated status.
+At `2026-08-03T13:28:13Z`, the previous production build returned edition `0` and `ProgramUpgradeRequired` through its public APIs. The local source was then deployed to Vercel production as `dpl_C4PpvBH63hHBPJ1z1uDDGGcQe12w`; Vercel reported `READY` and aliased `https://aleo-gilt.vercel.app` to that deployment. The deployed source reads the public Program source and current edition at runtime, so the stale edition-0 fallback is no longer part of the production build. No post-deployment URL request was issued by this task after the Vercel ready confirmation.
