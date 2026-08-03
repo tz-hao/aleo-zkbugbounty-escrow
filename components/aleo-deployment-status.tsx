@@ -19,6 +19,7 @@ type LiveDeployment = {
   programId: string;
   transactionId: string;
   edition: number | null;
+  currentEdition: number | null;
   verifyingKeyCount: number | null;
   programFound: boolean;
   transactionFound: boolean;
@@ -80,6 +81,11 @@ export function AleoDeploymentStatus() {
 
   const confirmed = liveState.kind === "confirmed";
   const partial = liveState.kind === "partial";
+  const currentEdition =
+    liveState.kind === "confirmed" || liveState.kind === "partial" || liveState.kind === "problem"
+      ? liveState.deployment.currentEdition ?? liveState.deployment.edition
+      : null;
+  const escrowV2Live = currentEdition !== null && currentEdition >= 1;
   const statusLabel =
     liveState.kind === "confirmed" || liveState.kind === "partial" || liveState.kind === "problem"
       ? statusLabels[liveState.deployment.verificationStatus]
@@ -87,9 +93,15 @@ export function AleoDeploymentStatus() {
         ? "正在核验"
         : "公开节点暂不可用";
   const networkLabel =
-    liveState.kind === "confirmed" || liveState.kind === "partial" || liveState.kind === "problem"
-      ? `testnet / edition ${liveState.deployment.edition ?? "unknown"}`
-      : "testnet / edition 0";
+    currentEdition !== null
+      ? `testnet / edition ${currentEdition}`
+      : "testnet / public edition unavailable";
+  const escrowLabel =
+    currentEdition === null
+      ? "Escrow v2: Awaiting public verification"
+      : escrowV2Live
+        ? "Escrow v2: Live"
+        : "Escrow v2: Awaiting upgrade";
   const keyCountLabel =
     liveState.kind === "confirmed" || liveState.kind === "partial" || liveState.kind === "problem"
       ? String(liveState.deployment.verifyingKeyCount ?? "unknown")
@@ -120,7 +132,9 @@ export function AleoDeploymentStatus() {
             <p className="page-kicker">部署核验</p>
             <h2 className="mt-1 text-lg font-semibold text-white">
               {confirmed
-                ? "Program 与部署交易已链上核验"
+                ? escrowV2Live
+                  ? "Escrow v2 已上线并完成链上核验"
+                  : "Program 与部署交易已链上核验"
                 : partial
                   ? "Program 已找到，部分接口不可用"
                   : "等待公开节点返回部署证据"}
@@ -155,6 +169,7 @@ export function AleoDeploymentStatus() {
             value={`${liveSourceLabel} / keys ${keyCountLabel}`}
             mono
           />
+          <DeploymentField label="Escrow status" value={escrowLabel} />
           <div className="flex flex-wrap gap-2">
           <a
             className="focus-ring secondary-action"

@@ -14,6 +14,7 @@ export function RewardEscrowStatus() {
   const [capability, setCapability] = useState<RewardEscrowCapability>(
     REWARD_ESCROW_CAPABILITY,
   );
+  const [capabilityChecked, setCapabilityChecked] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -31,23 +32,30 @@ export function RewardEscrowStatus() {
         if (!controller.signal.aborted) {
           setCapability({ ...REWARD_ESCROW_CAPABILITY, status: "EndpointUnavailable" });
         }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCapabilityChecked(true);
       });
     return () => controller.abort();
   }, []);
 
-  const available = capability.status === "Available";
-  const title = available
-    ? "On-chain Escrow Available"
-    : capability.status === "ProgramUpgradeRequired"
-      ? "Program Upgrade Required"
-      : capability.status === "EndpointUnavailable"
-        ? "Capability Check Unavailable"
-        : "Escrow Configuration Error";
-  const description = available
-    ? "已检测到 Credits Escrow 与 Responsible Disclosure mappings。Paid 仍必须以 Confirmed Transaction 和 Mapping Verified 为准。"
-    : capability.status === "ProgramUpgradeRequired"
-      ? "Escrow 代码、ABI 与 Wallet Preview 已准备；当前 Testnet edition 尚未广播升级，因此 RewardLocked / Paid 仍不可用。"
-      : "公开 Program endpoint 暂时无法完成能力核验。系统不会把节点错误解释为 Escrow 未部署，也不会回退到 Demo 状态。";
+  const available = capabilityChecked && capability.status === "Available";
+  const title = !capabilityChecked
+    ? "正在核验链上 Escrow 能力"
+    : available
+      ? "On-chain Escrow Available"
+      : capability.status === "ProgramUpgradeRequired"
+        ? "Program Upgrade Required"
+        : capability.status === "EndpointUnavailable"
+          ? "Capability Check Unavailable"
+          : "Escrow Configuration Error";
+  const description = !capabilityChecked
+    ? "正在从公开 Program source 与 current edition 核验 Escrow v2；不会启用 Wallet Action 或回退到本地状态。"
+    : available
+      ? "已检测到 Credits Escrow 与 Responsible Disclosure mappings。Paid 仍必须以 Confirmed Transaction 和 Mapping Verified 为准。"
+      : capability.status === "ProgramUpgradeRequired"
+        ? "当前公开 Program 尚未满足 Escrow v2 能力要求，因此 RewardLocked / Paid 保持不可用。"
+        : "公开 Program endpoint 暂时无法完成能力核验。系统不会把节点错误解释为 Escrow 未部署，也不会回退到 Demo 状态。";
 
   return (
     <section className="surface-card rounded-lg p-5" aria-labelledby="reward-escrow-status-title">
@@ -70,16 +78,18 @@ export function RewardEscrowStatus() {
           className={`inline-flex shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold ${
             available
               ? "border-emerald-300/20 bg-emerald-300/[0.07] text-emerald-100"
-              : "border-amber-300/20 bg-amber-300/[0.07] text-amber-100"
+              : capabilityChecked
+                ? "border-amber-300/20 bg-amber-300/[0.07] text-amber-100"
+                : "border-cyan-300/20 bg-cyan-300/[0.07] text-cyan-100"
           }`}
         >
           <CircleDollarSign size={14} aria-hidden="true" />
-          {available ? "链上能力已验证" : "链上支付尚未激活"}
+          {available ? "链上能力已验证" : capabilityChecked ? "链上支付尚未激活" : "正在核验"}
         </span>
       </div>
       <details className="group mt-4 border-t border-white/10 pt-3">
         <summary className="focus-ring min-h-11 cursor-pointer list-none py-2 text-xs font-semibold text-slate-400 hover:text-white [&::-webkit-details-marker]:hidden">
-          {available ? "查看已启用的 Program 入口" : "查看待启用的 Program 入口"}
+          {available ? "查看已启用的 Program 入口" : "查看 Program 入口与核验状态"}
         </summary>
         <div className="grid gap-3 pt-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
           {[...REWARD_ESCROW_FUNCTIONS, ...RESPONSIBLE_DISCLOSURE_FUNCTIONS].map((functionName) => (

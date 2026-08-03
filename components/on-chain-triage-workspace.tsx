@@ -95,6 +95,7 @@ export function OnChainTriageWorkspace() {
   const [capability, setCapability] = useState<RewardEscrowCapability>(
     REWARD_ESCROW_CAPABILITY,
   );
+  const [capabilityChecked, setCapabilityChecked] = useState(false);
   const [claimHash, setClaimHash] = useState("");
   const [bountyId, setBountyId] = useState("");
   const [bundle, setBundle] = useState<ChainBundle | null>(null);
@@ -123,6 +124,9 @@ export function OnChainTriageWorkspace() {
         if (!controller.signal.aborted) {
           setCapability({ ...REWARD_ESCROW_CAPABILITY, status: "EndpointUnavailable" });
         }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCapabilityChecked(true);
       });
     return () => controller.abort();
   }, []);
@@ -475,10 +479,16 @@ export function OnChainTriageWorkspace() {
             链上 Triage
           </h2>
         </div>
-        <span className="font-mono text-xs text-slate-500">{capability.status}</span>
+        <span className="font-mono text-xs text-slate-500">
+          {capabilityChecked ? capability.status : "Checking"}
+        </span>
       </div>
 
-      {capability.status !== "Available" ? (
+      {!capabilityChecked ? (
+        <div className="mt-5 border-l-2 border-cyan-300/40 pl-4 text-sm leading-6 text-slate-400">
+          正在从公开 Program source 与 current edition 核验链上 Triage 能力；Wallet Action 保持禁用。
+        </div>
+      ) : capability.status !== "Available" ? (
         <div className="mt-5 border-l-2 border-amber-300/40 pl-4 text-sm leading-6 text-slate-400">
           {capability.status === "ProgramUpgradeRequired"
             ? "当前 Program 尚未启用 Escrow 与 Triage Mapping。链上 Bounty、Receipt 和 Nullifier 读取不受影响。"
