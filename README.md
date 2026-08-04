@@ -9,6 +9,16 @@ zkBugBounty is a privacy-first responsible disclosure protocol prototype on Aleo
 - **Network:** Aleo Testnet
 - **Current program edition:** `1`
 
+![zkBugBounty protocol overview](public/images/zkbugbounty-readme-protocol-v1.png)
+
+> **Private proof in the browser. Public verification on Aleo.** The image shows the protocol boundary: private DemoVault inputs stay device-side; the chain receives only public commitments, receipts, and escrow state.
+
+| Step | Private boundary | Public Aleo state |
+| --- | --- | --- |
+| 1. Prove | DemoVault witness stays in the browser | No witness is uploaded |
+| 2. Commit | Reporter secret and exploit details stay private | Commitment, Claim Receipt, and Nullifier |
+| 3. Resolve | Encrypted details are only shared with the project owner | Escrow, payout, triage, and replay-protection state |
+
 ## Project Overview
 
 ### Problem Statement
