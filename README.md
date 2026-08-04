@@ -4,10 +4,10 @@
 
 zkBugBounty is a privacy-first responsible disclosure protocol prototype on Aleo Testnet. It lets a whitehat prove that a DemoVault security invariant is broken, while keeping the witness, exploit path, proof-of-concept, triggering parameters, and reporter secret outside public storage and public UI.
 
-**Live DApp:** [aleo-gilt.vercel.app](https://aleo-gilt.vercel.app)  
-**Aleo Program:** `zkbugbounty_7f3c92.aleo`  
-**Network:** Aleo Testnet  
-**Current program edition:** `1`
+- **Live DApp:** [aleo-gilt.vercel.app](https://aleo-gilt.vercel.app)
+- **Aleo Program:** `zkbugbounty_7f3c92.aleo`
+- **Network:** Aleo Testnet
+- **Current program edition:** `1`
 
 ## Project Overview
 
