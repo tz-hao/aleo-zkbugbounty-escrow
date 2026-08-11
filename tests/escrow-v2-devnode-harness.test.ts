@@ -624,6 +624,9 @@ test("Escrow Devnode harness derives its deploy baseline from the real Testnet e
 });
 test("Protocol V3 Devnode wrapper enables the complete arbitration extension", () => {
   assert.match(protocolV3Harness, /export ZKBB_RUN_PROTOCOL_V3=1/);
+  assert.match(protocolV3Harness, /V3_LEO_VERSION="4\.4\.0"/);
+  assert.match(protocolV3Harness, /leo-toolchains\/\$\{V3_LEO_VERSION\}\/bin\/leo/);
+  assert.match(protocolV3Harness, /Leo 4\.4\.0 is required/);
   assert.match(protocolV3Harness, /exec bash .*escrow-v2-devnode-e2e\.sh/);
 
   const steps = [
