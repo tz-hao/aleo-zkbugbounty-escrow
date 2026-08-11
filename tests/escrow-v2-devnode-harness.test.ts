@@ -506,9 +506,16 @@ test("Protocol V3 Devnode harness selects an explicit Candidate and keeps the SH
 test("Escrow Devnode harness restores locally patched source without relying on a worktree .git file", () => {
   assert.match(harness, /backup_test_sources/);
   assert.match(harness, /BASELINE_SOURCE_BACKUP/);
+  assert.match(harness, /BASELINE_PROGRAM_BACKUP/);
   assert.match(harness, /CANDIDATE_SOURCE_BACKUP/);
   assert.match(harness, /cp -- "\$\{BASELINE_SOURCE_BACKUP\}"/);
+  assert.match(harness, /cp -- "\$\{BASELINE_PROGRAM_BACKUP\}"/);
   assert.match(harness, /cp -- "\$\{CANDIDATE_SOURCE_BACKUP\}"/);
+});
+
+test("Escrow Devnode harness compiles its materialized Edition 0 baseline with the Leo 4.4 manifest", () => {
+  assert.match(harness, /cp -- "\$\{ROOT_DIR\}\/leo\/bug_proof\/program\.json"/);
+  assert.match(harness, /local Edition 0 baseline must use the Leo 4\.4 compiler manifest/);
 });
 
 test("Escrow Devnode harness snapshots the root Candidate", () => {

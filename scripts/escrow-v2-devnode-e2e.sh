@@ -74,6 +74,7 @@ BOOTSTRAP_OWNER_BALANCE_BEFORE=""
 BOOTSTRAP_WHITEHAT_BALANCE_BEFORE=""
 BOOTSTRAP_ARBITER_BALANCE_BEFORE=""
 BASELINE_SOURCE_BACKUP=""
+BASELINE_PROGRAM_BACKUP=""
 CANDIDATE_SOURCE_BACKUP=""
 CLEANUP_DONE=0
 ALEO_E2E_BOOTSTRAP_COMPLETE=0
@@ -345,8 +346,10 @@ assert_worktree_ref() {
 
 backup_test_sources() {
   BASELINE_SOURCE_BACKUP="$(mktemp "${REPORT_DIR}/baseline-main.leo.XXXXXX")"
+  BASELINE_PROGRAM_BACKUP="$(mktemp "${REPORT_DIR}/baseline-program.json.XXXXXX")"
   CANDIDATE_SOURCE_BACKUP="$(mktemp "${REPORT_DIR}/candidate-main.leo.XXXXXX")"
   cp -- "${BASELINE_DIR}/leo/bug_proof/src/main.leo" "${BASELINE_SOURCE_BACKUP}"
+  cp -- "${BASELINE_DIR}/leo/bug_proof/program.json" "${BASELINE_PROGRAM_BACKUP}"
   cp -- "${CANDIDATE_DIR}/leo/bug_proof/src/main.leo" "${CANDIDATE_SOURCE_BACKUP}"
 }
 
@@ -394,6 +397,9 @@ materialize_real_testnet_edition_zero_baseline() {
   node "${REAL_BASELINE_MATERIALIZER}" \
     "${ROOT_CANDIDATE_SOURCE}" "${baseline_source}" "${TESTNET_EDITION_ZERO_FIXTURE}" \
     || die "could not materialize the real Testnet edition 0 compatible baseline"
+  cp -- "${ROOT_DIR}/leo/bug_proof/program.json" "${BASELINE_DIR}/leo/bug_proof/program.json"
+  grep -q '"leo": "4.4.0"' "${BASELINE_DIR}/leo/bug_proof/program.json" \
+    || die "local Edition 0 baseline must use the Leo 4.4 compiler manifest"
   [[ -n "${BASELINE_SOURCE_BACKUP}" ]] || die "historical baseline backup is unavailable"
   if cmp -s "${baseline_source}" "${BASELINE_SOURCE_BACKUP}"; then
     die "refusing to use the historical Git baseline source for the full E2E"
@@ -438,6 +444,10 @@ restore_test_worktrees() {
   if [[ -n "${BASELINE_SOURCE_BACKUP}" && -f "${BASELINE_SOURCE_BACKUP}" ]]; then
     cp -- "${BASELINE_SOURCE_BACKUP}" "${BASELINE_DIR}/leo/bug_proof/src/main.leo"
     rm -f -- "${BASELINE_SOURCE_BACKUP}"
+  fi
+  if [[ -n "${BASELINE_PROGRAM_BACKUP}" && -f "${BASELINE_PROGRAM_BACKUP}" ]]; then
+    cp -- "${BASELINE_PROGRAM_BACKUP}" "${BASELINE_DIR}/leo/bug_proof/program.json"
+    rm -f -- "${BASELINE_PROGRAM_BACKUP}"
   fi
   if [[ -n "${CANDIDATE_SOURCE_BACKUP}" && -f "${CANDIDATE_SOURCE_BACKUP}" ]]; then
     cp -- "${CANDIDATE_SOURCE_BACKUP}" "${CANDIDATE_DIR}/leo/bug_proof/src/main.leo"
