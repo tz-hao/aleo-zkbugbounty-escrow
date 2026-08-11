@@ -98,11 +98,22 @@ export async function handlePublicTransactionStatusLookup(
   }
 }
 
+export async function handleTransactionLookupRequest(
+  transactionId: string,
+  intent: string | null,
+  fetcher: TransactionFetch = fetch,
+) {
+  if (intent === "create_bounty") {
+    return handleCreateBountyTransactionLookup(transactionId, fetcher);
+  }
+  return handlePublicTransactionStatusLookup(transactionId, fetcher);
+}
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ transactionId: string }> },
 ) {
   const { transactionId } = await context.params;
-  const result = await handlePublicTransactionStatusLookup(transactionId);
+  const intent = new URL(request.url).searchParams.get("intent");
+  const result = await handleTransactionLookupRequest(transactionId, intent);
   return NextResponse.json(result.body, { status: result.status });
 }

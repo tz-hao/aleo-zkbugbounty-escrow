@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { DEMO_VAULT_RULES, getDemoVaultRule } from "@/lib/demo-vault";
 import { canCreateBounty } from "@/lib/permissions";
 import { useAppState } from "./app-state-provider";
-import { zh } from "@/lib/i18n/zh";
+import { getChineseProtocolValue, zh } from "@/lib/i18n/zh";
 import { ExecutionStatusBadge } from "./execution-status-badge";
 
 const ruleSelectorOrder = [
@@ -20,7 +20,7 @@ export function BountyForm() {
   const router = useRouter();
   const { state, dispatch } = useAppState();
   const allowed = canCreateBounty(state.currentActor);
-  const [projectName, setProjectName] = useState("Demo Vault");
+  const [projectName, setProjectName] = useState("演示金库");
   const [scope, setScope] = useState("Vault accounting logic");
   const [bountyAmount, setBountyAmount] = useState("100");
   const [criticalReward, setCriticalReward] = useState("100");
@@ -127,10 +127,10 @@ export function BountyForm() {
         </div>
         <div>
           <p className="text-xs tracking-normal text-violet-200/80">{zh.createBounty.fields.affectedModule}</p>
-          <p className="mt-1 text-white">{selectedRule.affectedModule}</p>
+          <p className="mt-1 text-white">{getChineseProtocolValue(selectedRule.affectedModule)}</p>
         </div>
         <div>
-          <p className="text-xs tracking-normal text-violet-200/80">Invariant</p>
+          <p className="text-xs tracking-normal text-violet-200/80">安全不变量</p>
           <p className="mt-1 font-mono text-white">{selectedRule.invariantText}</p>
         </div>
         <div>
@@ -140,10 +140,10 @@ export function BountyForm() {
       </div>
       <div className="grid gap-4 md:grid-cols-5">
         <NumberField disabled={!allowed} label={zh.createBounty.fields.pool} onChange={setBountyAmount} value={bountyAmount} />
-        <NumberField disabled={!allowed} label="Critical 奖励" onChange={setCriticalReward} value={criticalReward} />
-        <NumberField disabled={!allowed} label="High 奖励" onChange={setHighReward} value={highReward} />
-        <NumberField disabled={!allowed} label="Medium 奖励" onChange={setMediumReward} value={mediumReward} />
-        <NumberField disabled={!allowed} label="Low 奖励" onChange={setLowReward} value={lowReward} />
+        <NumberField disabled={!allowed} label="严重级奖励" onChange={setCriticalReward} value={criticalReward} />
+        <NumberField disabled={!allowed} label="高危奖励" onChange={setHighReward} value={highReward} />
+        <NumberField disabled={!allowed} label="中危奖励" onChange={setMediumReward} value={mediumReward} />
+        <NumberField disabled={!allowed} label="低危奖励" onChange={setLowReward} value={lowReward} />
       </div>
       <button
         className="focus-ring primary-action w-fit disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-slate-600"

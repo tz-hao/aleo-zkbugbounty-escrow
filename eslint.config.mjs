@@ -5,5 +5,5 @@ import nextTypescript from "eslint-config-next/typescript";
 export default defineConfig([
   ...nextCoreWebVitals,
   ...nextTypescript,
-  globalIgnores([".next/**", "node_modules/**", "out/**", ".codex/edge-cdp/**"]),
+  globalIgnores([".next/**", "node_modules/**", "out/**", "tmp/**", "local-devnode/**", "local-e2e-results/**", ".codex/edge-cdp/**"]),
 ]);

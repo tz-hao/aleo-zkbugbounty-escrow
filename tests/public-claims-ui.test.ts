@@ -31,7 +31,7 @@ test("public claims page shows only public verification and disclosure guarantee
     "Private Proof Data: Never Stored",
     "Verification Level: Explicit",
     "Responsible Disclosure:",
-    "公开 Receipt 不等于公开 Exploit",
+    "公开收据不等于公开利用细节",
     "AleoPublicIndex",
     "AleoBountyRegistryPanel",
     "AleoClaimReceiptPanel",

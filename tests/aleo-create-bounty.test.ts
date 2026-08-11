@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { handleCreateBountyTransactionLookup } from "../app/api/aleo/transactions/[transactionId]/route.ts";
+import {
+  handleCreateBountyTransactionLookup,
+  handleTransactionLookupRequest,
+} from "../app/api/aleo/transactions/[transactionId]/route.ts";
 import {
   assertCreateBountyAbi,
   buildCreateBountyTransaction,
@@ -224,6 +227,23 @@ test("unconfirmed transaction is not mislabeled as confirmed", async () => {
   });
 });
 
+test("create_bounty acceptance intent returns the complete public transaction", async () => {
+  const responses = [
+    new Response(JSON.stringify(confirmedValue()), { status: 200 }),
+    new Response(JSON.stringify(blockHash), { status: 200 }),
+    new Response(JSON.stringify(blockValue()), { status: 200 }),
+  ];
+  const result = await handleTransactionLookupRequest(
+    transactionId,
+    "create_bounty",
+    async () => responses.shift()!,
+  );
+  assert.equal(result.status, 200);
+  assert.equal("transaction" in result.body, true);
+  if (!("transaction" in result.body)) assert.fail("create_bounty intent must return transaction details");
+  assert.equal(result.body.transaction?.transactionId, transactionId);
+  assert.equal(result.body.transaction?.publicInputs.bountyId, "5001field");
+});
 test("mapping verification compares every public create_bounty field", () => {
   const transaction = parseConfirmedCreateBountyTransaction(
     confirmedValue(),

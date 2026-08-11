@@ -1,0 +1,686 @@
+"use client";
+
+import {
+  Gavel,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  UserRoundCheck,
+  WalletCards,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
+import { useAleoWallet } from "./aleo-wallet-provider";
+import { useLocale } from "./locale-provider";
+import {
+  buildCastArbitrationVoteV3Transaction,
+  buildDisclosureActionV3Transaction,
+  buildDisputeClaimV3Transaction,
+  buildFinalizeArbitrationPrelockV3Transaction,
+  buildFinalizeRejectionV3Transaction,
+  buildFundBountyV3Transaction,
+  buildLockRewardV3Transaction,
+  buildRefundBountyV3Transaction,
+  buildResolutionActionV3Transaction,
+  buildReviewClaimV3Transaction,
+  buildSettleRewardV3Transaction,
+  PROTOCOL_V3_CAPABILITY,
+  type ProtocolV3Capability,
+  type ProtocolV3TransactionPreview,
+} from "@/lib/aleo-protocol-v3";
+import type {
+  OnChainBountyV3Config,
+  OnChainClaimV3ArbitrationTally,
+  OnChainClaimV3DisputeBond,
+  OnChainClaimV3Evidence,
+  OnChainClaimV3Payout,
+  OnChainClaimV3State,
+} from "@/lib/aleo-v3-registry";
+import type {
+  OnChainBountyState,
+  OnChainClaimReceipt,
+} from "@/lib/models";
+
+type ClaimBundle = {
+  bounty: OnChainBountyState;
+  policy: OnChainBountyV3Config;
+  receipt: OnChainClaimReceipt;
+  reporter: string;
+  evidence: OnChainClaimV3Evidence;
+  state: OnChainClaimV3State;
+  payout: OnChainClaimV3Payout | null;
+  tally: OnChainClaimV3ArbitrationTally | null;
+  acknowledgement: { acknowledgement: string } | null;
+  disputeBond: OnChainClaimV3DisputeBond | null;
+};
+
+type ActionId =
+  | "begin-review"
+  | "accept-claim"
+  | "reject-claim"
+  | "lock-reward"
+  | "deliver-disclosure"
+  | "acknowledge-disclosure"
+  | "confirm-reproduction"
+  | "reject-reproduction"
+  | "propose-patch"
+  | "accept-patch"
+  | "finalize-unappealed"
+  | "appeal-rejection"
+  | "escalate-timeout"
+  | "cast-vote"
+  | "settle-reward"
+  | "finalize-prelock"
+  | "finalize-rejection";
+
+const actionLabels: Record<ActionId, [string, string]> = {
+  "begin-review": ["开始审核", "Begin review"],
+  "accept-claim": ["受理 Claim", "Accept Claim"],
+  "reject-claim": ["提出拒绝", "Propose rejection"],
+  "lock-reward": ["锁定奖励", "Lock reward"],
+  "deliver-disclosure": ["登记加密交付", "Record encrypted delivery"],
+  "acknowledge-disclosure": ["确认收到密文", "Acknowledge delivery"],
+  "confirm-reproduction": ["确认复现", "Confirm reproduction"],
+  "reject-reproduction": ["记录无法复现", "Reject reproduction"],
+  "propose-patch": ["提交修复承诺", "Submit patch commitment"],
+  "accept-patch": ["确认修复", "Accept patch"],
+  "finalize-unappealed": ["终结未申诉拒绝", "Finalize unappealed rejection"],
+  "appeal-rejection": ["申诉拒绝", "Appeal rejection"],
+  "escalate-timeout": ["SLA 超时升级", "Escalate SLA timeout"],
+  "cast-vote": ["提交仲裁票", "Cast arbitration vote"],
+  "settle-reward": ["结算奖励", "Settle reward"],
+  "finalize-prelock": ["仲裁后先锁款", "Lock award after arbitration"],
+  "finalize-rejection": ["执行驳回裁决", "Finalize rejection"],
+};
+
+export function ProtocolV3Workbench() {
+  const { text } = useLocale();
+  const wallet = useAleoWallet();
+  const [capability, setCapability] =
+    useState<ProtocolV3Capability>(PROTOCOL_V3_CAPABILITY);
+  const [capabilityChecked, setCapabilityChecked] = useState(false);
+  const [claimHash, setClaimHash] = useState("");
+  const [bundle, setBundle] = useState<ClaimBundle | null>(null);
+  const [fee, setFee] = useState("1000000");
+  const [commitment, setCommitment] = useState("");
+  const [marker, setMarker] = useState("");
+  const [amount, setAmount] = useState("");
+  const [verdict, setVerdict] = useState<0 | 1 | 2 | 3>(0);
+  const [pendingPreview, setPendingPreview] =
+    useState<ProtocolV3TransactionPreview | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/aleo/v3", {
+      method: "GET",
+      headers: { accept: "application/json" },
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => null) as {
+          protocolV3?: ProtocolV3Capability;
+        } | null;
+        if (payload?.protocolV3) {
+          setCapability(payload.protocolV3);
+        } else {
+          setCapability({
+            ...PROTOCOL_V3_CAPABILITY,
+            status: response.ok ? "ConfigurationError" : "EndpointUnavailable",
+            currentEdition: null,
+          });
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setCapability({
+            ...PROTOCOL_V3_CAPABILITY,
+            status: "EndpointUnavailable",
+            currentEdition: null,
+          });
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCapabilityChecked(true);
+      });
+    return () => controller.abort();
+  }, []);
+
+  async function lookupClaim() {
+    const normalized = claimHash.trim();
+    if (!/^[0-9]+field$/.test(normalized)) {
+      setMessage(text("请输入有效的 Claim Hash（field）。", "Enter a valid Claim Hash (field)."));
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    setPendingPreview(null);
+    try {
+      const response = await fetch(
+        "/api/aleo/v3/claims/" + encodeURIComponent(normalized),
+        { method: "GET", headers: { accept: "application/json" }, cache: "no-store" },
+      );
+      const payload = await response.json().catch(() => null) as
+        | ClaimBundle
+        | { error?: string; capability?: string }
+        | null;
+      if (!response.ok || !payload || !("state" in payload)) {
+        throw new Error(
+          payload && "error" in payload && payload.error
+            ? payload.error
+            : "Protocol-v3 Claim could not be read",
+        );
+      }
+      setBundle(payload);
+      setAmount(rewardForReceipt(payload.bounty, payload.receipt));
+      setMessage(text("已读取并严格解析 V3 公共状态。", "Strictly parsed Protocol-v3 public state."));
+    } catch (error) {
+      setBundle(null);
+      setMessage(error instanceof Error ? error.message : text("读取失败。", "Lookup failed."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const roles = useMemo(() => {
+    const address = wallet.address;
+    if (!address || !bundle) return [] as string[];
+    const result: string[] = [];
+    if (address === bundle.bounty.owner) result.push(text("项目方", "Project Owner"));
+    if (address === bundle.state.whitehatAddress) result.push(text("白帽", "Whitehat"));
+    if (bundle.policy.arbiters.includes(address)) result.push(text("仲裁员", "Panel member"));
+    return result;
+  }, [bundle, text, wallet.address]);
+
+  const actions = useMemo(
+    () => availableActions(bundle, wallet.address),
+    [bundle, wallet.address],
+  );
+
+  function prepare(action: ActionId) {
+    if (!bundle) return;
+    try {
+      const feeMicrocredits = Number(fee);
+      const common = {
+        bountyId: bundle.bounty.bountyId,
+        claimHash: bundle.receipt.claimHash,
+        feeMicrocredits,
+      };
+      let preview: ProtocolV3TransactionPreview;
+      switch (action) {
+        case "begin-review":
+        case "accept-claim":
+        case "reject-claim":
+          preview = buildReviewClaimV3Transaction({
+            ...common,
+            action: action === "begin-review" ? 1 : action === "accept-claim" ? 2 : 3,
+            decisionCommitment: commitment,
+            actionMarker: marker,
+          });
+          break;
+        case "lock-reward":
+          preview = buildLockRewardV3Transaction({
+            ...common,
+            rewardAmount: amount,
+            lockMarker: marker,
+          });
+          break;
+        case "deliver-disclosure":
+        case "acknowledge-disclosure":
+          preview = buildDisclosureActionV3Transaction({
+            ...common,
+            action: action === "deliver-disclosure" ? 1 : 2,
+            actionCommitment: commitment,
+            actionMarker: marker,
+          });
+          break;
+        case "confirm-reproduction":
+        case "reject-reproduction":
+        case "propose-patch":
+        case "accept-patch":
+        case "finalize-unappealed":
+          preview = buildResolutionActionV3Transaction({
+            ...common,
+            action:
+              action === "confirm-reproduction" ? 1 :
+              action === "reject-reproduction" ? 2 :
+              action === "propose-patch" ? 3 :
+              action === "accept-patch" ? 4 : 5,
+            actionCommitment: commitment,
+            actionMarker: marker,
+          });
+          break;
+        case "appeal-rejection":
+        case "escalate-timeout":
+          preview = buildDisputeClaimV3Transaction({
+            ...common,
+            action: action === "appeal-rejection" ? 1 : 2,
+            disputeCommitment: commitment,
+            feeAmount: bundle.policy.arbitrationFeeMicrocredits,
+            disputeMarker: marker,
+          });
+          break;
+        case "cast-vote":
+          preview = buildCastArbitrationVoteV3Transaction({
+            ...common,
+            verdict,
+            voteMarker: marker,
+          });
+          break;
+        case "settle-reward":
+          preview = buildSettleRewardV3Transaction({
+            ...common,
+            whitehatAddress: bundle.state.whitehatAddress,
+            rewardAmount: amount,
+            bondAmount:
+              bundle.state.status === "Disputed"
+                ? bundle.disputeBond?.amount ?? "0"
+                : "0",
+            verdict,
+            marker,
+          });
+          break;
+        case "finalize-prelock":
+          preview = buildFinalizeArbitrationPrelockV3Transaction({
+            ...common,
+            whitehatAddress: bundle.state.whitehatAddress,
+            rewardAmount: amount,
+            bondAmount: bundle.disputeBond?.amount ?? "0",
+            verdict,
+            marker,
+          });
+          break;
+        case "finalize-rejection":
+          preview = buildFinalizeRejectionV3Transaction({
+            ...common,
+            ownerAddress: bundle.bounty.owner,
+            bondAmount: bundle.disputeBond?.amount ?? "0",
+            rejectionMarker: marker,
+          });
+          break;
+      }
+      setPendingPreview(preview);
+      setMessage(text("已生成公开交易预览；请核对后再请求签名。", "Public transaction preview prepared. Review it before signing."));
+    } catch (error) {
+      setPendingPreview(null);
+      setMessage(error instanceof Error ? error.message : text("无法生成交易。", "Could not build transaction."));
+    }
+  }
+
+  async function submitPreview() {
+    if (!pendingPreview) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await wallet.submitProtocolV3Transaction(pendingPreview);
+      setPendingPreview(null);
+      setMessage(text("钱包请求已创建；等待公开交易确认后重新读取 Mapping。", "Wallet request created. Re-read mappings after public confirmation."));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : text("钱包请求失败。", "Wallet request failed."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function prepareBountyEconomicAction(kind: "fund" | "refund") {
+    const bountyId = bundle?.bounty.bountyId;
+    if (!bountyId) {
+      setMessage(text("请先读取一个 V3 Claim，以确定链上 Bounty。", "Load a Protocol-v3 Claim first to identify its Bounty."));
+      return;
+    }
+    try {
+      const input = {
+        bountyId,
+        amount,
+        feeMicrocredits: Number(fee),
+      };
+      const preview = kind === "fund"
+        ? buildFundBountyV3Transaction({ ...input, fundingMarker: marker })
+        : buildRefundBountyV3Transaction({ ...input, refundMarker: marker });
+      setPendingPreview(preview);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : text("无法生成交易。", "Could not build transaction."));
+    }
+  }
+
+  const enabled = capability.status === "Available" &&
+    capability.walletRequestEnabled &&
+    capability.upgradeEvidenceVerified;
+
+  return (
+    <section className="surface-card-strong rounded-lg p-5 sm:p-6" aria-labelledby="v3-workbench-title">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <p className="page-kicker text-cyan-200">Protocol V3 workbench</p>
+          <h2 id="v3-workbench-title" className="mt-2 text-xl font-semibold text-white">
+            {text("项目方 · 白帽 · 仲裁面板", "Owner · Whitehat · Arbitration panel")}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            {text(
+              "权限取自已连接钱包与链上不可变配置。页面只读取公开承诺和状态；解密报告、复现材料及利用细节不得粘贴到这里。",
+              "Authority comes from the connected wallet and immutable on-chain config. This page reads public commitments and state only; decrypted reports, reproduction artifacts, and exploit details must never be pasted here.",
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-xs">
+          <span className={enabled ? "text-emerald-200" : "text-amber-200"}>
+            {capabilityChecked
+              ? capability.status
+              : text("核验中", "Checking")}
+          </span>
+          <span className="text-slate-500">
+            Edition {capability.currentEdition ?? "—"} / {capability.requiredEdition}
+          </span>
+        </div>
+      </div>
+
+      {!enabled ? (
+        <div className="mt-5 rounded-md border border-amber-300/20 bg-amber-300/[0.06] p-4 text-sm leading-6 text-amber-100/80">
+          {capability.status === "DeploymentEvidencePending"
+            ? text(
+                "链上已出现 Edition 2，但仓库尚未记录并验证升级交易 ID 与费用交易 ID；V3 钱包操作继续关闭。",
+                "Edition 2 is visible, but the repository has not recorded and verified the upgrade and fee transaction IDs. V3 wallet actions remain disabled.",
+              )
+            : text(
+                "当前 Aleo 测试网仍未满足 V3 启用条件。界面不会用本地状态或 Demo 回退替代链上能力。",
+                "Aleo Testnet does not yet satisfy the V3 activation requirements. The UI does not substitute local state or a Demo fallback.",
+              )}
+        </div>
+      ) : null}
+
+      <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_auto]">
+        <FieldInput
+          label={text("Claim Hash", "Claim Hash")}
+          value={claimHash}
+          onChange={setClaimHash}
+          placeholder="123...field"
+        />
+        <button
+          className="secondary-action self-end"
+          type="button"
+          disabled={!enabled || busy}
+          onClick={() => void lookupClaim()}
+        >
+          <Search size={16} aria-hidden="true" />
+          {text("读取 V3 状态", "Read V3 state")}
+        </button>
+      </div>
+
+      {bundle ? (
+        <>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <PublicField label={text("状态", "State")} value={bundle.state.status} />
+            <PublicField label={text("白帽地址", "Whitehat")} value={bundle.state.whitehatAddress} />
+            <PublicField label={text("仲裁面板", "Panel")} value={bundle.policy.panelId} />
+            <PublicField
+              label={text("当前钱包角色", "Connected role")}
+              value={roles.length ? roles.join(" / ") : text("只读公开用户", "Read-only public user")}
+            />
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-[0.72fr_1.28fr]">
+            <div className="rounded-md border border-white/10 bg-black/20 p-4">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="text-cyan-200" size={17} aria-hidden="true" />
+                <h3 className="text-sm font-semibold text-white">
+                  {text("公开证据边界", "Public evidence boundary")}
+                </h3>
+              </div>
+              <div className="mt-4 grid gap-3">
+                <PublicField label={text("目标系统承诺", "Target system")} value={bundle.evidence.targetSystemCommitment} />
+                <PublicField label={text("代码版本哈希", "Code hash")} value={bundle.evidence.targetCodeHash} />
+                <PublicField label={text("执行承诺", "Execution commitment")} value={bundle.evidence.executionCommitment} />
+                <PublicField label={text("报告承诺", "Report commitment")} value={bundle.evidence.reportCommitment} />
+              </div>
+            </div>
+
+            <div className="rounded-md border border-white/10 bg-black/20 p-4">
+              <div className="flex items-center gap-2">
+                <UserRoundCheck className="text-emerald-200" size={17} aria-hidden="true" />
+                <h3 className="text-sm font-semibold text-white">
+                  {text("角色允许的下一步", "Role-authorized next steps")}
+                </h3>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <FieldInput
+                  label={text("动作承诺 / 决策哈希", "Action / decision commitment")}
+                  value={commitment}
+                  onChange={setCommitment}
+                  placeholder="456...field"
+                />
+                <FieldInput
+                  label={text("唯一动作种子", "Unique action seed")}
+                  value={marker}
+                  onChange={setMarker}
+                  placeholder="789...field"
+                />
+                <FieldInput
+                  label={text("奖励 / 资金（microcredits）", "Reward / funds (microcredits)")}
+                  value={amount}
+                  onChange={setAmount}
+                  placeholder="1000000"
+                />
+                <FieldInput
+                  label={text("交易费（microcredits）", "Transaction fee (microcredits)")}
+                  value={fee}
+                  onChange={setFee}
+                  placeholder="1000000"
+                />
+                <label className="grid gap-2 text-xs text-slate-400">
+                  {text("仲裁结论", "Arbitration verdict")}
+                  <select
+                    className="input-surface focus-ring min-h-11 rounded-md px-3 text-sm"
+                    value={verdict}
+                    onChange={(event) => setVerdict(Number(event.target.value) as 0 | 1 | 2 | 3)}
+                  >
+                    <option value={0}>{text("驳回 / 无争议原等级", "Reject / uncontested original tier")}</option>
+                    <option value={1}>{text("中危", "Medium")}</option>
+                    <option value={2}>{text("高危", "High")}</option>
+                    <option value={3}>{text("严重", "Critical")}</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {wallet.connectionState !== "Connected" ? (
+                  <button className="primary-action" type="button" onClick={() => void wallet.connect()}>
+                    <WalletCards size={16} aria-hidden="true" />
+                    {text("连接 Leo Wallet", "Connect Leo Wallet")}
+                  </button>
+                ) : null}
+                {actions.map((action) => (
+                  <button
+                    className={action === "settle-reward" ? "primary-action" : "secondary-action"}
+                    type="button"
+                    key={action}
+                    disabled={!enabled || busy || wallet.transactionSubmissionBlocked}
+                    onClick={() => prepare(action)}
+                  >
+                    {action === "cast-vote" ? <Gavel size={15} aria-hidden="true" /> : null}
+                    {text(...actionLabels[action])}
+                  </button>
+                ))}
+                {wallet.address === bundle.bounty.owner ? (
+                  <>
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      disabled={!enabled || busy}
+                      onClick={() => prepareBountyEconomicAction("fund")}
+                    >
+                      {text("追加托管资金", "Fund escrow")}
+                    </button>
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      disabled={!enabled || busy}
+                      onClick={() => prepareBountyEconomicAction("refund")}
+                    >
+                      {text("到期退款", "Refund expired Bounty")}
+                    </button>
+                  </>
+                ) : null}
+                <button className="secondary-action" type="button" onClick={() => void lookupClaim()} disabled={busy || !enabled}>
+                  <RefreshCw size={15} aria-hidden="true" />
+                  {text("刷新", "Refresh")}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {bundle.tally ? (
+            <div className="mt-4 grid gap-3 rounded-md border border-violet-300/20 bg-violet-300/[0.05] p-4 sm:grid-cols-4">
+              <PublicField label={text("驳回票", "Reject")} value={String(bundle.tally.rejectVotes)} />
+              <PublicField label={text("中危票", "Medium")} value={String(bundle.tally.mediumVotes)} />
+              <PublicField label={text("高危票", "High")} value={String(bundle.tally.highVotes)} />
+              <PublicField label={text("严重票", "Critical")} value={String(bundle.tally.criticalVotes)} />
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {pendingPreview ? (
+        <div className="mt-5 rounded-md border border-cyan-300/20 bg-cyan-300/[0.05] p-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <PublicField label={text("函数", "Function")} value={pendingPreview.functionName} />
+            <PublicField label={text("网络", "Network")} value={pendingPreview.network} />
+            <PublicField label={text("费用", "Fee")} value={String(pendingPreview.feeMicrocredits)} />
+          </div>
+          <details className="mt-4 border-t border-white/10 pt-3">
+            <summary className="focus-ring cursor-pointer text-xs font-semibold text-slate-400">
+              {text("核对公开 ABI 输入", "Review public ABI inputs")}
+            </summary>
+            <ol className="mt-3 grid gap-2 font-mono text-xs text-slate-400">
+              {pendingPreview.inputs.map((input, index) => (
+                <li className="break-all" key={index}>
+                  {index + 1}. {input}
+                </li>
+              ))}
+            </ol>
+          </details>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              className="primary-action"
+              type="button"
+              disabled={!enabled || busy || wallet.transactionSubmissionBlocked}
+              onClick={() => void submitPreview()}
+            >
+              <WalletCards size={16} aria-hidden="true" />
+              {text("请求钱包签名", "Request wallet signature")}
+            </button>
+            <button className="secondary-action" type="button" onClick={() => setPendingPreview(null)}>
+              {text("取消", "Cancel")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {message ? <p className="mt-4 text-sm leading-6 text-slate-400">{message}</p> : null}
+      {wallet.protocolSubmission ? (
+        <p className="mt-3 break-all font-mono text-xs text-slate-500">
+          {wallet.protocolSubmission.functionName} · {wallet.protocolSubmission.walletRequestId}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function availableActions(bundle: ClaimBundle | null, address: string | null): ActionId[] {
+  if (!bundle || !address) return [];
+  const status = bundle.state.status;
+  const owner = address === bundle.bounty.owner;
+  const whitehat = address === bundle.state.whitehatAddress;
+  const panel = bundle.policy.arbiters.includes(address);
+  const result: ActionId[] = [];
+
+  if (owner) {
+    if (status === "Submitted") result.push("begin-review", "accept-claim", "reject-claim");
+    if (status === "OwnerReviewing") result.push("accept-claim", "reject-claim");
+    if (status === "Accepted") result.push("lock-reward", "reject-claim");
+    if (status === "DisclosureDelivered") result.push("acknowledge-disclosure");
+    if (status === "DisclosureAcknowledged") {
+      result.push("confirm-reproduction", "reject-reproduction");
+    }
+    if (status === "ReproductionConfirmed") result.push("propose-patch", "settle-reward");
+    if (status === "PatchProposed" && bundle.policy.paymentCondition === "OnReproduction") {
+      result.push("settle-reward");
+    }
+    if (status === "PatchAccepted") result.push("settle-reward");
+    if (status === "RewardLocked" || status === "PatchProposed") {
+      result.push("escalate-timeout");
+    }
+  }
+
+  if (whitehat) {
+    if (status === "RewardLocked") result.push("deliver-disclosure");
+    if (status === "PatchProposed") result.push("accept-patch");
+    if (status === "ReproductionRejected" || status === "OwnerRejected") {
+      result.push("appeal-rejection", "finalize-unappealed");
+    }
+    if (
+      status === "Submitted" ||
+      status === "OwnerReviewing" ||
+      status === "Accepted" ||
+      status === "DisclosureDelivered" ||
+      status === "DisclosureAcknowledged" ||
+      status === "ReproductionConfirmed"
+    ) {
+      result.push("escalate-timeout");
+    }
+  }
+
+  if (panel && status === "Disputed") result.push("cast-vote");
+  if (status === "Disputed") {
+    if (bundle.payout) result.push("settle-reward");
+    else result.push("finalize-prelock");
+    result.push("finalize-rejection");
+  }
+  return [...new Set(result)];
+}
+
+function rewardForReceipt(
+  bounty: OnChainBountyState,
+  receipt: OnChainClaimReceipt,
+) {
+  return receipt.severity === "Critical"
+    ? bounty.rewards.critical
+    : receipt.severity === "High"
+      ? bounty.rewards.high
+      : bounty.rewards.medium;
+}
+
+function PublicField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1 break-all font-mono text-sm text-slate-200">{value}</p>
+    </div>
+  );
+}
+
+function FieldInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <label className="grid gap-2 text-xs text-slate-400">
+      {label}
+      <input
+        className="input-surface focus-ring min-h-11 rounded-md px-3 font-mono text-sm"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        autoComplete="off"
+      />
+    </label>
+  );
+}

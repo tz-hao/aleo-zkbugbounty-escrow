@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { DatabaseZap, RefreshCw, ShieldCheck } from "lucide-react";
 
+import { useLocale } from "@/components/locale-provider";
 import type { OnChainNullifierState, ProofVerification } from "@/lib/models";
 
 type LookupState =
@@ -19,6 +20,7 @@ export function AleoNullifierStatus({
   nullifier: string;
   verification?: ProofVerification;
 }) {
+  const { text } = useLocale();
   const [lookupState, setLookup] = useState<{
     forNullifier: string;
     result: LookupState;
@@ -40,7 +42,10 @@ export function AleoNullifierStatus({
       }
       const payload: unknown = await response.json().catch(() => null);
       if (!response.ok || !isLookupResponse(payload)) {
-        const message = readError(payload) ?? "暂时无法读取 Aleo Testnet Nullifier Registry";
+        const message = readError(payload) ?? text(
+          "暂时无法读取 Aleo Testnet Nullifier Registry",
+          "The Aleo Testnet Nullifier Registry is temporarily unavailable.",
+        );
         setLookup({ forNullifier: nullifier, result: { kind: "error", message } });
         return;
       }
@@ -48,7 +53,13 @@ export function AleoNullifierStatus({
     } catch {
       setLookup({
         forNullifier: nullifier,
-        result: { kind: "error", message: "暂时无法连接 Aleo Testnet Registry" },
+        result: {
+          kind: "error",
+          message: text(
+            "暂时无法连接 Aleo Testnet Registry",
+            "Unable to reach the Aleo Testnet Registry right now.",
+          ),
+        },
       });
     }
   }
@@ -63,12 +74,14 @@ export function AleoNullifierStatus({
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold text-violet-100">
             <DatabaseZap size={16} aria-hidden="true" />
-            链上 Nullifier Registry
+            {text("链上防重复标识注册表", "On-chain Nullifier Registry")}
           </div>
           <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-400">
-            本地检查仅用于 Demo UX。防重放安全性由 Aleo Program 的
+            {text("本地检查仅用于界面提示。防重放安全性由 Aleo 程序的", "The local check is Demo UX only. Replay protection is enforced by the Aleo Program's")}
             <span className="mx-1 font-mono text-slate-300">nullifiers</span>
-            mapping 在 <span className="font-mono text-slate-300">submit_claim</span> Final 中执行。
+            {text("映射在", "mapping in")}
+            <span className="mx-1 font-mono text-slate-300">submit_claim</span>
+            Final {text("中执行。", ".")}
           </p>
         </div>
         <button
@@ -78,7 +91,7 @@ export function AleoNullifierStatus({
           type="button"
         >
           <RefreshCw className={state.kind === "loading" ? "animate-spin" : ""} size={14} aria-hidden="true" />
-          查询 Testnet
+          {text("查询测试网", "Query Testnet")}
         </button>
       </div>
 
@@ -90,24 +103,30 @@ export function AleoNullifierStatus({
         />
         <p className={networkConfirmed ? "text-emerald-100" : "text-amber-100"}>
           {networkConfirmed
-            ? "该结果标记为 Network Confirmed，仍可通过公开 mapping 独立复核。"
-            : "当前 Proof 尚非 Network Confirmed；生成本地结果不会自动占用链上 Nullifier。"}
+            ? text(
+              "该结果已达到网络确认级别，仍可通过公开映射独立复核。",
+              "This result is Network Confirmed and can still be independently checked against the public mapping.",
+            )
+            : text(
+              "当前证明尚未达到网络确认级别；生成本地结果不会自动占用链上防重复标识。",
+              "This Proof is not Network Confirmed. A local result does not reserve an on-chain Nullifier.",
+            )}
         </p>
       </div>
 
       {state.kind === "found" ? (
         <p className="mt-3 break-all rounded-md border border-emerald-300/20 bg-emerald-300/[0.06] p-3 text-xs text-emerald-100">
-          已占用，关联 Bounty：<span className="font-mono">{state.value.bountyId}</span>
+          {text("已占用，关联赏金：", "Already used by Bounty: ")}<span className="font-mono">{state.value.bountyId}</span>
         </p>
       ) : null}
       {state.kind === "not-found" ? (
         <p className="mt-3 rounded-md border border-slate-300/15 bg-white/[0.03] p-3 text-xs text-slate-300">
-          当前配置的 Testnet mapping 中未找到该 Nullifier。
+          {text("当前配置的测试网映射中未找到该防重复标识。", "This Nullifier is not present in the configured Testnet mapping.")}
         </p>
       ) : null}
       {state.kind === "error" ? (
         <p className="mt-3 rounded-md border border-amber-300/20 bg-amber-300/[0.06] p-3 text-xs text-amber-100">
-          {state.message}。不会回退到 localStorage 或 Demo State。
+          {state.message} {text("不会回退到浏览器本地存储或演示状态。", "There is no localStorage or Demo State fallback.")}
         </p>
       ) : null}
     </section>

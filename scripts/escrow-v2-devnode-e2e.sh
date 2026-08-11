@@ -11,14 +11,14 @@ LEO_BIN="${LEO_BIN:-leo}"
 readonly PROGRAM_ID="zkbugbounty_7f3c92.aleo"
 readonly ALEO_E2E_NETWORK="testnet"
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-readonly BASELINE_DIR="${ZKBB_DEVNODE_BASELINE_DIR:-${ROOT_DIR}/../aleo-devnode-baseline}"
-readonly CANDIDATE_DIR="${ZKBB_DEVNODE_CANDIDATE_DIR:-${ROOT_DIR}/../aleo-devnode-candidate}"
-readonly CANDIDATE_REF="${ZKBB_DEVNODE_CANDIDATE_REF:-escrow-v2-leo-4.4-migration}"
+readonly BASELINE_DIR="${ZKBB_DEVNODE_BASELINE_DIR:-${ROOT_DIR}/local-devnode/baseline-pre-escrow}"
+readonly CANDIDATE_DIR="${V3_CANDIDATE_WORKTREE:-${ZKBB_DEVNODE_CANDIDATE_DIR:-${ROOT_DIR}/local-devnode/candidate-escrow-v2}}"
+readonly CANDIDATE_REF="${CANDIDATE_REF:-${ZKBB_DEVNODE_CANDIDATE_REF:-escrow-v2-leo-4.4-migration}}"
 readonly ROOT_CANDIDATE_SOURCE="${ROOT_DIR}/leo/bug_proof/src/main.leo"
 readonly TESTNET_EDITION_ZERO_FIXTURE="${ROOT_DIR}/audit/testnet-edition-0/zkbugbounty_7f3c92.edition-0.aleo"
 readonly TESTNET_EDITION_ZERO_FIXTURE_SHA256="5f60a222cc989a55285258d1fa89ae46a6aa9e4487a396898e28cf94aa7afdf2"
 readonly REAL_BASELINE_MATERIALIZER="${ROOT_DIR}/scripts/materialize-testnet-edition0-baseline.mjs"
-readonly ALEO_E2E_LEDGER="${ZKBB_DEVNODE_LEDGER_DIR:-${ROOT_DIR}/../aleo-devnode-ledger}"
+readonly ALEO_E2E_LEDGER="${ZKBB_DEVNODE_LEDGER_DIR:-${ROOT_DIR}/local-devnode/ledger}"
 readonly ALEO_E2E_ENDPOINT="${ZKBB_DEVNODE_ENDPOINT:-http://127.0.0.1:3030}"
 readonly MINIMUM_V9_BLOCK_ADVANCE=20
 readonly MINIMUM_OWNER_MICROCREDITS=200000000
@@ -205,7 +205,7 @@ provision_local_accounts() {
 
 clean_local_ledger() {
   local expected
-  expected="$(realpath -m "${ROOT_DIR}/../aleo-devnode-ledger")"
+  expected="$(realpath -m "${ROOT_DIR}/local-devnode/ledger")"
   [[ "$(realpath -m "${ALEO_E2E_LEDGER}")" == "${expected}" ]] || die "ledger must be the isolated sibling directory"
   rm -rf -- "${expected}"
   mkdir -p "${expected}"
@@ -252,25 +252,83 @@ worktree_head_from_root() {
   return 1
 }
 
+read_linked_worktree_gitdir() {
+  local workspace="$1"
+  local pointer=""
+
+  [[ -f "${workspace}/.git" ]] || return 1
+  IFS= read -r pointer < "${workspace}/.git" || return 1
+  pointer="${pointer%$'\r'}"
+  [[ "${pointer}" == "gitdir: "* ]] || return 1
+  pointer="${pointer#gitdir: }"
+  [[ -n "${pointer}" ]] || return 1
+  printf '%s\n' "${pointer}"
+}
+
+resolve_gitdir_path() {
+  local worktree_dir="$1"
+  local gitdir_value="$2"
+  local resolved_path=""
+
+  gitdir_value="${gitdir_value%$'\r'}"
+  [[ -n "${gitdir_value}" ]] || return 1
+
+  if [[ "${gitdir_value}" =~ ^[[:alpha:]]:[/\\] ]]; then
+    if command -v wslpath >/dev/null 2>&1; then
+      resolved_path="$(wslpath -u -- "${gitdir_value}")" || return 1
+    else
+      resolved_path="${gitdir_value}"
+    fi
+  elif [[ "${gitdir_value}" == /* ]]; then
+    resolved_path="${gitdir_value}"
+  else
+    resolved_path="${worktree_dir}/${gitdir_value}"
+  fi
+
+  realpath -e -- "${resolved_path}"
+}
+
+linked_worktree_head_from_gitdir() {
+  local gitdir="$1"
+  local raw_head=""
+  local revision=""
+
+  [[ -f "${gitdir}/HEAD" ]] || return 1
+  IFS= read -r raw_head < "${gitdir}/HEAD" || return 1
+  raw_head="${raw_head%$'\r'}"
+  [[ -n "${raw_head}" ]] || return 1
+  revision="${raw_head#ref: }"
+  git -C "${ROOT_DIR}" rev-parse "${revision}^{commit}"
+}
+
 assert_worktree_ref() {
   local workspace="$1"
   local ref="$2"
-  local expected candidate_head candidate_common_dir root_common_dir
+  local expected candidate_head registered_head candidate_gitdir candidate_gitdir_value
+  local candidate_common_dir candidate_common_dir_value root_common_dir
 
   expected="$(git -C "${ROOT_DIR}" rev-parse "${ref}^{commit}")" \
     || die "could not resolve candidate ref: ${ref}"
-  [[ -f "${workspace}/.git" ]] \
-    || die "candidate is not a linked Git worktree: ${workspace}"
-  grep -q "^gitdir: " "${workspace}/.git" \
+  candidate_gitdir_value="$(read_linked_worktree_gitdir "${workspace}")" \
     || die "candidate Git metadata is invalid: ${workspace}"
-  candidate_common_dir="$(cd "${workspace}" && realpath "$(git rev-parse --git-common-dir)")" \
+  candidate_gitdir="$(resolve_gitdir_path "${workspace}" "${candidate_gitdir_value}")" \
+    || die "could not resolve candidate Git directory: ${workspace}"
+  [[ -f "${candidate_gitdir}/commondir" ]] \
+    || die "candidate Git common-directory metadata is missing: ${workspace}"
+  IFS= read -r candidate_common_dir_value < "${candidate_gitdir}/commondir" \
+    || die "could not read candidate Git common-directory metadata: ${workspace}"
+  candidate_common_dir="$(resolve_gitdir_path "${candidate_gitdir}" "${candidate_common_dir_value}")" \
     || die "could not resolve candidate Git common directory: ${workspace}"
-  root_common_dir="$(cd "${ROOT_DIR}" && realpath "$(git rev-parse --git-common-dir)")" \
+  root_common_dir="$(resolve_gitdir_path "${ROOT_DIR}" "$(git -C "${ROOT_DIR}" rev-parse --git-common-dir)")" \
     || die "could not resolve root Git common directory"
   [[ "${candidate_common_dir}" == "${root_common_dir}" ]] \
     || die "candidate is not registered by the root Git worktree: ${workspace}"
-  candidate_head="$(git -C "${workspace}" rev-parse HEAD)" \
-    || die "could not resolve candidate HEAD: ${workspace}"
+  candidate_head="$(linked_worktree_head_from_gitdir "${candidate_gitdir}")" \
+    || die "could not resolve candidate HEAD metadata: ${workspace}"
+  registered_head="$(worktree_head_from_root "${workspace}")" \
+    || die "candidate is not registered by the root Git worktree: ${workspace}"
+  [[ "${candidate_head}" == "${registered_head}" ]] \
+    || die "candidate HEAD metadata does not match the root Git worktree: ${workspace}"
 
   if [[ "${candidate_head}" != "${expected}" ]]; then
     printf 'escrow-devnode-e2e: candidate HEAD mismatch\n' >&2
@@ -278,6 +336,11 @@ assert_worktree_ref() {
     printf 'actual:   %s\n' "${candidate_head}" >&2
     exit 1
   fi
+
+  printf 'escrow-devnode-e2e: candidate HEAD match\n'
+  printf 'expected: %s\n' "${expected}"
+  printf 'actual:   %s\n' "${candidate_head}"
+  printf 'MATCH\n'
 }
 
 backup_test_sources() {
@@ -289,6 +352,11 @@ backup_test_sources() {
 
 materialize_root_candidate_snapshot() {
   local candidate_source="${CANDIDATE_DIR}/leo/bug_proof/src/main.leo"
+
+  if [[ -n "${V3_CANDIDATE_WORKTREE:-}" ]]; then
+    printf '[candidate-source] explicit V3 Candidate worktree\n'
+    return 0
+  fi
 
   [[ -f "${ROOT_CANDIDATE_SOURCE}" ]] || die "root Candidate source is missing: ${ROOT_CANDIDATE_SOURCE}"
   [[ -f "${candidate_source}" ]] || die "temporary Candidate source is missing: ${candidate_source}"
@@ -500,6 +568,31 @@ generate_preflight_devnode_key() {
   key=""
 }
 
+
+generate_ephemeral_local_account() {
+  local key_variable="$1"
+  local address_variable="$2"
+  local label="$3"
+  local account_output=""
+  local key=""
+  local public_address=""
+  local private_key_prefix="A""Private""Key"
+
+  account_output="$("${LEO_BIN}" account new --network "${ALEO_E2E_NETWORK}" 2>/dev/null)"     || die "could not generate ${label}"
+  key="$(printf '%s\n' "${account_output}" | tr -cs '[:alnum:]_' '\n' |
+    awk -v prefix="${private_key_prefix}" 'index($0, prefix) == 1 { print; exit }')"
+  public_address="$(printf '%s\n' "${account_output}" | tr -cs '[:alnum:]_' '\n' |
+    awk 'index($0, "aleo1") == 1 { print; exit }')"
+  account_output=""
+
+  validate_local_private_key "${label}" "${key}"
+  [[ "${public_address}" =~ ^aleo1[0-9a-z]+$ ]] ||
+    die "${label} did not produce a valid public address"
+  printf -v "${key_variable}" '%s' "${key}"
+  printf -v "${address_variable}" '%s' "${public_address}"
+  key=""
+  public_address=""
+}
 start_devnode() {
   local preflight_key=""
   ALEO_E2E_LAUNCH_DIR="$(mktemp -d "${REPORT_DIR}/devnode-launch.XXXXXX")"
@@ -1798,6 +1891,151 @@ main() {
   assert_mapping_unchanged "v2-rejected-escrow-accounting" bounty_escrows \
     "${bounty_v2}" "${refunded_escrow}"
 
+
+  if [[ "${ZKBB_RUN_PROTOCOL_V3:-0}" == "1" ]]; then
+    local arbiter_two_key="" arbiter_two_address=""
+    local arbiter_three_key="" arbiter_three_address=""
+    local v3_height="" v3_deadline_height="" v3_deadline=""
+    local v3_bounty="" v3_scope="" v3_claim_award="" v3_claim_reject=""
+    local v3_target_system="" v3_target_code="" v3_panel=""
+    local v3_binding_award="" v3_binding_reject="" v3_witness_award=""
+    local v3_witness_reject="" v3_policy=""
+    local v3_program_before_fund="" v3_program_after_refund=""
+    local v3_program_before_award="" v3_program_after_award=""
+    local v3_whitehat_before_award="" v3_whitehat_after_award=""
+    local v3_program_before_rejection="" v3_program_after_rejection=""
+    local v3_owner_before_rejection="" v3_owner_after_rejection=""
+    local v3_current_block="" v3_blocks_to_advance=""
+
+    generate_ephemeral_local_account arbiter_two_key arbiter_two_address       "ephemeral V3 Arbiter 2"
+    generate_ephemeral_local_account arbiter_three_key arbiter_three_address       "ephemeral V3 Arbiter 3"
+    [[ "${arbiter_two_address}" != "${ARBITER_ADDRESS}" ]]       || die "V3 Arbiter 2 duplicates Arbiter 1"
+    [[ "${arbiter_three_address}" != "${ARBITER_ADDRESS}" &&
+       "${arbiter_three_address}" != "${arbiter_two_address}" ]]       || die "V3 Arbiter 3 is not distinct"
+
+    execute_accepted "v3-bootstrap-arbiter-two" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" credits.aleo::transfer_public       "${arbiter_two_address}" 500000000u64
+    execute_accepted "v3-bootstrap-arbiter-three" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" credits.aleo::transfer_public       "${arbiter_three_address}" 500000000u64
+    require_public_balance "v3-arbiter-two" "Arbiter 2" "${arbiter_two_address}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" ||
+      die "V3 Arbiter 2 bootstrap failed"
+    require_public_balance "v3-arbiter-three" "Arbiter 3" "${arbiter_three_address}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" ||
+      die "V3 Arbiter 3 bootstrap failed"
+
+    v3_height="$(current_height)"
+    v3_deadline_height=$((10#${v3_height} + 250))
+    v3_deadline="${v3_deadline_height}u32"
+    v3_bounty="$(( $(date +%s%N) + 501 ))field"
+    v3_scope="$(( $(date +%s%N) + 502 ))field"
+    v3_target_system="$(( $(date +%s%N) + 503 ))field"
+    v3_target_code="$(( $(date +%s%N) + 504 ))field"
+    v3_panel="$(( $(date +%s%N) + 505 ))field"
+    v3_policy="{ disclosure_key_commitment: $(( $(date +%s%N) + 506 ))field, target_system_commitment: ${v3_target_system}, target_code_hash: ${v3_target_code}, panel_id: ${v3_panel}, arbiter_one: ${ARBITER_ADDRESS}, arbiter_two: ${arbiter_two_address}, arbiter_three: ${arbiter_three_address}, quorum: 2u8, review_window_blocks: 20u32, decision_window_blocks: 30u32, arbitration_fee_microcredits: 1000000u64, payment_condition: 1u8 }"
+
+    execute_accepted "v3-create-bounty" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" create_bounty_v3 "${v3_bounty}"       "${v3_scope}" 1field 3000000u64 2000000u64 1000000u64 0u64       "${v3_deadline}" "${v3_policy}"
+    assert_mapping_matches "v3-bounty" bounties "${v3_bounty}"       "owner_address:${OWNER_ADDRESS}" "scope_hash:${v3_scope}" "status:1u8"
+    assert_mapping_matches "v3-protocol-version" bounty_protocol_versions       "${v3_bounty}" "3u8"
+    assert_mapping_matches "v3-policy" bounty_v3_configs "${v3_bounty}"       "target_system_commitment:${v3_target_system}"       "target_code_hash:${v3_target_code}" "panel_id:${v3_panel}"       "arbiter_one:${ARBITER_ADDRESS}" "arbiter_two:${arbiter_two_address}"       "arbiter_three:${arbiter_three_address}" "quorum:2u8"       "arbitration_fee_microcredits:1000000u64"
+
+    v3_program_before_fund="$(public_credits_balance "${PROGRAM_ID}")"
+    execute_accepted "v3-fund-bounty" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" fund_bounty_v3 "${v3_bounty}"       10000000u64 "$(( $(date +%s%N) + 507 ))field"
+    assert_mapping_matches "v3-funded-escrow" bounty_escrows "${v3_bounty}"       "total_funded:10000000u64" "available_balance:10000000u64"       "locked_amount:0u64"
+
+    v3_binding_award="{ target_system_commitment: ${v3_target_system}, target_state_commitment: $(( $(date +%s%N) + 508 ))field, target_code_hash: ${v3_target_code}, execution_commitment: $(( $(date +%s%N) + 509 ))field, report_commitment: $(( $(date +%s%N) + 510 ))field }"
+    v3_witness_award="{ vault_balance_before: 1000u64, total_deposits_before: 1000u64, total_claims_before: 100u64, reserved_rewards_before: 0u64, withdraw_limit_before: 1000u64, user_balance_before: 1000u64, requested_withdraw_before: 0u64, hidden_delta_balance: 200u64, hidden_delta_claims: 800u64, hidden_delta_reserved_rewards: 0u64, hidden_delta_withdraw_amount: 0u64, hidden_delta_user_balance: 0u64, reporter_secret: $(( $(date +%s%N) + 511 ))field }"
+    execute_accepted "v3-submit-award-claim" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${WHITEHAT_PRIVATE_KEY}" "Whitehat" "${WHITEHAT_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" submit_claim_v3 "${v3_bounty}"       "${v3_scope}" 1field "${v3_binding_award}" "${v3_witness_award}"
+    v3_claim_award="$(field_from_output claim_hash)"
+    [[ -n "${v3_claim_award}" ]] || die "could not derive V3 award Claim hash"
+    v3_binding_award=""
+    v3_witness_award=""
+    assert_mapping_matches "v3-award-receipt" claim_receipts "${v3_claim_award}"       "bounty_id:${v3_bounty}" "severity:3u8" "protocol_version:3u8"
+    assert_mapping_matches "v3-award-evidence" claim_v3_evidence "${v3_claim_award}"       "target_system_commitment:${v3_target_system}"       "target_code_hash:${v3_target_code}"
+    assert_mapping_matches "v3-award-submitted" claim_v3_states "${v3_claim_award}"       "whitehat_address:${WHITEHAT_ADDRESS}" "status:1u8"
+
+    execute_accepted "v3-begin-review" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" review_claim_v3 "${v3_bounty}"       "${v3_claim_award}" 1u8 "$(( $(date +%s%N) + 512 ))field"       "$(( $(date +%s%N) + 513 ))field"
+    assert_mapping_matches "v3-owner-reviewing" claim_v3_states "${v3_claim_award}"       "status:2u8"
+
+    execute_accepted "v3-accept-claim" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" review_claim_v3 "${v3_bounty}"       "${v3_claim_award}" 2u8 "$(( $(date +%s%N) + 514 ))field"       "$(( $(date +%s%N) + 515 ))field"
+    execute_accepted "v3-lock-award" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" lock_reward_v3 "${v3_bounty}"       "${v3_claim_award}" 3000000u64 "$(( $(date +%s%N) + 516 ))field"
+    assert_mapping_matches "v3-award-locked" claim_v3_states "${v3_claim_award}"       "status:4u8"
+    assert_mapping_matches "v3-award-payout-locked" claim_v3_payouts       "${v3_claim_award}" "reserved_amount:3000000u64" "status:1u8"
+
+    execute_accepted "v3-deliver-disclosure" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${WHITEHAT_PRIVATE_KEY}" "Whitehat" "${WHITEHAT_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" disclosure_action_v3       "${v3_bounty}" "${v3_claim_award}" 1u8       "$(( $(date +%s%N) + 517 ))field" "$(( $(date +%s%N) + 518 ))field"
+    execute_accepted "v3-acknowledge-disclosure" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" disclosure_action_v3 "${v3_bounty}"       "${v3_claim_award}" 2u8 "$(( $(date +%s%N) + 519 ))field"       "$(( $(date +%s%N) + 520 ))field"
+    assert_mapping_matches "v3-disclosure-acknowledged" claim_v3_states       "${v3_claim_award}" "status:6u8"
+    assert_mapping_present "v3-acknowledgement" claim_v3_acknowledgements       "${v3_claim_award}"
+
+    execute_accepted "v3-reproduction-rejected" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" resolution_action_v3 "${v3_bounty}"       "${v3_claim_award}" 2u8 "$(( $(date +%s%N) + 521 ))field"       "$(( $(date +%s%N) + 522 ))field"
+    execute_accepted "v3-open-dispute" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${WHITEHAT_PRIVATE_KEY}" "Whitehat" "${WHITEHAT_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" dispute_claim_v3 "${v3_bounty}"       "${v3_claim_award}" 1u8 "$(( $(date +%s%N) + 523 ))field"       1000000u64 "$(( $(date +%s%N) + 524 ))field"
+    assert_mapping_matches "v3-award-disputed" claim_v3_states "${v3_claim_award}"       "status:11u8" "pre_dispute_status:8u8"
+    assert_mapping_matches "v3-award-bond" claim_v3_dispute_bonds       "${v3_claim_award}" "payer:${WHITEHAT_ADDRESS}" "amount:1000000u64"       "status:1u8"
+
+    execute_accepted "v3-arbiter-one-high-vote" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${ARBITER_PRIVATE_KEY}" "Arbiter 1" "${ARBITER_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" cast_arbitration_vote_v3       "${v3_bounty}" "${v3_claim_award}" 2u8       "$(( $(date +%s%N) + 525 ))field"
+    execute_accepted "v3-arbiter-two-high-vote" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${arbiter_two_key}" "Arbiter 2" "${arbiter_two_address}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" cast_arbitration_vote_v3       "${v3_bounty}" "${v3_claim_award}" 2u8       "$(( $(date +%s%N) + 526 ))field"
+    assert_mapping_matches "v3-high-quorum" claim_v3_arbitration_tallies       "${v3_claim_award}" "high_votes:2u8"
+
+    v3_program_before_award="$(public_credits_balance "${PROGRAM_ID}")"
+    v3_whitehat_before_award="$(public_credits_balance "${WHITEHAT_ADDRESS}")"
+    execute_accepted "v3-settle-high-award" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${ARBITER_PRIVATE_KEY}" "Arbiter 1" "${ARBITER_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" settle_reward_v3       "${v3_bounty}" "${v3_claim_award}" "${WHITEHAT_ADDRESS}" 2000000u64       1000000u64 2u8 "$(( $(date +%s%N) + 527 ))field"
+    v3_program_after_award="$(public_credits_balance "${PROGRAM_ID}")"
+    v3_whitehat_after_award="$(public_credits_balance "${WHITEHAT_ADDRESS}")"
+    assert_balance_delta "v3-award-program-credits" "${v3_program_before_award}"       "${v3_program_after_award}" -3000000
+    assert_balance_delta "v3-award-whitehat-credits" "${v3_whitehat_before_award}"       "${v3_whitehat_after_award}" 3000000
+    assert_mapping_matches "v3-award-paid-state" claim_v3_states       "${v3_claim_award}" "status:12u8"
+    assert_mapping_matches "v3-award-paid-payout" claim_v3_payouts       "${v3_claim_award}" "reserved_amount:3000000u64"       "paid_amount:2000000u64" "status:2u8"
+    assert_mapping_matches "v3-award-bond-settled" claim_v3_dispute_bonds       "${v3_claim_award}" "status:2u8"
+    assert_mapping_matches "v3-award-count-resolved" bounty_claim_counts       "${v3_bounty}" "0u64"
+
+    v3_binding_reject="{ target_system_commitment: ${v3_target_system}, target_state_commitment: $(( $(date +%s%N) + 528 ))field, target_code_hash: ${v3_target_code}, execution_commitment: $(( $(date +%s%N) + 529 ))field, report_commitment: $(( $(date +%s%N) + 530 ))field }"
+    v3_witness_reject="{ vault_balance_before: 1000u64, total_deposits_before: 1000u64, total_claims_before: 100u64, reserved_rewards_before: 0u64, withdraw_limit_before: 1000u64, user_balance_before: 1000u64, requested_withdraw_before: 0u64, hidden_delta_balance: 200u64, hidden_delta_claims: 800u64, hidden_delta_reserved_rewards: 0u64, hidden_delta_withdraw_amount: 0u64, hidden_delta_user_balance: 0u64, reporter_secret: $(( $(date +%s%N) + 531 ))field }"
+    execute_accepted "v3-submit-reject-claim" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${WHITEHAT_PRIVATE_KEY}" "Whitehat" "${WHITEHAT_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" submit_claim_v3 "${v3_bounty}"       "${v3_scope}" 1field "${v3_binding_reject}" "${v3_witness_reject}"
+    v3_claim_reject="$(field_from_output claim_hash)"
+    [[ -n "${v3_claim_reject}" && "${v3_claim_reject}" != "${v3_claim_award}" ]]       || die "could not derive distinct V3 rejection Claim hash"
+    v3_binding_reject=""
+    v3_witness_reject=""
+
+    execute_accepted "v3-accept-reject-claim" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" review_claim_v3 "${v3_bounty}"       "${v3_claim_reject}" 2u8 "$(( $(date +%s%N) + 532 ))field"       "$(( $(date +%s%N) + 533 ))field"
+    execute_accepted "v3-lock-reject-claim" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" lock_reward_v3 "${v3_bounty}"       "${v3_claim_reject}" 3000000u64 "$(( $(date +%s%N) + 534 ))field"
+    execute_accepted "v3-deliver-reject-claim" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${WHITEHAT_PRIVATE_KEY}" "Whitehat" "${WHITEHAT_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" disclosure_action_v3       "${v3_bounty}" "${v3_claim_reject}" 1u8       "$(( $(date +%s%N) + 535 ))field" "$(( $(date +%s%N) + 536 ))field"
+    execute_accepted "v3-ack-reject-claim" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" disclosure_action_v3 "${v3_bounty}"       "${v3_claim_reject}" 2u8 "$(( $(date +%s%N) + 537 ))field"       "$(( $(date +%s%N) + 538 ))field"
+    execute_accepted "v3-reject-reproduction-two" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" resolution_action_v3 "${v3_bounty}"       "${v3_claim_reject}" 2u8 "$(( $(date +%s%N) + 539 ))field"       "$(( $(date +%s%N) + 540 ))field"
+    execute_accepted "v3-open-rejection-dispute" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${WHITEHAT_PRIVATE_KEY}" "Whitehat" "${WHITEHAT_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" dispute_claim_v3 "${v3_bounty}"       "${v3_claim_reject}" 1u8 "$(( $(date +%s%N) + 541 ))field"       1000000u64 "$(( $(date +%s%N) + 542 ))field"
+    execute_accepted "v3-arbiter-one-reject-vote" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${ARBITER_PRIVATE_KEY}" "Arbiter 1" "${ARBITER_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" cast_arbitration_vote_v3       "${v3_bounty}" "${v3_claim_reject}" 0u8       "$(( $(date +%s%N) + 543 ))field"
+
+    expect_chain_rejected "v3-duplicate-arbiter-vote" STEP_TX_ID STEP_FEE_ID       STEP_FEE_TX_ID "${CANDIDATE_DIR}" "${ARBITER_PRIVATE_KEY}" "Arbiter 1"       "${ARBITER_ADDRESS}" "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" execute       cast_arbitration_vote_v3 "${v3_bounty}" "${v3_claim_reject}" 0u8       "$(( $(date +%s%N) + 544 ))field" --skip-execute-proof --broadcast --yes
+
+    execute_accepted "v3-arbiter-two-reject-vote" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${arbiter_two_key}" "Arbiter 2" "${arbiter_two_address}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" cast_arbitration_vote_v3       "${v3_bounty}" "${v3_claim_reject}" 0u8       "$(( $(date +%s%N) + 545 ))field"
+    assert_mapping_matches "v3-reject-quorum" claim_v3_arbitration_tallies       "${v3_claim_reject}" "reject_votes:2u8"
+
+    v3_program_before_rejection="$(public_credits_balance "${PROGRAM_ID}")"
+    v3_owner_before_rejection="$(public_credits_balance "${OWNER_ADDRESS}")"
+    execute_accepted "v3-finalize-rejection" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${arbiter_three_key}" "Arbiter 3"       "${arbiter_three_address}" "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}"       finalize_rejection_v3 "${v3_bounty}" "${v3_claim_reject}"       "${OWNER_ADDRESS}" 1000000u64 "$(( $(date +%s%N) + 546 ))field"
+    v3_program_after_rejection="$(public_credits_balance "${PROGRAM_ID}")"
+    v3_owner_after_rejection="$(public_credits_balance "${OWNER_ADDRESS}")"
+    assert_balance_delta "v3-reject-program-bond" "${v3_program_before_rejection}"       "${v3_program_after_rejection}" -1000000
+    assert_balance_delta "v3-reject-owner-bond" "${v3_owner_before_rejection}"       "${v3_owner_after_rejection}" 1000000
+    assert_mapping_matches "v3-rejected-state" claim_v3_states       "${v3_claim_reject}" "status:14u8"
+    assert_mapping_matches "v3-rejected-payout" claim_v3_payouts       "${v3_claim_reject}" "status:3u8"
+    assert_mapping_matches "v3-rejected-bond" claim_v3_dispute_bonds       "${v3_claim_reject}" "status:2u8"
+    assert_mapping_matches "v3-all-claims-resolved" bounty_claim_counts       "${v3_bounty}" "0u64"
+    assert_mapping_matches "v3-escrow-after-arbitration" bounty_escrows       "${v3_bounty}" "available_balance:8000000u64"       "locked_amount:0u64" "paid_amount:2000000u64"
+
+    execute_accepted "v3-close-bounty" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" close_bounty "${v3_bounty}"
+    v3_current_block="$(current_height)"
+    if ((10#${v3_current_block} <= v3_deadline_height)); then
+      v3_blocks_to_advance=$((v3_deadline_height - 10#${v3_current_block} + 1))
+      advance_blocks "${v3_blocks_to_advance}"
+    fi
+    execute_accepted "v3-refund-bounty" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" refund_bounty_v3 "${v3_bounty}"       8000000u64 "$(( $(date +%s%N) + 547 ))field"
+    v3_program_after_refund="$(public_credits_balance "${PROGRAM_ID}")"
+    assert_balance_delta "v3-program-conservation" "${v3_program_before_fund}"       "${v3_program_after_refund}" 0
+    assert_mapping_matches "v3-refunded-escrow" bounty_escrows "${v3_bounty}"       "available_balance:0u64" "locked_amount:0u64"       "paid_amount:2000000u64" "refunded_amount:8000000u64" "status:3u8"
+
+    arbiter_two_key=""
+    arbiter_three_key=""
+    record_event "protocol-v3-award-flow" "passed"
+    record_event "protocol-v3-rejection-flow" "passed"
+    record_event "protocol-v3-credits-conservation" "passed"
+    printf 'Local Devnode Protocol V3 accepted and rejected arbitration flows passed.\n'
+  fi
   record_event "credits-conservation" "passed"
   record_event "status" "COMPLETED"
   write_public_report

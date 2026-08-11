@@ -19,6 +19,15 @@ export const EDITION_ONE_MAPPING_NAMES = [
   "claim_triage_states",
   "bounty_protocol_versions",
   "escrow_operation_markers",
+  "bounty_v3_configs",
+  "claim_v3_evidence",
+  "claim_v3_states",
+  "claim_v3_payouts",
+  "claim_v3_arbitration_tallies",
+  "claim_v3_arbitration_votes",
+  "v3_operation_markers",
+  "claim_v3_acknowledgements",
+  "claim_v3_dispute_bonds",
 ] as const;
 
 export type EditionOneMappingName = (typeof EDITION_ONE_MAPPING_NAMES)[number];

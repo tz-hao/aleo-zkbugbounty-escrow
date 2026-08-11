@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const harness = readFileSync("scripts/escrow-v2-devnode-e2e.sh", "utf8");
+const protocolV3Harness = readFileSync("scripts/protocol-v3-devnode-e2e.sh", "utf8");
 
 const executionTransactionLine = /^[ \t]*-[ \t]*transaction ID:[ \t]*'([^']+)'[ \t]*.*$/;
 const feeIdLine = /^[ \t]*-[ \t]*fee ID:[ \t]*'([^']+)'[ \t]*.*$/;
@@ -59,9 +60,9 @@ function formatMicrocreditsForTest(value: bigint) {
 test("Escrow Devnode harness is localhost-only and starts from an isolated ledger", () => {
   assert.match(harness, /http:\/\/127\.0\.0\.1:3030\|http:\/\/localhost:3030/);
   assert.match(harness, /refusing non-local endpoint/);
-  assert.match(harness, /aleo-devnode-baseline/);
-  assert.match(harness, /aleo-devnode-candidate/);
-  assert.match(harness, /aleo-devnode-ledger/);
+  assert.match(harness, /local-devnode\/baseline-pre-escrow/);
+  assert.match(harness, /local-devnode\/candidate-escrow-v2/);
+  assert.match(harness, /local-devnode\/ledger/);
   assert.match(harness, /"\$\{LEO_BIN\}" devnode start --socket-addr 127\.0\.0\.1:3030/);
   assert.match(harness, /--storage "\$\{ALEO_E2E_LEDGER\}"/);
   assert.doesNotMatch(harness, /api\.explorer\.provable\.com/);
@@ -494,6 +495,14 @@ test("Escrow Devnode harness validates Windows-created worktrees from the root r
   assert.doesNotMatch(harness, /git -C "\$\{CANDIDATE_DIR\}"/);
 });
 
+test("Protocol V3 Devnode harness selects an explicit Candidate and keeps the SHA gate fail-closed", () => {
+  assert.match(harness, /V3_CANDIDATE_WORKTREE/);
+  assert.match(harness, /readonly CANDIDATE_REF="\$\{CANDIDATE_REF:-/);
+  assert.match(harness, /candidate HEAD mismatch/);
+  assert.match(harness, /candidate HEAD match/);
+  assert.match(harness, /MATCH/);
+  assert.match(harness, /explicit V3 Candidate worktree/);
+});
 test("Escrow Devnode harness restores locally patched source without relying on a worktree .git file", () => {
   assert.match(harness, /backup_test_sources/);
   assert.match(harness, /BASELINE_SOURCE_BACKUP/);
@@ -605,4 +614,43 @@ test("Escrow Devnode harness derives its deploy baseline from the real Testnet e
   assert.match(harness, /--ignore-constructor/);
   assert.doesNotMatch(harness, /assert_worktree_ref "\$\{BASELINE_DIR\}" "pre-escrow-upgrade"/);
   assert.doesNotMatch(harness, /api\.explorer\.provable\.com/);
+});
+test("Protocol V3 Devnode wrapper enables the complete arbitration extension", () => {
+  assert.match(protocolV3Harness, /export ZKBB_RUN_PROTOCOL_V3=1/);
+  assert.match(protocolV3Harness, /exec bash .*escrow-v2-devnode-e2e\.sh/);
+
+  const steps = [
+    "v3-create-bounty",
+    "v3-fund-bounty",
+    "v3-submit-award-claim",
+    "v3-begin-review",
+    "v3-accept-claim",
+    "v3-lock-award",
+    "v3-deliver-disclosure",
+    "v3-acknowledge-disclosure",
+    "v3-reproduction-rejected",
+    "v3-open-dispute",
+    "v3-arbiter-one-high-vote",
+    "v3-arbiter-two-high-vote",
+    "v3-settle-high-award",
+    "v3-submit-reject-claim",
+    "v3-duplicate-arbiter-vote",
+    "v3-finalize-rejection",
+    "v3-close-bounty",
+    "v3-refund-bounty",
+  ];
+
+  let previous = harness.indexOf('if [[ "${ZKBB_RUN_PROTOCOL_V3:-0}" == "1" ]]');
+  assert.ok(previous >= 0);
+  for (const step of steps) {
+    const current = harness.indexOf(step, previous + 1);
+    assert.ok(current > previous, `${step} must follow the previous V3 E2E stage`);
+    previous = current;
+  }
+
+  assert.match(harness, /generate_ephemeral_local_account/);
+  assert.match(harness, /quorum: 2u8/);
+  assert.match(harness, /assert_balance_delta "v3-program-conservation"/);
+  assert.match(harness, /record_event "protocol-v3-award-flow" "passed"/);
+  assert.match(harness, /record_event "protocol-v3-rejection-flow" "passed"/);
 });

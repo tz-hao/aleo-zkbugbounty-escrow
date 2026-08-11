@@ -101,8 +101,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const hydrated = useRef(false);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(DEMO_STATE_STORAGE_KEY);
-    const persisted = stored ? parsePersistedDemoState(stored) : null;
+    let persisted: PersistedDemoState | null = null;
+    try {
+      const stored = window.localStorage.getItem(DEMO_STATE_STORAGE_KEY);
+      persisted = stored ? parsePersistedDemoState(stored) : null;
+    } catch {
+      // Restricted browser storage must not prevent the public UI from rendering.
+    }
     hydrated.current = true;
     dispatch({
       type: "hydratePublicState",
@@ -114,10 +119,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (!hydrated.current) {
       return;
     }
-    window.localStorage.setItem(
-      DEMO_STATE_STORAGE_KEY,
-      JSON.stringify(createPersistedDemoState(state)),
-    );
+    try {
+      window.localStorage.setItem(
+        DEMO_STATE_STORAGE_KEY,
+        JSON.stringify(createPersistedDemoState(state)),
+      );
+    } catch {
+      // The app remains usable when storage is disabled or quota-limited.
+    }
   }, [state]);
 
   const value = useMemo(() => ({ state, dispatch }), [state]);

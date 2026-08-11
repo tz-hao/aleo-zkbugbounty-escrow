@@ -13,10 +13,11 @@ import {
 } from "@/lib/permissions";
 import { useAppState } from "./app-state-provider";
 import { EncryptedDisclosureWorkbench } from "./encrypted-disclosure-workbench";
-import { zh } from "@/lib/i18n/zh";
+import { useLocale } from "./locale-provider";
 
 export function TriageActionControls({ claim, bounty }: { claim: BugClaim; bounty: Bounty }) {
   const { state, dispatch } = useAppState();
+  const { copy, text } = useLocale();
   const actor = state.currentActor;
   const [note, setNote] = useState("");
   const [pendingAction, setPendingAction] = useState<ActionType | null>(null);
@@ -25,31 +26,31 @@ export function TriageActionControls({ claim, bounty }: { claim: BugClaim; bount
   const ownerActions = [
     {
       actionType: "RewardLocked" as const,
-      label: `${zh.triage.actions.lock}（Demo State）`,
+      label: `${copy.triage.actions.lock} (${text("本地演示状态", "Demo state")})`,
       icon: Lock,
       enabled: canLockReward(actor, bounty, claim),
     },
     {
       actionType: "DetailsRequested" as const,
-      label: zh.triage.actions.request,
+      label: copy.triage.actions.request,
       icon: Send,
       enabled: canRequestEncryptedDetails(actor, bounty, claim),
     },
     {
       actionType: "Patched" as const,
-      label: zh.triage.actions.patched,
+      label: copy.triage.actions.patched,
       icon: Wrench,
       enabled: canMarkPatched(actor, bounty, claim),
     },
     {
       actionType: "Paid" as const,
-      label: `${zh.triage.actions.paid}（Demo State）`,
+      label: `${copy.triage.actions.paid} (${text("本地演示状态", "Demo state")})`,
       icon: Check,
       enabled: canReleaseBounty(actor, bounty, claim),
     },
     {
       actionType: "Rejected" as const,
-      label: zh.triage.actions.rejected,
+      label: copy.triage.actions.rejected,
       icon: ShieldX,
       enabled: canRejectClaim(actor, bounty, claim),
     },
@@ -61,22 +62,22 @@ export function TriageActionControls({ claim, bounty }: { claim: BugClaim; bount
     }
     dispatch({ type: "addTriageNote", claimId: claim.id, publicNote: note.trim() });
     setNote("");
-    setFeedback("公开备注已添加。" );
+    setFeedback(text("公开备注已添加。", "Public note added."));
   }
 
   function recommendSeverity() {
     dispatch({
       type: "addTriageNote",
       claimId: claim.id,
-      publicNote: `Security Arbiter recommends severity: ${claim.severity}.`,
+      publicNote: text(`安全仲裁者建议严重程度：${copy.status.severity[claim.severity]}。`, `Security Arbiter recommends severity: ${claim.severity}.`),
     });
-    setFeedback("Severity 建议已添加到公开 Triage 时间线。" );
+    setFeedback(text("严重程度建议已添加到公开分诊时间线。", "Severity recommendation added to the public triage timeline."));
   }
 
   function runOwnerAction(actionType: ActionType) {
     dispatch({ type: "triage", claimId: claim.id, actionType });
     setPendingAction(null);
-    setFeedback(`${actionType} 状态已更新；当前未提交链上交易。`);
+    setFeedback(text(`${copy.triage.workflow.actionLabels[actionType]}状态已更新；当前未提交链上交易。`, `${actionType} status updated; no on-chain transaction was submitted.`));
   }
 
   function requestOwnerAction(actionType: ActionType) {
@@ -90,7 +91,7 @@ export function TriageActionControls({ claim, bounty }: { claim: BugClaim; bount
   return (
     <div className="grid gap-4">
       <p className="rounded-lg border border-amber-300/20 bg-amber-300/[0.07] p-3 text-sm text-amber-100">
-        当前 Role、Reward Lock、Payout 与 Disclosure Delivery 均为本地 Demo State；没有 Wallet 签名、Escrow 转账或密文托管。
+        {text("当前角色、奖励锁定、支付与披露交付均为本地演示状态；没有钱包签名、托管转账或密文托管。", "Current role, reward lock, payout, and disclosure delivery are local Demo State only. There is no Wallet signature, Escrow transfer, or ciphertext custody.")}
       </p>
       {actor.role === "ProjectOwner" ? (
         <div className="grid gap-2 sm:grid-cols-2">
@@ -116,15 +117,15 @@ export function TriageActionControls({ claim, bounty }: { claim: BugClaim; bount
       {pendingAction ? (
         <div className="rounded-lg border border-red-300/25 bg-red-500/10 p-4" role="alertdialog" aria-modal="true">
           <p className="font-semibold text-red-100">
-            {zh.triage.confirmFinal}
+            {copy.triage.confirmFinal}
           </p>
-          <p className="mt-1 text-sm text-slate-300">{zh.triage.confirmFinalBody}</p>
+          <p className="mt-1 text-sm text-slate-300">{copy.triage.confirmFinalBody}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button className="focus-ring min-h-11 rounded-lg border border-red-300/35 bg-red-500/15 px-4 text-sm font-semibold text-red-100" onClick={() => runOwnerAction(pendingAction)} type="button">
-              {zh.common.confirm}
+              {copy.common.confirm}
             </button>
             <button className="focus-ring secondary-action" onClick={() => setPendingAction(null)} type="button">
-              {zh.common.cancel}
+              {copy.common.cancel}
             </button>
           </div>
         </div>
@@ -141,13 +142,13 @@ export function TriageActionControls({ claim, bounty }: { claim: BugClaim; bount
               type="button"
             >
               <ShieldCheck size={16} aria-hidden="true" />
-              {zh.triage.actions.recommend}
+              {copy.triage.actions.recommend}
             </button>
           ) : null}
           <textarea
             className="focus-ring input-surface min-h-20 rounded-lg px-3 py-3 text-sm"
             onChange={(event) => setNote(event.target.value)}
-            placeholder={zh.triage.actions.notePlaceholder}
+            placeholder={copy.triage.actions.notePlaceholder}
             value={note}
           />
           <button
@@ -156,14 +157,14 @@ export function TriageActionControls({ claim, bounty }: { claim: BugClaim; bount
             type="button"
           >
             <FileText size={16} aria-hidden="true" />
-            {zh.triage.actions.addNote}
+            {copy.triage.actions.addNote}
           </button>
         </div>
       ) : null}
 
       {actor.role === "PublicUser" ? (
         <p className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm text-slate-400">
-          {zh.triage.publicNoActions}
+          {copy.triage.publicNoActions}
         </p>
       ) : null}
       <p aria-live="polite" className="min-h-5 text-sm text-emerald-200">{feedback}</p>

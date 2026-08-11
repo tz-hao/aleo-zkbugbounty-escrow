@@ -15,6 +15,7 @@ import {
 import type { BugClaim } from "@/lib/models";
 import { canShareEncryptedDetails } from "@/lib/permissions";
 import { useAppState } from "./app-state-provider";
+import { useLocale } from "./locale-provider";
 
 function downloadJson(filename: string, content: string) {
   const url = URL.createObjectURL(new Blob([content], { type: "application/json" }));
@@ -34,6 +35,7 @@ async function readJsonFile(event: ChangeEvent<HTMLInputElement>) {
 }
 
 export function EncryptedDisclosureWorkbench({ claim }: { claim: BugClaim }) {
+  const { text } = useLocale();
   const { state, dispatch } = useAppState();
   const actor = state.currentActor;
   const [publicKeyJson, setPublicKeyJson] = useState("");
@@ -56,9 +58,9 @@ export function EncryptedDisclosureWorkbench({ claim }: { claim: BugClaim }) {
       const keys = await generateDisclosureRecipientKeys();
       setPublicKeyJson(exportDisclosurePublicKey(keys));
       setDecryptionKeyJson(exportDisclosureKeyBundle(keys));
-      setFeedback("披露密钥已在当前设备生成，未写入 Store 或浏览器存储。");
+      setFeedback(text("披露密钥已在当前设备生成，未写入状态仓库或浏览器存储。", "Disclosure keys were generated on this device and were not written to Store or browser storage."));
     } catch {
-      setFeedback("当前浏览器无法生成披露密钥。");
+      setFeedback(text("当前浏览器无法生成披露密钥。", "This browser cannot generate disclosure keys."));
     } finally {
       setBusy(false);
     }
@@ -76,10 +78,10 @@ export function EncryptedDisclosureWorkbench({ claim }: { claim: BugClaim }) {
       setEncryptedPackage(packageValue);
       setReport("");
       setRecipientPublicKeyInput("");
-      setFeedback("Ciphertext Package 已在本地生成。请导出并通过外部安全通道交付。");
+      setFeedback(text("密文包已在本地生成。请导出并通过外部安全通道交付。", "The Ciphertext Package was created locally. Export it and deliver it through an external secure channel."));
     } catch {
       setEncryptedPackage(null);
-      setFeedback("本地加密失败，请检查 Owner Public Key 与报告内容。");
+      setFeedback(text("本地加密失败，请检查项目方公钥与报告内容。", "Local encryption failed. Check the Owner Public Key and report content."));
     } finally {
       setBusy(false);
     }
@@ -96,7 +98,7 @@ export function EncryptedDisclosureWorkbench({ claim }: { claim: BugClaim }) {
       },
     });
     setEncryptedPackage(null);
-    setFeedback("仅 Package Hash、Recipient Key ID 与公开状态已登记；Ciphertext 未进入 Store。");
+    setFeedback(text("仅密文包哈希、接收方密钥编号与公开状态已登记；密文未进入状态仓库。", "Only the Package Hash, Recipient Key ID, and public status were recorded. Ciphertext did not enter Store."));
   }
 
   async function decryptPackage() {
@@ -113,9 +115,9 @@ export function EncryptedDisclosureWorkbench({ claim }: { claim: BugClaim }) {
       setDecryptedReport(plaintext);
       setPackageInput("");
       setDecryptionKeyInput("");
-      setFeedback("Integrity Check 通过。解密内容仅存在于当前组件内存中。");
+      setFeedback(text("完整性校验通过。解密内容仅存在于当前组件内存中。", "Integrity Check passed. Decrypted content exists only in current component memory."));
     } catch {
-      setFeedback("解密失败：Package 被修改、Claim 不匹配，或 Disclosure Decryption Key 错误。");
+      setFeedback(text("解密失败：密文包被修改、漏洞声明不匹配，或披露解密密钥错误。", "Decryption failed: the Package was changed, the Claim does not match, or the Disclosure Decryption Key is invalid."));
     } finally {
       setBusy(false);
     }
@@ -127,10 +129,10 @@ export function EncryptedDisclosureWorkbench({ claim }: { claim: BugClaim }) {
         <LockKeyhole className="mt-0.5 shrink-0 text-cyan-200" size={18} aria-hidden="true" />
         <div>
           <h3 id={`encrypted-disclosure-${claim.id}`} className="font-semibold text-white">
-            Encrypted Disclosure · Device Only
+            {text("加密披露 · 仅限当前设备", "Encrypted Disclosure · Device Only")}
           </h3>
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            明文与 Disclosure Decryption Key 不上传、不持久化；云端 Ciphertext Delivery 尚未配置。
+            {text("明文与披露解密密钥不会上传或持久化；云端密文交付尚未配置。", "Plaintext and the Disclosure Decryption Key are neither uploaded nor persisted. Cloud Ciphertext Delivery is not configured.")}
           </p>
         </div>
       </div>
@@ -140,35 +142,35 @@ export function EncryptedDisclosureWorkbench({ claim }: { claim: BugClaim }) {
           <div className="flex flex-wrap items-center gap-2">
             <button className="focus-ring secondary-action" disabled={busy} onClick={() => void generateOwnerKeys()} type="button">
               <KeyRound size={16} aria-hidden="true" />
-              生成披露密钥
+              {text("生成披露密钥", "Generate disclosure keys")}
             </button>
             {publicKeyJson ? (
               <button className="focus-ring secondary-action" onClick={() => downloadJson(`zkbb-${claim.id}-owner-public-key.json`, publicKeyJson)} type="button">
                 <Download size={16} aria-hidden="true" />
-                导出 Owner Public Key
+                {text("导出项目方公钥", "Export Owner Public Key")}
               </button>
             ) : null}
             {decryptionKeyJson ? (
               <button className="focus-ring secondary-action border-amber-300/25 text-amber-100" onClick={() => downloadJson(`zkbb-${claim.id}-disclosure-decryption-key.json`, decryptionKeyJson)} type="button">
                 <Download size={16} aria-hidden="true" />
-                导出 Disclosure Decryption Key
+                {text("导出披露解密密钥", "Export Disclosure Decryption Key")}
               </button>
             ) : null}
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <ImportField label="导入 Ciphertext Package" onLoad={setPackageInput} />
-            <ImportField label="导入 Disclosure Decryption Key" onLoad={setDecryptionKeyInput} />
+            <ImportField label={text("导入密文包", "Import Ciphertext Package")} onLoad={setPackageInput} />
+            <ImportField label={text("导入披露解密密钥", "Import Disclosure Decryption Key")} onLoad={setDecryptionKeyInput} />
           </div>
           <button className="focus-ring primary-action w-fit" disabled={busy || !packageInput || !decryptionKeyInput} onClick={() => void decryptPackage()} type="button">
             <ShieldCheck size={16} aria-hidden="true" />
-            Integrity Check + 本地解密
+            {text("完整性校验并在本地解密", "Integrity Check + local decryption")}
           </button>
           {decryptedReport ? (
             <div className="grid gap-2 border-l-2 border-emerald-300/40 pl-4">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-semibold uppercase text-emerald-100">Decrypted · Memory Only</p>
-                <button className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-300" onClick={() => setDecryptedReport("")} type="button" title="清除解密内容" aria-label="清除解密内容">
+                <p className="text-xs font-semibold text-emerald-100">{text("已解密 · 仅限内存", "Decrypted · Memory Only")}</p>
+                <button className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-300" onClick={() => setDecryptedReport("")} type="button" title={text("清除解密内容", "Clear decrypted content")} aria-label={text("清除解密内容", "Clear decrypted content")}>
                   <Trash2 size={15} aria-hidden="true" />
                 </button>
               </div>
@@ -178,31 +180,31 @@ export function EncryptedDisclosureWorkbench({ claim }: { claim: BugClaim }) {
         </div>
       ) : (
         <div className="grid gap-3">
-          <ImportField label="导入 Owner Public Key" onLoad={setRecipientPublicKeyInput} />
+          <ImportField label={text("导入项目方公钥", "Import Owner Public Key")} onLoad={setRecipientPublicKeyInput} />
           <label className="grid gap-2 text-sm text-slate-300">
-            私密披露报告（Memory Only）
+            {text("私密披露报告（仅限内存）", "Private disclosure report (Memory Only)")}
             <textarea className="focus-ring input-surface min-h-32 rounded-lg px-3 py-3" value={report} onChange={(event) => setReport(event.target.value)} autoComplete="off" />
           </label>
           <div className="flex flex-wrap gap-2">
             <button className="focus-ring primary-action" disabled={busy || !canShareEncryptedDetails(actor, claim) || !recipientPublicKeyInput || !report.trim()} onClick={() => void encryptReport()} type="button">
               <LockKeyhole size={16} aria-hidden="true" />
-              本地加密
+              {text("本地加密", "Encrypt locally")}
             </button>
             {encryptedPackage ? (
               <button className="focus-ring secondary-action" onClick={() => downloadJson(`zkbb-${claim.id}-ciphertext-package.json`, JSON.stringify(encryptedPackage, null, 2))} type="button">
                 <Download size={16} aria-hidden="true" />
-                导出 Ciphertext Package
+                {text("导出密文包", "Export Ciphertext Package")}
               </button>
             ) : null}
             {encryptedPackage ? (
               <button className="focus-ring secondary-action border-emerald-300/25 text-emerald-100" onClick={attestDelivery} type="button">
                 <ShieldCheck size={16} aria-hidden="true" />
-                确认交付并登记 Hash
+                {text("确认交付并登记哈希", "Confirm delivery and record Hash")}
               </button>
             ) : null}
           </div>
           {!canShareEncryptedDetails(actor, claim) ? (
-            <p className="text-xs text-amber-200/80">仅在 DetailsRequested 且 RewardLocked Demo 状态后开放本地加密交付。</p>
+            <p className="text-xs text-amber-200/80">{text("仅在已请求细节且奖励已锁定的本地演示状态后开放加密交付。", "Local encrypted delivery becomes available only after the DetailsRequested and RewardLocked Demo states.")}</p>
           ) : null}
         </div>
       )}
@@ -212,13 +214,14 @@ export function EncryptedDisclosureWorkbench({ claim }: { claim: BugClaim }) {
 }
 
 function ImportField({ label, onLoad }: { label: string; onLoad: (value: string) => void }) {
+  const { text } = useLocale();
   const [error, setError] = useState("");
   return (
     <label className="grid gap-2 text-sm text-slate-300">
       {label}
       <span className="focus-ring input-surface inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-3 text-sm">
         <Upload size={15} aria-hidden="true" />
-        选择 JSON 文件
+        {text("选择 JSON 文件", "Choose JSON file")}
         <input
           className="sr-only"
           type="file"
@@ -229,7 +232,7 @@ function ImportField({ label, onLoad }: { label: string; onLoad: (value: string)
               .then((value) => {
                 if (value) onLoad(value);
               })
-              .catch(() => setError("JSON 文件无法读取或超过限制。"));
+              .catch(() => setError(text("JSON 文件无法读取或超过限制。", "The JSON file cannot be read or exceeds the limit.")));
           }}
         />
       </span>

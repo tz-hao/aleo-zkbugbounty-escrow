@@ -26,6 +26,9 @@ aleo-devnode-ledger/
 devnode/
 devnode-results/
 local-e2e-results/
+local-upgrade-results/
 *.local-key
 *.local-private
 devnode-*.json
+local-devnode/
+local-audits/

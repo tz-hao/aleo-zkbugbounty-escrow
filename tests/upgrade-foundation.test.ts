@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { CANONICAL_ALEO_PROGRAM_ID } from "../lib/aleo-program.ts";
 import { createInitialDemoState } from "../lib/store.ts";
 import { assertNoPrivateFields } from "../lib/privacy-guards.ts";
-import { createPersistedDemoState, hydratePersistedDemoState } from "../lib/persistence.ts";
+import { createPersistedDemoState, hydratePersistedDemoState, parsePersistedDemoState } from "../lib/persistence.ts";
 import { createAleoProgramEngine, createMockVaultEngine } from "../lib/proof-engines/index.ts";
 import { getClaimWorkflowGuidance } from "../lib/state-machine.ts";
 
@@ -40,6 +40,26 @@ test("persisted demo state contains public workflow data only", () => {
   assert.equal(restored.claims.length, persisted.claims.length);
 });
 
+test("stale persisted demo state missing newer public collections is ignored", () => {
+  const state = createInitialDemoState();
+  const staleState = {
+    version: 1,
+    bounties: state.bounties,
+    claims: state.claims,
+  };
+
+  assert.equal(parsePersistedDemoState(JSON.stringify(staleState)), null);
+});
+test("malformed persisted public records are ignored before any page can render them", () => {
+  const state = createInitialDemoState();
+  const malformed = {
+    ...createPersistedDemoState(state),
+    bounties: [{ id: "missing-required-fields" }],
+  };
+
+  assert.equal(parsePersistedDemoState(JSON.stringify(malformed)), null);
+  assert.deepEqual(hydratePersistedDemoState(state, malformed as never), state);
+});
 test("proof engines expose rule capabilities", () => {
   const mock = createMockVaultEngine();
   const aleo = createAleoProgramEngine();

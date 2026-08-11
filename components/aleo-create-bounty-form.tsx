@@ -31,6 +31,8 @@ import { DEMO_VAULT_RULES, getDemoVaultRule } from "@/lib/demo-vault";
 import type { DemoVaultRuleId } from "@/lib/models";
 import { useAleoWallet } from "./aleo-wallet-provider";
 
+import { useLocale } from "./locale-provider";
+
 type NetworkState =
   | { kind: "loading" }
   | { kind: "available"; latestHeight: number }
@@ -82,6 +84,8 @@ export function AleoCreateBountyForm() {
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const selectedRule = getDemoVaultRule(ruleId);
+  const { copy, text } = useLocale();
+  const selectedRuleCopy = copy.rules[ruleId];
 
   async function refreshNetwork() {
     setNetwork({ kind: "loading" });
@@ -117,7 +121,7 @@ export function AleoCreateBountyForm() {
       setScopeHash(nextScopeHash);
       setPreview(null);
     } catch {
-      setMessage("无法生成公开 Bounty ID 或 Scope Hash，请检查 Scope。");
+      setMessage(text("无法生成公开赏金编号或范围哈希，请检查漏洞范围。", "Unable to generate the public Bounty ID or Scope Hash. Check the Scope."));
     }
   }
 
@@ -148,7 +152,7 @@ export function AleoCreateBountyForm() {
       setPreview(createPreview());
     } catch (error) {
       setPreview(null);
-      setMessage(error instanceof Error ? error.message : "交易参数无效。");
+      setMessage(error instanceof Error ? error.message : text("交易参数无效。", "The transaction parameters are invalid."));
     }
   }
 
@@ -187,11 +191,11 @@ export function AleoCreateBountyForm() {
               Aleo Testnet
             </span>
             <span className="rounded-md border border-cyan-300/20 bg-cyan-300/[0.07] px-2 py-1 text-xs text-cyan-100">
-              Wallet signature required
+              {text("需要钱包签名", "Wallet signature required")}
             </span>
           </div>
           <h2 id="real-create-bounty-title" className="mt-3 text-xl font-semibold text-white">
-            钱包签名创建链上 Bounty
+            {text("通过钱包签名创建链上赏金", "Create an on-chain Bounty with a Wallet signature")}
           </h2>
         </div>
         <NetworkBadge network={network} onRefresh={() => void refreshNetwork()} />
@@ -199,7 +203,7 @@ export function AleoCreateBountyForm() {
 
       <form className="mt-5 grid gap-5" onSubmit={handlePreview}>
         <label className="grid gap-2 text-sm text-slate-300">
-          安全规则（Public）
+          {text("安全规则（公开）", "Security rule (public)")}
           <select
             className="focus-ring input-surface rounded-lg px-3 py-3"
             value={ruleId}
@@ -210,13 +214,16 @@ export function AleoCreateBountyForm() {
             }}
           >
             {DEMO_VAULT_RULES.map((rule) => (
-              <option className="bg-slate-950" key={rule.id} value={rule.id}>{rule.name}</option>
+              <option className="bg-slate-950" key={rule.id} value={rule.id}>{copy.rules[rule.id].name}</option>
             ))}
           </select>
+          <span className="text-xs leading-5 text-slate-500">
+            <span className="font-medium text-slate-300">{selectedRuleCopy.name}</span>{text("：", ": ")}{selectedRuleCopy.description}
+          </span>
         </label>
 
         <label className="grid gap-2 text-sm text-slate-300">
-          Scope（仅用于生成 Public Scope Hash）
+          {text("漏洞范围（仅用于生成公开范围哈希）", "Scope (used only to generate the public Scope Hash)")}
           <textarea
             className="focus-ring input-surface min-h-24 rounded-lg px-3 py-3"
             value={scope}
@@ -225,51 +232,57 @@ export function AleoCreateBountyForm() {
               setScopeHash("");
               setPreview(null);
             }}
+            placeholder={text("例如：金库记账逻辑", "Example: Vault accounting logic")}
             required
           />
+          <span className="text-xs leading-5 text-slate-500">
+            {text("仅用于生成公开范围哈希。不要填写利用细节、概念验证、触发参数或其他敏感信息。", "Used only to generate a public Scope Hash. Do not enter an Exploit, PoC, triggering parameters, or other sensitive data.")}
+          </span>
         </label>
 
         <div className="grid gap-3 border-y border-white/10 py-5 md:grid-cols-[1fr_1fr_auto] md:items-end">
-          <ReadOnlyField label="Bounty ID" value={bountyId || "尚未生成"} />
-          <ReadOnlyField label="Scope Hash" value={scopeHash || "尚未生成"} />
+          <ReadOnlyField label={text("赏金编号", "Bounty ID")} value={bountyId || text("尚未生成", "Not generated")} />
+          <ReadOnlyField label={text("范围哈希", "Scope Hash")} value={scopeHash || text("尚未生成", "Not generated")} />
           <button className="focus-ring secondary-action" type="button" onClick={() => void generatePublicIdentifiers()}>
             <Hash size={16} aria-hidden="true" />
-            生成公开标识
+            {text("生成公开标识", "Generate public identifiers")}
           </button>
           <p className="text-xs leading-5 text-slate-500 md:col-span-3">
-            Bounty ID 使用浏览器安全随机数；Scope 明文不保存、不入链，仅将 SHA-256/128 field commitment 作为公开交易参数。
+            {text("赏金编号使用浏览器安全随机数；漏洞范围明文不保存、不入链，仅将 SHA-256/128 field 承诺作为公开交易参数。", "Bounty ID uses browser-secure randomness. The raw Scope is neither stored nor written on-chain; only a SHA-256/128 field commitment is a public transaction input.")}
           </p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <NumberField label="Critical Reward (microcredits)" value={criticalReward} onChange={setCriticalReward} />
-          <NumberField label="High Reward (microcredits)" value={highReward} onChange={setHighReward} />
-          <NumberField label="Medium Reward (microcredits)" value={mediumReward} onChange={setMediumReward} />
-          <ReadOnlyField label="Low Reward（不可领取）" value="0 microcredits" />
+          <NumberField label={text("严重级奖励（microcredits）", "Critical reward (microcredits)")} value={criticalReward} onChange={setCriticalReward} />
+          <NumberField label={text("高危奖励（microcredits）", "High reward (microcredits)")} value={highReward} onChange={setHighReward} />
+          <NumberField label={text("中危奖励（microcredits）", "Medium reward (microcredits)")} value={mediumReward} onChange={setMediumReward} />
+          <ReadOnlyField label={text("低危奖励（不可领取）", "Low reward (not claimable)")} value="0 microcredits" />
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <NumberField label="有效期（Blocks）" value={deadlineBlocks} onChange={setDeadlineBlocks} min="100" />
-          <ReadOnlyField label="Disclosure Deadline Height" value={deadlineHeight === null ? "等待网络高度" : String(deadlineHeight)} />
-          <NumberField label="预计 Public Fee (microcredits)" value={feeMicrocredits} onChange={setFeeMicrocredits} min="1" />
+          <NumberField label={text("有效期（区块数）", "Validity (blocks)")} value={deadlineBlocks} onChange={setDeadlineBlocks} min="100" />
+          <ReadOnlyField label={text("披露期限区块高度", "Disclosure Deadline Height")} value={deadlineHeight === null ? text("等待网络高度", "Waiting for network height") : String(deadlineHeight)} />
+          <NumberField label={text("交易费（microcredits）", "Transaction fee (microcredits)")} value={feeMicrocredits} onChange={setFeeMicrocredits} min="1" />
         </div>
 
         <div className="grid gap-3 border-t border-white/10 pt-5 text-sm sm:grid-cols-3">
-          <ProtocolFact label="Program" value={CANONICAL_ALEO_PROGRAM_ID} mono />
-          <ProtocolFact label="Invariant" value={selectedRule.invariantText} mono />
-          <ProtocolFact label="资金状态" value="Not Escrowed" />
+          <ProtocolFact label={text("程序", "Program")} value={CANONICAL_ALEO_PROGRAM_ID} mono />
+          <ProtocolFact label={text("安全不变量", "Invariant")} value={selectedRule.invariantText} mono />
+          <ProtocolFact label={text("资金状态", "Funding status")} value={text("等待充值赏金（尚未进入托管）", "Awaiting Fund Bounty (not in Escrow)")} />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <button className="focus-ring secondary-action" type="submit">
             <ShieldCheck size={16} aria-hidden="true" />
-            生成 Transaction Preview
+            {text("生成交易预览", "Generate transaction preview")}
           </button>
           <span className="text-xs leading-5 text-amber-200/80">
-            Reward 数值仅写入 Registry；Iteration 5 不锁定 Credits。
+            {text("创建操作只登记奖励档位；链上 Credits 需在确认后通过 fund_bounty_v2 单独注入托管。", "Creation registers reward tiers only. After confirmation, on-chain Credits must be deposited into Escrow separately through fund_bounty_v2.")}
           </span>
         </div>
       </form>
+
+
 
       {message ? (
         <p className="mt-4 flex items-start gap-2 rounded-lg border border-red-400/20 bg-red-500/[0.08] p-3 text-sm text-red-100" role="alert">
@@ -287,11 +300,11 @@ export function AleoCreateBountyForm() {
             onClick={() => void handleWalletRequest()}
           >
             {submitting ? <LoaderCircle className="animate-spin" size={16} aria-hidden="true" /> : <WalletCards size={16} aria-hidden="true" />}
-            {submitting ? "等待 Wallet" : "请求 Wallet 签名"}
+            {submitting ? text("等待钱包响应", "Waiting for Wallet") : text("请求钱包签名", "Request Wallet signature")}
             {!submitting ? <ArrowRight size={16} aria-hidden="true" /> : null}
           </button>
           {wallet.connectionState !== "Connected" ? (
-            <p className="text-xs text-slate-500">请先在顶部连接 Leo Wallet，并确认 Testnet 网络。</p>
+            <p className="text-xs text-slate-500">{text("请先在顶部连接 Leo Wallet，并确认已切换到 Aleo 测试网。", "Connect Leo Wallet in the header and confirm Aleo Testnet first.")}</p>
           ) : null}
         </TransactionPreview>
       ) : null}
@@ -301,14 +314,15 @@ export function AleoCreateBountyForm() {
 
 function NetworkBadge({ network, onRefresh }: { network: NetworkState; onRefresh: () => void }) {
   const available = network.kind === "available";
+  const { text } = useLocale();
   return (
     <div className="flex items-center gap-2">
       <span className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold ${available ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100" : "border-amber-300/25 bg-amber-300/10 text-amber-100"}`}>
         {network.kind === "loading" ? <LoaderCircle className="animate-spin" size={14} aria-hidden="true" /> : <Radio size={14} aria-hidden="true" />}
-        {available ? `Testnet #${network.latestHeight.toLocaleString()}` : network.kind === "loading" ? "检查 Testnet" : "Testnet Unavailable"}
+        {available ? text(`测试网 #${network.latestHeight.toLocaleString()}`, `Testnet #${network.latestHeight.toLocaleString()}`) : network.kind === "loading" ? text("正在检查测试网", "Checking Testnet") : text("测试网暂不可用", "Testnet unavailable")}
       </span>
       {network.kind === "unavailable" ? (
-        <button className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-300" type="button" onClick={onRefresh} aria-label="重新检查 Testnet" title="重新检查 Testnet">
+        <button className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-300" type="button" onClick={onRefresh} aria-label={text("重新检查测试网", "Recheck Testnet")} title={text("重新检查测试网", "Recheck Testnet")}>
           <RefreshCw size={15} aria-hidden="true" />
         </button>
       ) : null}
@@ -317,21 +331,22 @@ function NetworkBadge({ network, onRefresh }: { network: NetworkState; onRefresh
 }
 
 function TransactionPreview({ preview, children }: { preview: CreateBountyTransactionPreview; children: ReactNode }) {
+  const { text } = useLocale();
   const labels = ["bounty_id", "scope_hash", "rule_id", "critical_reward", "high_reward", "medium_reward", "low_reward", "disclosure_deadline"];
   return (
     <div className="terminal-panel mt-6 rounded-lg p-4 sm:p-5">
       <div className="flex flex-col gap-2 border-b border-cyan-300/15 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="page-kicker text-[0.68rem]">Transaction Preview</p>
-          <h3 className="mt-2 text-lg font-semibold text-white">create_bounty / Aleo Testnet</h3>
+          <p className="page-kicker text-[0.68rem]">{text("交易预览", "Transaction Preview")}</p>
+          <h3 className="mt-2 text-lg font-semibold text-white">create_bounty / {text("Aleo 测试网", "Aleo Testnet")}</h3>
         </div>
-        <span className="text-xs font-semibold text-amber-200">Submitted ≠ Confirmed ≠ Mapping Verified</span>
+        <span className="text-xs font-semibold text-amber-200">{text("已提交 ≠ 已确认 ≠ 映射已核验", "Submitted ≠ Confirmed ≠ Mapping verified")}</span>
       </div>
       <dl className="mt-4 grid gap-x-6 sm:grid-cols-2">
-        <PreviewRow label="Program" value={preview.programId} />
-        <PreviewRow label="Function" value={preview.functionName} />
-        <PreviewRow label="Owner" value={preview.ownerSource} />
-        <PreviewRow label="Public Fee" value={`${preview.feeMicrocredits} microcredits`} />
+        <PreviewRow label={text("程序编号", "Program")} value={preview.programId} />
+        <PreviewRow label={text("函数", "Function")} value={preview.functionName} />
+        <PreviewRow label={text("钱包来源", "Wallet source")} value={preview.ownerSource} />
+        <PreviewRow label={text("交易费用", "Transaction Fee")} value={`${preview.feeMicrocredits} microcredits`} />
         {preview.inputs.map((value, index) => <PreviewRow key={labels[index]} label={labels[index]} value={value} />)}
       </dl>
       <div className="mt-5 flex flex-col items-start gap-3 border-t border-cyan-300/15 pt-4">{children}</div>

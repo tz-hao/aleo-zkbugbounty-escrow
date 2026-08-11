@@ -1,9 +1,10 @@
 "use client";
 
 import { Database, LoaderCircle, RefreshCw, WalletCards } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAleoWallet } from "@/components/aleo-wallet-provider";
+import { useLocale } from "@/components/locale-provider";
 import type {
   OnChainBountyEscrowState,
   OnChainBountyState,
@@ -26,6 +27,8 @@ import {
   type RewardEscrowTransactionPreview,
 } from "@/lib/aleo-reward-escrow";
 import { ALEO_TESTNET_PROGRAM_OWNER } from "@/lib/aleo-program";
+import { getLocalizedTransactionMessage } from "@/lib/i18n/transaction";
+import { getLocalizedWalletMessage } from "@/lib/i18n/wallet";
 
 type ChainBundle = {
   bounty: OnChainBountyState;
@@ -54,6 +57,38 @@ type ActionName =
   | "reject"
   | "refund";
 
+function getChineseCapabilityStatus(status: RewardEscrowCapability["status"]) {
+  if (status === "Available") return "可用";
+  if (status === "ProgramUpgradeRequired") return "需要程序升级";
+  if (status === "ConfigurationError") return "配置错误";
+  return "暂不可用";
+}
+
+function getChineseBountyStatus(status: OnChainBountyState["status"]) {
+  if (status === "Active") return "进行中";
+  if (status === "Paused") return "已暂停";
+  return "已关闭";
+}
+
+function getChineseTriageStatus(status?: OnChainClaimTriageState["status"]) {
+  if (!status) return "尚未开始";
+  const labels: Record<OnChainClaimTriageState["status"], string> = {
+    RewardLocked: "奖励已锁定",
+    DetailsRequested: "已请求加密细节",
+    EncryptedDetailsShared: "已分享加密细节",
+    Patched: "已修复",
+    Paid: "已支付",
+    Rejected: "已拒绝",
+  };
+  return labels[status];
+}
+
+function getChinesePayoutStatus(status?: OnChainClaimPayoutState["status"]) {
+  if (!status) return "尚未充值";
+  if (status === "RewardLocked") return "奖励已锁定";
+  if (status === "Paid") return "已支付";
+  return "已拒绝";
+}
 function randomPublicField() {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   let value = 0n;
@@ -85,6 +120,9 @@ function readNetworkHeight(result: {
 }
 
 export function OnChainTriageWorkspace() {
+  const { text } = useLocale();
+  const routeClaimHash = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("claimHash")?.trim() ?? "";
+  const loadedRouteClaimHash = useRef<string | null>(null);
   const {
     address,
     connectionState,
@@ -221,11 +259,11 @@ export function OnChainTriageWorkspace() {
   async function lookupBounty() {
     const key = bountyId.trim();
     if (!/^[0-9]+field$/.test(key)) {
-      setMessage("请输入有效的 Aleo Bounty ID。");
+      setMessage(text("请输入有效的 Aleo 赏金编号。", "Enter a valid Aleo Bounty ID."));
       return;
     }
     if (capability.status !== "Available") {
-      setMessage("当前部署尚未启用链上 Escrow/Triage。");
+      setMessage(text("当前部署尚未启用链上托管与分诊。", "On-chain Escrow/Triage is not enabled by the current deployment."));
       return;
     }
     setBusy(true);
@@ -245,13 +283,13 @@ export function OnChainTriageWorkspace() {
         readJson<{ network?: { latestHeight?: number } }>("/api/aleo/network"),
       ]);
       if (!bountyResult.response.ok || !("bounty" in (bountyResult.payload ?? {}))) {
-        throw new Error("未找到链上 Bounty Mapping。");
+        throw new Error(text("未找到链上赏金映射。", "On-chain Bounty Mapping was not found."));
       }
       if (
         !escrowResult.response.ok ||
         !("protocolVersion" in (escrowResult.payload ?? {}))
       ) {
-        throw new Error("该 Bounty 不具备 protocol-v2 Escrow 资格。");
+        throw new Error(text("该赏金不具备协议 v2 托管资格。", "This Bounty is not eligible for protocol-v2 Escrow."));
       }
       const bounty = (bountyResult.payload as { bounty: OnChainBountyState }).bounty;
       const escrowState = escrowResult.payload as {
@@ -265,22 +303,22 @@ export function OnChainTriageWorkspace() {
         currentHeight: readNetworkHeight(networkResult),
       });
       setAmount(escrowState.escrow?.availableBalance ?? "");
-      setMessage("Bounty Escrow 公开状态已读取。");
+      setMessage(text("赏金托管公开状态已读取。", "Public Bounty Escrow state was read."));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Bounty Escrow 读取失败。");
+      setMessage(error instanceof Error ? error.message : text("赏金托管状态读取失败。", "Bounty Escrow lookup failed."));
     } finally {
       setBusy(false);
     }
   }
 
-  async function lookup() {
-    const key = claimHash.trim();
+  const lookupClaim = useCallback(async (value: string) => {
+    const key = value.trim();
     if (!/^[0-9]+field$/.test(key)) {
-      setMessage("请输入有效的 Aleo Claim Hash。");
+      setMessage(text("请输入有效的 Aleo 漏洞声明哈希。", "Enter a valid Aleo Claim Hash."));
       return;
     }
     if (capability.status !== "Available") {
-      setMessage("当前部署尚未启用链上 Escrow/Triage。");
+      setMessage(text("当前部署尚未启用链上托管与分诊。", "On-chain Escrow/Triage is not enabled by the current deployment."));
       return;
     }
     setBusy(true);
@@ -292,7 +330,7 @@ export function OnChainTriageWorkspace() {
         `/api/aleo/receipts/${encodeURIComponent(key)}`,
       );
       if (!receiptResult.response.ok || !("receipt" in (receiptResult.payload ?? {}))) {
-        throw new Error("未找到链上 Claim Receipt。");
+        throw new Error(text("未找到链上漏洞声明收据。", "On-chain Claim Receipt was not found."));
       }
       const receipt = (receiptResult.payload as { receipt: OnChainClaimReceipt }).receipt;
       const [bountyResult, triageResult, escrowResult, networkResult] = await Promise.all([
@@ -314,7 +352,7 @@ export function OnChainTriageWorkspace() {
         readJson<{ network?: { latestHeight?: number } }>("/api/aleo/network"),
       ]);
       if (!bountyResult.response.ok || !("bounty" in (bountyResult.payload ?? {}))) {
-        throw new Error("Claim 对应的 Bounty Mapping 不可用。");
+        throw new Error(text("漏洞声明对应的赏金映射不可用。", "The Bounty Mapping for this Claim is unavailable."));
       }
       const bounty = (bountyResult.payload as { bounty: OnChainBountyState }).bounty;
       const triagePayload = triageResult.response.ok
@@ -349,18 +387,30 @@ export function OnChainTriageWorkspace() {
         });
       }
       setAmount(escrow?.availableBalance ?? "");
-      setMessage("链上公开状态已读取。操作仍需 Wallet 签名与 Mapping 验证。");
+      setMessage(text("链上公开状态已读取。操作仍需钱包签名与映射验证。", "Public on-chain state was read. The action still requires a wallet signature and Mapping verification."));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "链上状态读取失败。");
+      setMessage(error instanceof Error ? error.message : text("链上状态读取失败。", "On-chain state lookup failed."));
     } finally {
       setBusy(false);
     }
-  }
+  }, [capability.status, text]);
 
+  useEffect(() => {
+    if (
+      !capabilityChecked ||
+      capability.status !== "Available" ||
+      !/^[0-9]+field$/.test(routeClaimHash) ||
+      loadedRouteClaimHash.current === routeClaimHash
+    ) {
+      return;
+    }
+    loadedRouteClaimHash.current = routeClaimHash;
+    void lookupClaim(routeClaimHash);
+  }, [capability.status, capabilityChecked, lookupClaim, routeClaimHash]);
   function buildActionPreview(action: ActionName): RewardEscrowTransactionPreview {
     const feeMicrocredits = Number(fee);
     if (action === "fund") {
-      if (!bountyBundle) throw new Error("请先读取 Bounty。");
+      if (!bountyBundle) throw new Error(text("请先读取赏金。", "Read the Bounty first."));
       return buildFundBountyTransaction({
         bountyId: bountyBundle.bounty.bountyId,
         amount,
@@ -369,7 +419,7 @@ export function OnChainTriageWorkspace() {
       });
     }
     if (action === "refund") {
-      if (!bountyBundle) throw new Error("请先读取 Bounty。");
+      if (!bountyBundle) throw new Error(text("请先读取赏金。", "Read the Bounty first."));
       return buildRefundBountyTransaction({
         bountyId: bountyBundle.bounty.bountyId,
         amount: bountyBundle.escrow?.availableBalance ?? "",
@@ -377,7 +427,7 @@ export function OnChainTriageWorkspace() {
         feeMicrocredits,
       });
     }
-    if (!bundle) throw new Error("请先读取 Claim。");
+    if (!bundle) throw new Error(text("请先读取漏洞声明。", "Read the Claim first."));
     if (action === "lock") {
       return buildLockRewardTransaction({
         bounty: bundle.bounty,
@@ -436,9 +486,14 @@ export function OnChainTriageWorkspace() {
     setMessage(null);
     try {
       setPendingPreview(buildActionPreview(action));
-      setMessage("Transaction Preview 已生成。核对公开输入后再请求 Wallet 签名。");
+      setMessage(
+        text(
+          "交易预览已生成。核对公开输入后再请求钱包签名。",
+          "Transaction preview is ready. Review public inputs before requesting a wallet signature.",
+        ),
+      );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Transaction could not be completed.");
+      setMessage(error instanceof Error ? error.message : "交易未能完成。");
     }
   }
 
@@ -453,55 +508,58 @@ export function OnChainTriageWorkspace() {
     try {
       await submitProtocolTransaction(pendingPreview);
       setPendingPreview(null);
-      setMessage("Wallet Request 已创建；这不是 Confirmed Transaction，也不会提前更新 Mapping。");
+      setMessage(text("钱包请求已创建；这不是已确认交易，也不会提前更新链上映射。", "The Wallet Request was created. It is not a Confirmed Transaction and does not update Mapping state early."));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Wallet 请求失败。");
+      setMessage(error instanceof Error ? error.message : text("钱包请求失败。", "Wallet request failed."));
     } finally {
       setBusy(false);
     }
   }
 
   const actionLabels: Record<ActionName, string> = {
-    fund: "充值 Escrow",
-    lock: "锁定奖励",
-    request: "请求加密细节",
-    share: "登记 Package Hash",
-    patch: "标记已修复",
-    release: "释放奖励",
-    reject: "Arbiter 拒绝 Claim",
-    refund: "退回可用余额",
+    fund: text("充值托管", "Fund Escrow"),
+    lock: text("受理并锁定奖励（V2）", "Accept + lock reward (V2)"),
+    request: text("请求加密细节", "Request encrypted details"),
+    share: text("登记密文包哈希", "Record Package Hash"),
+    patch: text("项目方声明已修复（V2）", "Owner attests patch (V2)"),
+    release: text("项目方释放奖励（V2）", "Owner releases reward (V2)"),
+    reject: text("固定管理员拒绝声明（V2）", "Fixed admin rejects Claim (V2)"),
+    refund: text("退回可用余额", "Refund available balance"),
   };
 
   return (
     <section className="surface-card rounded-lg p-5 sm:p-6" aria-labelledby="chain-triage-title">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="page-kicker">Aleo Testnet Registry</p>
+          <p className="page-kicker">{text("Aleo 测试网注册表", "Aleo Testnet Registry")}</p>
           <h2 id="chain-triage-title" className="mt-2 text-lg font-semibold text-white">
-            链上 Triage
+            {text("链上分诊", "On-chain Triage")}
           </h2>
         </div>
         <span className="font-mono text-xs text-slate-500">
-          {capabilityChecked ? capability.status : "Checking"}
+          {capabilityChecked ? text(getChineseCapabilityStatus(capability.status), capability.status) : text("核验中", "Checking")}
         </span>
       </div>
 
       {!capabilityChecked ? (
         <div className="mt-5 border-l-2 border-cyan-300/40 pl-4 text-sm leading-6 text-slate-400">
-          正在从公开 Program source 与 current edition 核验链上 Triage 能力；Wallet Action 保持禁用。
+          {text(
+            "正在从公开程序源码与当前版本核验链上分诊能力；钱包操作保持禁用。",
+            "Verifying on-chain triage capability from the public Program source and current edition. Wallet actions stay disabled.",
+          )}
         </div>
       ) : capability.status !== "Available" ? (
         <div className="mt-5 border-l-2 border-amber-300/40 pl-4 text-sm leading-6 text-slate-400">
           {capability.status === "ProgramUpgradeRequired"
-            ? "当前 Program 尚未启用 Escrow 与 Triage Mapping。链上 Bounty、Receipt 和 Nullifier 读取不受影响。"
-            : "暂时无法核验链上能力；不会启用 Wallet Action，也不会使用本地状态替代。"}
+            ? text("当前程序尚未启用托管与分诊映射。链上赏金、收据和防重复标识读取不受影响。", "The current Program has not enabled Escrow and Triage mappings. On-chain Bounty, Receipt, and Nullifier reads are unaffected.")
+            : text("暂时无法核验链上能力；不会启用钱包操作，也不会使用本地状态替代。", "On-chain capability cannot be verified right now. Wallet actions remain disabled and there is no local-state substitute.")}
         </div>
       ) : (
         <>
           <div className="mt-5 grid gap-3 border-b border-white/10 pb-5">
             <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
               <label className="grid gap-2 text-sm text-slate-300">
-                Bounty ID
+                {text("赏金编号", "Bounty ID")}
                 <input
                   className="focus-ring min-h-11 rounded-md border border-white/10 bg-black/30 px-3 font-mono text-sm text-white"
                   value={bountyId}
@@ -516,37 +574,37 @@ export function OnChainTriageWorkspace() {
                 onClick={lookupBounty}
               >
                 {busy ? <LoaderCircle className="animate-spin" size={16} /> : <Database size={16} />}
-                读取 Escrow
+                {text("读取托管状态", "Read Escrow")}
               </button>
             </div>
             {bountyBundle ? (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <ChainField label="Protocol" value={`v${bountyBundle.protocolVersion}`} />
-                <ChainField label="Bounty" value={bountyBundle.bounty.status} />
+                <ChainField label={text("协议版本", "Protocol")} value={`v${bountyBundle.protocolVersion}`} />
+                <ChainField label={text("赏金状态", "Bounty")} value={text(getChineseBountyStatus(bountyBundle.bounty.status), bountyBundle.bounty.status)} />
                 <ChainField
-                  label="Available"
+                  label={text("可用余额", "Available")}
                   value={bountyBundle.escrow?.availableBalance ?? "0"}
                 />
                 <ChainField
-                  label="Unresolved Claims"
+                  label={text("未结案声明", "Unresolved Claims")}
                   value={bountyBundle.unresolvedClaimCount ?? "0"}
                 />
                 <ChainField
-                  label="Testnet Height"
-                  value={bountyBundle.currentHeight?.toLocaleString() ?? "Unavailable"}
+                  label={text("测试网高度", "Testnet Height")}
+                  value={bountyBundle.currentHeight?.toLocaleString() ?? text("暂不可用", "Unavailable")}
                 />
               </div>
             ) : null}
             {bountyBundle && availableBountyActions.length > 0 ? (
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
                 <CompactInput
-                  label="Amount (microcredits)"
+                  label={text("金额（microcredits）", "Amount (microcredits)")}
                   value={amount}
                   onChange={setAmount}
                   placeholder="1000000"
                 />
                 <CompactInput
-                  label="Fee (microcredits)"
+                  label={text("交易费（microcredits）", "Fee (microcredits)")}
                   value={fee}
                   onChange={setFee}
                   placeholder="1000000"
@@ -573,17 +631,17 @@ export function OnChainTriageWorkspace() {
                 onClick={() => void connect()}
               >
                 <WalletCards size={16} />
-                连接 Leo Wallet
+                {text("连接 Leo Wallet", "Connect Leo Wallet")}
               </button>
             ) : null}
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
             <label className="grid gap-2 text-sm text-slate-300">
-              Claim Hash
+              漏洞声明哈希
               <input
                 className="focus-ring min-h-11 rounded-md border border-white/10 bg-black/30 px-3 font-mono text-sm text-white"
-                value={claimHash}
+                value={routeClaimHash || claimHash}
                 onChange={(event) => setClaimHash(event.target.value)}
                 placeholder="123...field"
               />
@@ -592,37 +650,43 @@ export function OnChainTriageWorkspace() {
               className="secondary-action self-end"
               type="button"
               disabled={busy}
-              onClick={lookup}
+              onClick={() => void lookupClaim(routeClaimHash || claimHash)}
             >
               {busy ? <LoaderCircle className="animate-spin" size={16} /> : <Database size={16} />}
-              读取 Mapping
+              {text("读取链上映射", "Read Mapping")}
             </button>
           </div>
 
           {bundle ? (
             <div className="mt-5 grid gap-5">
               <div className="grid gap-3 border-y border-white/10 py-4 sm:grid-cols-2 lg:grid-cols-4">
-                <ChainField label="Bounty" value={bundle.bounty.bountyId} />
+                <ChainField label={text("赏金", "Bounty")} value={bundle.bounty.bountyId} />
                 <ChainField
-                  label="Protocol"
+                  label={text("协议版本", "Protocol")}
                   value={`v${bundle.receipt.protocolVersion}`}
                 />
-                <ChainField label="Triage" value={bundle.triage?.status ?? "NotStarted"} />
-                <ChainField label="Payout" value={bundle.payout?.status ?? "Unfunded"} />
+                <ChainField label={text("分诊状态", "Triage")} value={text(getChineseTriageStatus(bundle.triage?.status), bundle.triage?.status ?? "NotStarted")} />
+                <ChainField label={text("支付状态", "Payout")} value={text(getChinesePayoutStatus(bundle.payout?.status), bundle.payout?.status ?? "Unfunded")} />
                 <ChainField
-                  label="Escrow Available"
-                  value={bundle.escrow ? `${bundle.escrow.availableBalance} microcredits` : "NotFunded"}
+                  label={text("托管可用余额", "Escrow Available")}
+                  value={bundle.escrow ? `${bundle.escrow.availableBalance} microcredits` : text("尚未充值", "NotFunded")}
                 />
               </div>
 
+              {bundle.receipt.protocolVersion === 2 ? (
+                <p className="border-l-2 border-amber-300/40 pl-4 text-sm leading-6 text-slate-400">
+                  {text("当前 Testnet 的 V2 只把公开收据作为锁款门槛；“修复”和“放款”仍是项目方单方链上声明，不等于加密报告已收到、漏洞已复现或独立仲裁已完成。", "Current Testnet V2 uses the public Receipt only as a reward-lock threshold. Its patch and payout events are unilateral Owner attestations, not proof of received disclosure, reproduced vulnerability, or independent arbitration.")}
+                </p>
+              ) : null}
+
               {bundle.receipt.protocolVersion !== 2 ? (
                 <p className="border-l-2 border-amber-300/40 pl-4 text-sm leading-6 text-slate-400">
-                  该 Receipt 属于 protocol v1，仅支持公开验证，不具备 Escrow 支付资格。
+                  {text("该收据属于协议 v1，仅支持公开验证，不具备托管支付资格。", "This Receipt belongs to protocol v1. It supports public verification only and is not eligible for Escrow payout.")}
                 </p>
               ) : null}
               {bundle.receipt.protocolVersion === 2 && !bundle.reporterAddress ? (
                 <p className="border-l-2 border-rose-300/40 pl-4 text-sm leading-6 text-slate-400">
-                  未找到 claim_reporters Mapping，无法安全锁定奖励；不会允许手填收款地址。
+                  {text("未找到 claim_reporters 映射，无法安全锁定奖励；不会允许手填收款地址。", "claim_reporters Mapping was not found, so the reward cannot be locked safely. Manual recipient entry is not allowed.")}
                 </p>
               ) : null}
               {bundle.receipt.protocolVersion === 2 &&
@@ -632,27 +696,27 @@ export function OnChainTriageWorkspace() {
               !bundle.triage &&
               !availableActions.includes("lock") ? (
                 <p className="border-l-2 border-amber-300/40 pl-4 text-sm leading-6 text-slate-400">
-                  Escrow 可用余额不足以覆盖该 Severity 奖励，请先在上方为 Bounty 充值。
+                  {text("托管可用余额不足以覆盖该严重程度奖励，请先在上方为赏金充值。", "Available Escrow balance cannot cover this Severity reward. Fund the Bounty above first.")}
                 </p>
               ) : null}
 
               <div className="grid gap-3 sm:grid-cols-3">
                 {availableActions.includes("lock") ? (
                   <ChainField
-                    label="Whitehat（claim_reporters）"
-                    value={bundle.reporterAddress ?? "Mapping unavailable"}
+                    label={text("白帽研究员（claim_reporters）", "Whitehat (claim_reporters)")}
+                    value={bundle.reporterAddress ?? text("映射不可用", "Mapping unavailable")}
                   />
                 ) : null}
                 {availableActions.includes("share") ? (
                   <CompactInput
-                    label="Package Hash"
+                    label={text("密文包哈希", "Package Hash")}
                     value={packageHash}
                     onChange={setPackageHash}
                     placeholder="123...field"
                   />
                 ) : null}
                 <CompactInput
-                  label="Fee (microcredits)"
+                  label={text("交易费（microcredits）", "Fee (microcredits)")}
                   value={fee}
                   onChange={setFee}
                   placeholder="1000000"
@@ -663,7 +727,7 @@ export function OnChainTriageWorkspace() {
                 {connectionState !== "Connected" ? (
                   <button className="primary-action" type="button" onClick={() => void connect()}>
                     <WalletCards size={16} />
-                    连接 Leo Wallet
+                    {text("连接 Leo Wallet", "Connect Leo Wallet")}
                   </button>
                 ) : null}
                 {availableActions.map((action) => (
@@ -677,9 +741,9 @@ export function OnChainTriageWorkspace() {
                     {actionLabels[action]}
                   </button>
                 ))}
-                <button className="icon-action" type="button" onClick={lookup} title="刷新 Mapping">
+                <button className="icon-action" type="button" onClick={() => void lookupClaim(routeClaimHash || claimHash)} title={text("刷新链上映射", "Refresh Mapping")}>
                   <RefreshCw size={16} />
-                  <span className="sr-only">刷新 Mapping</span>
+                  <span className="sr-only">{text("刷新链上映射", "Refresh Mapping")}</span>
                 </button>
               </div>
 
@@ -689,21 +753,21 @@ export function OnChainTriageWorkspace() {
           {pendingPreview ? (
             <div className="mt-5 rounded-md border border-cyan-300/20 bg-cyan-300/[0.04] p-4">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <ChainField label="Program" value={pendingPreview.programId} />
-                <ChainField label="Function" value={pendingPreview.functionName} />
-                <ChainField label="Network" value={pendingPreview.network} />
+                <ChainField label={text("程序", "Program")} value={pendingPreview.programId} />
+                <ChainField label={text("函数", "Function")} value={pendingPreview.functionName} />
+                <ChainField label={text("网络", "Network")} value={text("Aleo 测试网", pendingPreview.network)} />
                 <ChainField
-                  label="Fee"
+                  label={text("交易费", "Fee")}
                   value={`${pendingPreview.feeMicrocredits} microcredits`}
                 />
               </div>
               <ChainField
-                label="Operation Marker"
-                value={pendingPreview.publicSummary.operationMarker ?? "Unavailable"}
+                label={text("操作标识", "Operation Marker")}
+                value={pendingPreview.publicSummary.operationMarker ?? text("暂不可用", "Unavailable")}
               />
               <details className="mt-3 border-t border-white/10 pt-3">
                 <summary className="focus-ring cursor-pointer text-xs font-semibold text-slate-400">
-                  查看公开输入
+                  {text("查看公开输入", "View public inputs")}
                 </summary>
                 <ol className="mt-3 grid gap-2 font-mono text-xs text-slate-400">
                   {pendingPreview.inputs.map((input, index) => (
@@ -714,7 +778,7 @@ export function OnChainTriageWorkspace() {
                 </ol>
               </details>
               <p className="mt-4 text-xs leading-5 text-amber-100/80">
-                Do not resubmit the same operation while the transaction is pending.
+                {text("交易待处理期间请勿重复提交同一操作。", "Do not resubmit the same operation while the transaction is pending.")}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
@@ -724,7 +788,7 @@ export function OnChainTriageWorkspace() {
                   onClick={() => void requestPreparedAction()}
                 >
                   <WalletCards size={16} />
-                  请求 Wallet 签名
+                  {text("请求钱包签名", "Request Wallet signature")}
                 </button>
                 <button
                   className="secondary-action"
@@ -732,7 +796,7 @@ export function OnChainTriageWorkspace() {
                   disabled={busy}
                   onClick={() => setPendingPreview(null)}
                 >
-                  取消
+                  {text("取消", "Cancel")}
                 </button>
               </div>
             </div>
@@ -745,10 +809,10 @@ export function OnChainTriageWorkspace() {
         <div className="mt-4 border-t border-white/10 pt-4 text-xs leading-5 text-slate-500">
           <span className="text-slate-300">{protocolSubmission.functionName}</span>
           {" · "}
-          Wallet Request: <span className="font-mono">{protocolSubmission.walletRequestId}</span>
+          {text("钱包请求", "Wallet Request")}: <span className="font-mono">{protocolSubmission.walletRequestId}</span>
           {" · "}
-          {protocolSubmission.statusText}
-          <span className="block text-amber-100/80">{transactionStatus.message}</span>
+          {getLocalizedWalletMessage(protocolSubmission.statusText, text)}
+          <span className="block text-amber-100/80">{getLocalizedTransactionMessage(transactionStatus.state, text)}</span>
         </div>
       ) : null}
     </section>

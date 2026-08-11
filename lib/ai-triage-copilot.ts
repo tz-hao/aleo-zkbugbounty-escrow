@@ -1,5 +1,6 @@
 import { assertNoPrivateFields, redactSensitiveText } from "./privacy-guards.ts";
 import type { Bounty, BugClaim, TriageAction } from "./models.ts";
+import { getChineseProtocolValue } from "./i18n/zh.ts";
 
 export type TriageCopilotPublicMetadata = {
   bugType: string;
@@ -34,7 +35,7 @@ export type TriageCopilotModelTransport = (
 >;
 
 export const TRIAGE_COPILOT_SCOPE_STATEMENT =
-  "本建议仅基于 Public Metadata。Exploit 细节始终隐藏。This recommendation is based only on public metadata. Exploit details remain hidden.";
+  "本建议仅基于公开元数据。利用细节始终隐藏。This recommendation is based only on public metadata. Exploit details remain hidden.";
 
 export const AI_TRIAGE_CAPABILITY = {
   status: "ExternalProviderUnavailable",
@@ -166,30 +167,32 @@ export function buildTriageCopilotMetadata({
 export function generateTriageCopilotRecommendation(
   metadata: TriageCopilotPublicMetadata,
 ): TriageCopilotRecommendation {
-  const riskSummary = `${metadata.severity} ${metadata.bugType}，受影响模块为 ${metadata.affectedModule}。Proof Status：${metadata.proofStatus}；公开 Triage 备注：${metadata.publicTriageNotes.length} 条。`;
+  const severityLabels = { Critical: "严重", High: "高危", Medium: "中危", Low: "低危" } as const;
+  const proofStatusLabels = { Pending: "等待验证", Verified: "已验证", Invalid: "验证失败" } as const;
+  const riskSummary = `${severityLabels[metadata.severity]}风险：${getChineseProtocolValue(metadata.bugType)}；受影响模块为 ${getChineseProtocolValue(metadata.affectedModule)}。证明状态：${proofStatusLabels[metadata.proofStatus]}；公开分诊备注：${metadata.publicTriageNotes.length} 条。`;
 
-  let recommendedNextStep = "查看公开 Claim Receipt，并等待 Proof 完成验证。";
+  let recommendedNextStep = "查看公开漏洞声明收据，并等待证明完成验证。";
   if (metadata.proofStatus === "Verified" && metadata.payoutStatus === "Unfunded") {
-    recommendedNextStep = "为 Verified Claim 锁定奖励（Lock Reward）。";
+    recommendedNextStep = "为已验证的漏洞声明锁定奖励。";
   } else if (
     metadata.proofStatus === "Verified" &&
     metadata.payoutStatus === "RewardLocked" &&
     metadata.disclosureStatus === "NotRequested"
   ) {
-    recommendedNextStep = "向 Whitehat 请求 Encrypted Details。";
+    recommendedNextStep = "向白帽研究员请求加密细节。";
   } else if (metadata.disclosureStatus === "EncryptedDetailsShared") {
-    recommendedNextStep = "Project Owner 验证加密报告后，标记已修复（Mark Patched）。";
+    recommendedNextStep = "项目方验证加密报告后，将漏洞声明标记为已修复。";
   } else if (metadata.disclosureStatus === "Patched" && metadata.payoutStatus === "RewardLocked") {
-    recommendedNextStep = "为已修复的 Verified Claim 释放 Bounty。";
+    recommendedNextStep = "为已修复且经过验证的漏洞声明释放赏金。";
   } else if (metadata.payoutStatus === "Paid") {
-    recommendedNextStep = "保留 Claim 的公开 Paid Demo 状态；接入 Escrow 后再以链上交易确认支付。";
+    recommendedNextStep = "保留漏洞声明的公开演示支付状态；接入链上托管后再以确认交易核验支付。";
   }
 
   return {
     riskSummary,
     recommendedNextStep,
     responsibleDisclosureReminder:
-      "请始终在加密的 Responsible Disclosure 流程中协作，公开侧只发布状态更新。",
+      "请始终通过加密的负责任披露流程协作，公开侧只发布状态更新。",
     scopeStatement: TRIAGE_COPILOT_SCOPE_STATEMENT,
   };
 }

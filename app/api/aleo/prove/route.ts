@@ -4,7 +4,7 @@ import { getDeviceProofCapability } from "../../../../lib/device-proof-boundary.
 export const runtime = "nodejs";
 
 const DEVICE_ONLY_ERROR =
-  "Server-side private proving is disabled. Use Leo Wallet device-side submit_claim.";
+  "Server-side private proving is disabled. Use Leo Wallet device-side submit_claim_v2.";
 
 export function handleAleoProofRequest() {
   return {

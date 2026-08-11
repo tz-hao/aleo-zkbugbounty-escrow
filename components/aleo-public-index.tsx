@@ -2,13 +2,47 @@
 
 import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, ExternalLink, RefreshCw, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 
 import { getOnChainBountyOperationalStatus } from "@/lib/aleo-bounty-registry";
-import type { AleoPublicIndexPage } from "@/lib/aleo-public-index";
+import type { AleoPublicIndexPage, MappingVerificationStatus } from "@/lib/aleo-public-index";
+import { useLocale } from "./locale-provider";
 
 type IndexKind = "bounties" | "claims";
+type Localize = (chinese: string, english: string) => string;
+
+const ruleLabels: Record<string, { chinese: string; english: string }> = {
+  "vault-accounting-safety": { chinese: "金库记账安全", english: "Vault Accounting Safety" },
+  "claims-vs-deposits": { chinese: "索赔与存款安全", english: "Claims vs Deposits Safety" },
+  "reward-reserve-safety": { chinese: "奖励准备金安全", english: "Reward Reserve Safety" },
+  "withdraw-limit-safety": { chinese: "提款限额安全", english: "Withdrawal Limit Safety" },
+};
+
+const bountyStatusLabels: Record<string, { chinese: string; english: string }> = {
+  Active: { chinese: "进行中", english: "Active" },
+  Paused: { chinese: "已暂停", english: "Paused" },
+  Closed: { chinese: "已关闭", english: "Closed" },
+  Expired: { chinese: "已过期", english: "Expired" },
+};
+
+const severityLabels: Record<string, { chinese: string; english: string }> = {
+  Critical: { chinese: "严重", english: "Critical" },
+  High: { chinese: "高危", english: "High" },
+  Medium: { chinese: "中危", english: "Medium" },
+  Low: { chinese: "低危", english: "Low" },
+};
+
+function labelFor(
+  labels: Record<string, { chinese: string; english: string }>,
+  value: string,
+  text: Localize,
+) {
+  const label = labels[value];
+  return label ? text(label.chinese, label.english) : value;
+}
 
 export function AleoPublicIndex() {
+  const { text } = useLocale();
   const [kind, setKind] = useState<IndexKind>("bounties");
   const [page, setPage] = useState(0);
   const [registry, setRegistry] = useState<AleoPublicIndexPage | null>(null);
@@ -52,7 +86,7 @@ export function AleoPublicIndex() {
       .catch((caught: unknown) => {
         if (active && !(caught instanceof DOMException && caught.name === "AbortError")) {
           setRegistry(null);
-          setError("Aleo Testnet 索引暂时不可用。没有使用 Mock 或 localStorage fallback。");
+          setError(text("Aleo 测试网索引暂时不可用。未使用模拟数据或本地存储回退。", "Aleo Testnet index is temporarily unavailable. No Mock or localStorage fallback is used."));
         }
       })
       .finally(() => {
@@ -62,7 +96,7 @@ export function AleoPublicIndex() {
       active = false;
       controller.abort();
     };
-  }, [kind, page, requestVersion]);
+  }, [kind, page, requestVersion, text]);
 
   function changeKind(nextKind: IndexKind) {
     setKind(nextKind);
@@ -80,18 +114,21 @@ export function AleoPublicIndex() {
   }
 
   const items = registry?.kind === kind ? registry.items : [];
+  const emptyMessage = kind === "bounties"
+    ? text("当前页没有发现创建赏金交易。", "This page has no discovered create-bounty transactions.")
+    : text("当前页没有发现提交声明交易。", "This page has no discovered claim-submission transactions.");
 
   return (
     <section className="surface-card rounded-lg p-5 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="page-kicker">链上 Registry</p>
-          <h2 className="mt-2 text-xl font-semibold text-white">公开链上索引</h2>
+          <p className="page-kicker">{text("链上注册表", "On-chain Registry")}</p>
+          <h2 className="mt-2 text-xl font-semibold text-white">{text("公开链上索引", "Public on-chain index")}</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-            RPC 只负责发现公开 Transaction；每条结果必须再次通过 Aleo Mapping 验证。Confirmed 不等于 Mapping Verified。
+            {text("公开交易索引用于发现链上调用；每条结果都必须再次通过 Aleo 映射验证。交易已确认不等于映射已验证。", "The public transaction index discovers on-chain calls. Every result must be verified again through an Aleo Mapping. Confirmed does not equal Mapping Verified.")}
           </p>
         </div>
-        <div className="inline-flex w-fit rounded-md border border-white/10 bg-black/20 p-1" aria-label="Registry view">
+        <div className="inline-flex w-fit rounded-md border border-white/10 bg-black/20 p-1" aria-label={text("注册表视图", "Registry view")}>
           {(["bounties", "claims"] as const).map((item) => (
             <button
               className={`focus-ring min-h-11 rounded px-3 py-2 text-xs font-semibold ${
@@ -101,7 +138,7 @@ export function AleoPublicIndex() {
               type="button"
               onClick={() => changeKind(item)}
             >
-              {item === "bounties" ? "Bounties" : "Claims"}
+              {item === "bounties" ? text("赏金", "Bounties") : text("漏洞声明", "Claims")}
             </button>
           ))}
         </div>
@@ -109,38 +146,42 @@ export function AleoPublicIndex() {
 
       <div className="mt-5 border-y border-white/10">
         {loading ? (
-          <p className="py-8 text-sm text-slate-400">正在读取 Aleo Testnet RPC 与 Mapping...</p>
+          <p className="py-8 text-sm text-slate-400">{text("正在读取 Aleo 测试网公开索引与映射数据…", "Reading the Aleo Testnet public index and mappings...")}</p>
         ) : error ? (
           <div className="flex flex-wrap items-center justify-between gap-3 py-5">
             <p className="text-sm text-amber-100">{error}</p>
             <button className="focus-ring secondary-action" type="button" onClick={retry}>
               <RefreshCw size={15} aria-hidden="true" />
-              重试
+              {text("重试", "Retry")}
             </button>
           </div>
         ) : items.length === 0 ? (
-          <p className="py-8 text-sm text-slate-400">
-            当前分页没有已发现的 {kind === "bounties" ? "create_bounty" : "submit_claim"} Transaction。
-          </p>
+          <p className="py-8 text-sm text-slate-400">{emptyMessage}</p>
         ) : registry?.kind === "bounties" ? (
           registry.items.map((item) => (
             <article className="grid gap-4 border-b border-white/10 py-5 last:border-b-0 lg:grid-cols-[1fr_auto]" key={item.transactionId}>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <IndexStatus status={item.mappingStatus} />
-                  <span className="text-xs text-slate-500">Transaction Accepted</span>
+                  <span className="text-xs text-slate-500">{text("交易已确认", "Transaction accepted")}</span>
                 </div>
                 <p className="mt-3 break-all font-mono text-xs text-cyan-100">{item.bountyId}</p>
                 {item.bounty ? (
                   <p className="mt-2 text-sm text-slate-400">
-                    {item.bounty.ruleId} ·{" "}
-                    {currentHeight === null
-                      ? item.bounty.status
-                      : getOnChainBountyOperationalStatus(item.bounty, currentHeight)}{" "}
-                    · Owner {shorten(item.bounty.owner)}
+                    {labelFor(ruleLabels, item.bounty.ruleId, text)} · {labelFor(
+                      bountyStatusLabels,
+                      currentHeight === null
+                        ? item.bounty.status
+                        : getOnChainBountyOperationalStatus(item.bounty, currentHeight),
+                      text,
+                    )} · {text("所有者", "Owner")} {shorten(item.bounty.owner)}
                   </p>
                 ) : (
-                  <p className="mt-2 text-sm text-red-200">Mapping 未验证，不能作为有效 Bounty 展示。</p>
+                  <p className="mt-2 text-sm text-amber-100">
+                    {item.mappingStatus === "Unavailable"
+                      ? text("暂时无法读取映射；该条目不会作为有效赏金展示。", "The mapping cannot be read temporarily, so this item is not shown as a valid bounty.")
+                      : text("映射未验证，不能作为有效赏金展示。", "Mapping is unverified and cannot be shown as a valid bounty.")}
+                  </p>
                 )}
               </div>
               <ExplorerLink transactionId={item.transactionId} />
@@ -152,21 +193,34 @@ export function AleoPublicIndex() {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <IndexStatus status={item.mappingStatus} />
-                  <span className="text-xs text-slate-500">Transaction Accepted</span>
+                  <span className="text-xs text-slate-500">{text("交易已确认", "Transaction accepted")}</span>
                 </div>
                 <p className="mt-3 break-all font-mono text-xs text-cyan-100">{item.claimHash}</p>
                 {item.receipt ? (
                   <p className="mt-2 text-sm text-slate-400">
-                    {item.receipt.ruleId} · {item.receipt.severity} · Block {item.receipt.createdHeight}
+                    {labelFor(ruleLabels, item.receipt.ruleId, text)} · {labelFor(severityLabels, item.receipt.severity, text)} · {text("区块", "Block")} {item.receipt.createdHeight}
                   </p>
                 ) : (
-                  <p className="mt-2 text-sm text-red-200">Receipt 或 Nullifier Mapping 未验证。</p>
+                  <p className="mt-2 text-sm text-amber-100">
+                    {item.mappingStatus === "Unavailable"
+                      ? text("暂时无法读取收据或防重复标识映射；该条目不会作为有效漏洞声明展示。", "The receipt or nullifier mapping cannot be read temporarily, so this item is not shown as a valid claim.")
+                      : text("收据或防重复标识映射未验证。", "Receipt or nullifier mapping is unverified.")}
+                  </p>
                 )}
               </div>
-              <ExplorerLink transactionId={item.transactionId} />
+              <div className="flex flex-wrap content-start gap-2">
+                <Link className="focus-ring secondary-action w-fit" href={`/public-claims/${encodeURIComponent(item.claimHash)}`}>
+                  {text("公开收据", "Public receipt")}
+                </Link>
+                {item.mappingStatus === "Verified" && item.receipt?.protocolVersion === 2 ? (
+                  <Link className="focus-ring secondary-action w-fit" href={`/triage?claimHash=${encodeURIComponent(item.claimHash)}`}>
+                    {text("链上分诊", "On-chain triage")}
+                  </Link>
+                ) : null}
+                <ExplorerLink transactionId={item.transactionId} />
+              </div>
             </article>
-          ))
-        ) : null}
+          ))        ) : null}
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3">
@@ -180,9 +234,9 @@ export function AleoPublicIndex() {
           }}
         >
           <ArrowLeft size={15} aria-hidden="true" />
-          上一页
+          {text("上一页", "Previous")}
         </button>
-        <span className="text-xs text-slate-500">Page {page + 1}</span>
+        <span className="text-xs text-slate-500">{text(`第 ${page + 1} 页`, `Page ${page + 1}`)}</span>
         <button
           className="focus-ring secondary-action"
           disabled={!registry?.hasMore || loading}
@@ -192,7 +246,7 @@ export function AleoPublicIndex() {
             setPage((value) => value + 1);
           }}
         >
-          下一页
+          {text("下一页", "Next")}
           <ArrowRight size={15} aria-hidden="true" />
         </button>
       </div>
@@ -200,21 +254,31 @@ export function AleoPublicIndex() {
   );
 }
 
-function IndexStatus({ status }: { status: "Verified" | "Missing" | "Mismatch" }) {
-  const verified = status === "Verified";
+function IndexStatus({ status }: { status: MappingVerificationStatus }) {
+  const { text } = useLocale();
+  const labels: Record<MappingVerificationStatus, { chinese: string; english: string }> = {
+    Verified: { chinese: "映射已验证", english: "Mapping verified" },
+    Missing: { chinese: "未找到映射", english: "Mapping missing" },
+    Mismatch: { chinese: "映射不匹配", english: "Mapping mismatch" },
+    Unavailable: { chinese: "映射暂不可用", english: "Mapping unavailable" },
+  };
+  const tone = status === "Verified"
+    ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
+    : status === "Unavailable"
+      ? "border-amber-300/25 bg-amber-300/10 text-amber-100"
+      : "border-red-300/25 bg-red-300/10 text-red-100";
+  const label = labels[status];
+
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
-      verified
-        ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-100"
-        : "border-red-300/25 bg-red-300/10 text-red-100"
-    }`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${tone}`}>
       <ShieldCheck size={13} aria-hidden="true" />
-      Mapping {status}
+      {text(label.chinese, label.english)}
     </span>
   );
 }
 
 function ExplorerLink({ transactionId }: { transactionId: string }) {
+  const { text } = useLocale();
   return (
     <a
       className="focus-ring secondary-action w-fit"
@@ -222,7 +286,7 @@ function ExplorerLink({ transactionId }: { transactionId: string }) {
       rel="noreferrer"
       target="_blank"
     >
-      Explorer
+      {text("区块浏览器", "Explorer")}
       <ExternalLink size={15} aria-hidden="true" />
     </a>
   );

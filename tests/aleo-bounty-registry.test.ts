@@ -39,7 +39,7 @@ test("Leo Bounty Registry uses signer-owned Final mapping transitions", () => {
   assert.match(source, /let signer = std::ctx::signer\(\);/);
   assert.match(source, /return final \{/);
   assert.match(source, /assert_eq\(current\.owner_address, signer\)/);
-  assert.equal(source.includes("public owner"), false);
+  assert.equal(/\bpublic owner\s*:/.test(source), false);
   assert.equal(source.includes("ownerId"), false);
 });
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ExternalLink, Radio, ShieldCheck } from "lucide-react";
 
 import { ALEO_TESTNET_DEPLOYMENT, ALEO_TESTNET_EDITION_ONE_UPGRADE } from "@/lib/aleo-program";
+import { useLocale } from "./locale-provider";
 
 type LiveDeployment = {
   status: "Confirmed" | "Partial" | "Unavailable" | "NotDeployed" | "ConfigurationError";
@@ -38,7 +39,7 @@ type LiveState =
 
 const statusLabels: Record<LiveDeployment["verificationStatus"], string> = {
   verified: "链上已确认",
-  program_found_transaction_unavailable: "Program 已找到，交易接口暂不可用",
+  program_found_transaction_unavailable: "已找到程序，交易接口暂不可用",
   transaction_found_program_unavailable: "交易已找到，Program 接口暂不可用",
   endpoint_unavailable: "公开节点暂不可用",
   not_deployed: "未部署",
@@ -46,6 +47,7 @@ const statusLabels: Record<LiveDeployment["verificationStatus"], string> = {
 };
 
 export function AleoDeploymentStatus() {
+  const { text } = useLocale();
   const [liveState, setLiveState] = useState<LiveState>({ kind: "loading" });
 
   useEffect(() => {
@@ -143,15 +145,15 @@ export function AleoDeploymentStatus() {
             <ShieldCheck size={19} aria-hidden="true" />
           </div>
           <div>
-            <p className="page-kicker">部署核验</p>
+            <p className="page-kicker">{text("部署核验", "Deployment verification")}</p>
             <h2 className="mt-1 text-lg font-semibold text-white">
               {confirmed
                 ? escrowV2Live
-                  ? "Escrow v2 已上线并完成链上核验"
-                  : "Program 与部署交易已链上核验"
+                  ? text("托管协议 v2 已上线并完成链上核验", "Escrow v2 is live and verified on-chain")
+                  : text("程序与部署交易已完成链上核验", "Program and deployment transaction are verified on-chain")
                 : partial
-                  ? "Program 已找到，部分接口不可用"
-                  : "等待公开节点返回部署证据"}
+                  ? text("已找到程序，部分接口不可用", "Program found; some endpoints are unavailable")
+                  : text("等待公开节点返回部署证据", "Waiting for public-node deployment evidence")}
             </h2>
           </div>
         </div>
@@ -170,21 +172,21 @@ export function AleoDeploymentStatus() {
       </div>
 
       <div className="mt-4 grid gap-4 border-t border-white/10 pt-4 sm:grid-cols-[0.7fr_1.3fr]">
-        <DeploymentField label="Network" value={networkLabel} />
-        <DeploymentField label="Program ID" value={ALEO_TESTNET_DEPLOYMENT.programId} mono />
+        <DeploymentField label={text("网络", "Network")} value={networkLabel} />
+        <DeploymentField label={text("程序编号", "Program ID")} value={ALEO_TESTNET_DEPLOYMENT.programId} mono />
       </div>
       <details className="group mt-4 border-t border-white/10 pt-3">
         <summary className="focus-ring min-h-11 cursor-pointer list-none py-2 text-xs font-semibold text-slate-400 hover:text-white [&::-webkit-details-marker]:hidden">
-          查看部署证据与 Explorer 链接
+          {text("查看部署证据与区块浏览器链接", "View deployment evidence and Explorer links")}
         </summary>
         <div className="grid gap-4 pt-2">
           <DeploymentField
-            label="Verification"
+            label={text("核验状态", "Verification")}
             value={`${liveSourceLabel} / keys ${keyCountLabel}`}
             mono
           />
-          <DeploymentField label="Escrow status" value={escrowLabel} />
-          <DeploymentField label="Edition 1 upgrade" value={upgradeLabel} />
+          <DeploymentField label={text("托管状态", "Escrow status")} value={escrowLabel} />
+          <DeploymentField label={text("版本 1 升级", "Edition 1 upgrade")} value={upgradeLabel} />
           <div className="flex flex-wrap gap-2">
           <a
             className="focus-ring secondary-action"
@@ -192,7 +194,7 @@ export function AleoDeploymentStatus() {
             target="_blank"
             rel="noreferrer"
           >
-            查看 Program
+            {text("查看程序", "View Program")}
             <ExternalLink size={15} aria-hidden="true" />
           </a>
           <a
@@ -201,7 +203,7 @@ export function AleoDeploymentStatus() {
             target="_blank"
             rel="noreferrer"
           >
-            部署交易
+            {text("部署交易", "Deployment transaction")}
             <ExternalLink size={15} aria-hidden="true" />
           </a>          <a
             className="focus-ring secondary-action"

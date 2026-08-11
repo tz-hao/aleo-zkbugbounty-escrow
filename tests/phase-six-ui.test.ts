@@ -33,12 +33,12 @@ test("dashboard keeps the privacy promise and one primary protocol entry", () =>
   const combinedSource = `${source}\n${heroSource}`;
 
   for (const phrase of [
-    "Private Witness · Public Proof",
+    "私有见证 · 公开证明",
     "证明漏洞存在",
-    "Exploit 保持私密",
-    "zh.home.proofAction",
+    "利用细节保持私密",
+    "copy.home.proofAction",
     "href=\"/submit-proof\"",
-    "Private Witness 留在设备端",
+    "私有见证数据留在设备端",
   ]) {
     assert.equal(combinedSource.includes(phrase), true, `${phrase} should be present on dashboard`);
   }

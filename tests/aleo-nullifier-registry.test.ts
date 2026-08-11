@@ -115,10 +115,10 @@ test("submit proof UI labels local duplicate checks as UX and queries only publi
   const panel = readFileSync("components/aleo-nullifier-status.tsx", "utf8");
   const packageJson = readFileSync("package.json", "utf8");
 
-  assert.match(panel, /本地检查仅用于 Demo UX/);
+  assert.match(panel, /本地检查仅用于界面提示/);
   assert.match(panel, /\/api\/aleo\/nullifiers\//);
   assert.equal(panel.includes("localStorage"), true);
-  assert.match(panel, /不会回退到 localStorage 或 Demo State/);
+  assert.match(panel, /不会回退到浏览器本地存储或演示状态/);
   assert.equal(panel.includes("localStorage.setItem"), false);
   assert.equal(panel.includes("sessionStorage"), false);
   assert.equal(panel.includes("reporterSecret"), false);

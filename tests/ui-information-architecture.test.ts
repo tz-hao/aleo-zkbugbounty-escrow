@@ -19,7 +19,7 @@ test("Real Mode identity is derived from wallet and mapping, not Demo Preview", 
     submitPage.indexOf("function publishClaim"),
   );
   assert.equal(walletRequest.includes("demoAllowed"), false);
-  assert.match(submitPage, /当前钱包将作为 Whitehat \/ Reporter/);
+  assert.match(submitPage, /当前钱包将作为白帽研究员与报告人/);
 });
 
 test("Demo role selection is isolated in an explicitly local preview control", () => {

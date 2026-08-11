@@ -11,9 +11,9 @@ test("dashboard is a single immersive protocol entry", () => {
   for (const phrase of [
     "home-immersive",
     "HeroProofVisual",
-    "Private Witness · Public Proof",
+    "私有见证 · 公开证明",
     "证明漏洞存在",
-    "Exploit 保持私密",
+    "利用细节保持私密",
     "进入协议",
     "/images/zkbugbounty-protocol-portal.webp",
   ]) {

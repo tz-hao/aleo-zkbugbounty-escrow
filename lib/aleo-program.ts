@@ -9,6 +9,7 @@ export const ALEO_TESTNET_UPGRADE_TRANSACTION_ID =
 export const ALEO_TESTNET_UPGRADE_FEE_TRANSACTION_ID =
   "at15c8j82u3mpxj0c6fq3kq9873rmzly0h8gegumypjtafz4wlg8s8q6k0c5r";
 export const ALEO_TESTNET_EXPECTED_EDITION = 1;
+export const ALEO_TESTNET_V3_EXPECTED_EDITION = 2;
 export const ALEO_TESTNET_PROGRAM_OWNER =
   "aleo19cavyq6przvp7d5yjtpm60z5nh58rqd0vc3zr8q409fdqdtn7ypq8vfqx6";
 
@@ -36,3 +37,15 @@ export const ALEO_TESTNET_EDITION_ONE_UPGRADE = {
   feeTransactionApiUrl: `${ALEO_TESTNET_API_ENDPOINT}/${ALEO_TESTNET_NETWORK}/transaction/${ALEO_TESTNET_UPGRADE_FEE_TRANSACTION_ID}`,
   transactionExplorerUrl: `${ALEO_TESTNET_EXPLORER_ENDPOINT}/transaction/${ALEO_TESTNET_UPGRADE_TRANSACTION_ID}`,
 } as const;
+// Populated only after the administrator broadcasts and confirms the V3 upgrade.
+// Keeping these IDs null makes every V3 wallet path fail closed on Edition 1 and
+// after an unrecorded upgrade. Both values are public chain evidence, never secrets.
+export const ALEO_TESTNET_V3_UPGRADE_EVIDENCE: {
+  transactionId: string | null;
+  feeTransactionId: string | null;
+  expectedEdition: typeof ALEO_TESTNET_V3_EXPECTED_EDITION;
+} = {
+  transactionId: null,
+  feeTransactionId: null,
+  expectedEdition: ALEO_TESTNET_V3_EXPECTED_EDITION,
+};

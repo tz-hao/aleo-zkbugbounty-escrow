@@ -22,10 +22,10 @@ canonical candidate tag, Testnet program, and mappings are not modified.
 
 ## Isolated inputs
 
-- Baseline worktree: `../aleo-devnode-baseline` at `pre-escrow-upgrade`
-- Candidate worktree: `../aleo-devnode-candidate` at
+- Baseline worktree: `local-devnode/baseline-pre-escrow` at `pre-escrow-upgrade`
+- Candidate worktree: `local-devnode/candidate-escrow-v2` at
   `escrow-v2-upgrade-candidate`
-- Fresh ledger: `../aleo-devnode-ledger`, supplied to Leo 4.0.2 with `--home`
+- Fresh ledger: `local-devnode/ledger`, supplied to Leo 4.0.2 with `--home`
 
 Leo 4.0.2 does not expose `--storage` or `--clear-storage`; the harness removes
 only this exact dedicated ledger directory after validating its resolved path.

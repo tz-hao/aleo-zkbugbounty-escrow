@@ -9,7 +9,7 @@ test("Real Mode uses the wallet device boundary with no server or Mock fallback"
     mode: "leo-wallet-device",
     network: "testnet",
     programId: "zkbugbounty_7f3c92.aleo",
-    functionName: "submit_claim",
+    functionName: "submit_claim_v2",
     serverProofEnabled: false,
     privateInputsAcceptedByApi: false,
     mockFallbackAllowed: false,
@@ -25,7 +25,7 @@ test("submit page never serializes private proof input into a network request", 
   assert.equal(page.includes("localStorage"), false);
   assert.equal(page.includes("sessionStorage"), false);
   assert.equal(page.includes("console.log"), false);
-  assert.match(page, /wallet\.submitWalletClaim\(/);
+  assert.match(page, /wallet\.submitWalletClaimV2\(/);
 });
 
 test("server prove route never parses request bodies or imports a proof engine", () => {

@@ -34,7 +34,8 @@ zkBugBounty separates **proof of impact** from **exploit disclosure**:
 - The project owner can follow a responsible-disclosure state machine without exposing exploit details to the public registry.
 - Edition 1 adds real Credits-backed bounty escrow, reward locking, encrypted-detail attestation, patch marking, payout, refund guards, and replay protection.
 
-The public result proves that a claim is valid. It does not publish how to reproduce the vulnerability.
+The public receipt proves only that the submitted private input satisfied the configured circuit and protocol bindings. It is a qualification for project review and reward reservation, not final confirmation of a real vulnerability.
+Protocol V3 then separates owner review, reward lock, encrypted delivery, reproduction, remediation, dispute, panel verdict, and settlement.
 
 ## Blockchain Relevance
 
@@ -202,6 +203,9 @@ These rules are intentionally fictional protocol invariants for a safe product d
 
 - [Edition 1 production runbook](docs/edition-1-production-runbook.md)
 - [Edition 1 manual smoke-test plan](docs/testnet-edition-1-smoke-test-plan.md)
+- [Protocol V3 responsible-disclosure and arbitration design](docs/protocol-v3-design.zh.md)
+- [Protocol V3 Local Devnode E2E](docs/protocol-v3-devnode-e2e.zh.md)
+- [Protocol V3 / Testnet Edition 2 upgrade runbook](docs/testnet-edition-2-upgrade-runbook.zh.md)
 
 The runbook covers stale frontend deployment, wallet connection failures, wrong network, rejected transactions, indexing delay, mapping verification, and frontend-only rollback. An Aleo Program edition cannot be rolled back from the frontend.
 
@@ -215,9 +219,11 @@ The runbook covers stale frontend deployment, wallet connection failures, wrong 
 - Duplicate Nullifier rejection on Testnet
 - Credits escrow, release, refund, and replay guards validated on Local Devnode
 - Production deployment, public Edition 1 verifier, and manual Smoke tooling
+- Protocol V3 local contract, typed wallet workbenches, immutable per-Bounty panel, and fail-closed Edition 2 capability gate
 
 ### Next
 
+- Administrator-run Testnet Program Edition 2 upgrade and public evidence verification
 - Human-run Testnet Credits escrow acceptance flow with fresh test data
 - Broader invariant libraries beyond DemoVault
 - Formal protocol review and external security audit

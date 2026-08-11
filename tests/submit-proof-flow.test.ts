@@ -47,7 +47,7 @@ test("submit proof page isolates Mock Demo Mode from Wallet device-side Real Mod
     "/api/aleo/bounties/",
     "/api/aleo/network",
     "clearPrivateInputState",
-    "Private Witness 不离开 Wallet 边界",
+    "私有见证数据不会离开钱包边界",
     "Transaction preview ready",
     "vault-accounting-safety",
     "claims-vs-deposits",

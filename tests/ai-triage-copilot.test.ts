@@ -70,10 +70,10 @@ test("AI triage copilot recommendation declares public-only scope", () => {
   );
   const serialized = JSON.stringify(recommendation);
 
-  assert.match(recommendation.riskSummary, /Critical/i);
+  assert.match(recommendation.riskSummary, /严重/);
   assert.match(recommendation.riskSummary, /受影响模块/);
-  assert.match(recommendation.recommendedNextStep, /Lock Reward|Encrypted Details|Mark Patched|释放 Bounty/);
-  assert.match(recommendation.scopeStatement, /本建议仅基于 Public Metadata/);
+  assert.match(recommendation.recommendedNextStep, /锁定奖励|请求加密细节|标记为已修复|释放赏金/);
+  assert.match(recommendation.scopeStatement, /本建议仅基于公开元数据/);
   assert.match(recommendation.scopeStatement, /This recommendation is based only on public metadata/);
 
   for (const forbidden of ["hiddenDelta", "reporterSecret", "privateCallSequence", "privateStateValues", "PoC", "exploit path"]) {
@@ -86,7 +86,7 @@ test("triage page renders the AI triage copilot public-only panel", () => {
   const copilotSource = readFileSync("lib/ai-triage-copilot.ts", "utf8");
   const uiCopySource = readFileSync("lib/i18n/zh.ts", "utf8");
 
-  assert.equal(`${source}\n${uiCopySource}`.includes("Triage Copilot（本地策略）"), true);
+  assert.equal(`${source}\n${uiCopySource}`.includes("分诊助手（本地策略）"), true);
   assert.equal(
     copilotSource.includes("This recommendation is based only on public metadata. Exploit details remain hidden."),
     true,

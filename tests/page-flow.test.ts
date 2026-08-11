@@ -150,11 +150,11 @@ test("Project Owner creates bounty with built-in rule selector", () => {
   const combinedSource = `${source}\n${uiCopySource}`;
 
   for (const phrase of [
-    "安全规则（Invariant）",
-    "Vault Accounting Safety",
-    "Claims 与 Deposits 安全",
-    "Reward Reserve 安全",
-    "Withdrawal Limit 安全",
+    "安全规则",
+    "金库记账安全",
+    "索赔与存款安全",
+    "奖励准备金安全",
+    "提款限额安全",
     "受影响模块",
   ]) {
     assert.equal(combinedSource.includes(phrase), true, `${phrase} should appear in create bounty UI`);
@@ -174,7 +174,7 @@ test("Whitehat sees dynamic witness form based on selected bounty rule", () => {
     "withdraw-limit-safety",
     "hiddenDeltaWithdrawAmount",
     "hiddenDeltaUserBalance",
-    "Private Witness 仅在当前设备内存中临时存在，不持久化。",
+    "私有见证数据仅在当前设备内存中临时存在，不会持久化。",
   ]) {
     assert.equal(combinedSource.includes(phrase), true, `${phrase} should appear in submit proof dynamic form`);
   }
@@ -186,7 +186,7 @@ test("Public User sees only public rule metadata", () => {
   const receiptPanel = readFileSync("components/aleo-claim-receipt-panel.tsx", "utf8");
   const combinedSource = `${source}\n${bountyPanel}\n${receiptPanel}`;
 
-  for (const phrase of ["AleoPublicIndex", "AleoBountyRegistryPanel", "AleoClaimReceiptPanel", "查询链上 Bounty 状态", "独立核验链上 Claim Receipt"]) {
+  for (const phrase of ["AleoPublicIndex", "AleoBountyRegistryPanel", "AleoClaimReceiptPanel", "查询链上赏金状态", "独立核验链上漏洞声明收据"]) {
     assert.equal(combinedSource.includes(phrase), true, `${phrase} should be public metadata`);
   }
   for (const forbidden of ["hiddenDeltaBalance", "hiddenDeltaClaims", "reporterSecret", "privateCallSequence"]) {
