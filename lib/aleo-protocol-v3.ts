@@ -43,6 +43,8 @@ export const PROTOCOL_V3_MAPPINGS = [
   "v3_operation_markers",
   "claim_v3_acknowledgements",
   "claim_v3_dispute_bonds",
+  "claim_v3_project_decisions",
+  "claim_v3_dispute_metadata",
 ] as const;
 
 export type ProtocolV3FunctionName = (typeof PROTOCOL_V3_FUNCTIONS)[number];
@@ -114,17 +116,17 @@ const SOURCE_FUNCTION_INPUTS: Record<ProtocolV3FunctionName, readonly string[]> 
     "field", "field", "field", "ClaimV3BindingInput", "VaultWitnessInput",
   ],
   fund_bounty_v3: ["field", "u64", "field"],
-  review_claim_v3: ["field", "field", "u8", "field", "field"],
+  review_claim_v3: ["field", "field", "u8", "u8", "field", "field"],
   lock_reward_v3: ["field", "field", "u64", "field"],
   disclosure_action_v3: ["field", "field", "u8", "field", "field"],
   resolution_action_v3: ["field", "field", "u8", "field", "field"],
-  dispute_claim_v3: ["field", "field", "u8", "field", "u64", "field"],
+  dispute_claim_v3: ["field", "field", "u8", "u8", "field", "u64", "field"],
   cast_arbitration_vote_v3: ["field", "field", "u8", "field"],
   settle_reward_v3: ["field", "field", "address", "u64", "u64", "u8", "field"],
   finalize_arbitration_prelock_v3: [
     "field", "field", "address", "u64", "u64", "u8", "field",
   ],
-  finalize_rejection_v3: ["field", "field", "address", "u64", "field"],
+  finalize_rejection_v3: ["field", "field", "address", "u64", "u8", "field"],
   refund_bounty_v3: ["field", "u64", "field"],
 };
 
@@ -138,6 +140,8 @@ const SOURCE_MAPPING_VALUES: Record<ProtocolV3MappingName, string> = {
   v3_operation_markers: "boolean",
   claim_v3_acknowledgements: "field",
   claim_v3_dispute_bonds: "ClaimV3DisputeBond",
+  claim_v3_project_decisions: "ClaimV3ProjectDecision",
+  claim_v3_dispute_metadata: "ClaimV3DisputeMetadata",
 };
 
 function sourceFunctionMatches(source: string, name: ProtocolV3FunctionName) {
@@ -590,17 +594,33 @@ export function buildFundBountyV3Transaction(input: {
 export function buildReviewClaimV3Transaction(input: {
   bountyId: string;
   claimHash: string;
-  action: 1 | 2 | 3;
+  action: 1 | 2 | 3 | 4 | 5 | 6;
+  projectSeverity: 0 | 1 | 2 | 3;
   decisionCommitment: string;
   actionMarker: string;
   feeMicrocredits: number;
 }) {
-  return buildActionPreview(
+  if (!Number.isSafeInteger(input.action) || input.action < 1 || input.action > 6) {
+    throw new Error("review_claim_v3 action is outside the supported range");
+  }
+  const bountyId = requireField(input.bountyId, "Bounty ID");
+  const claimHash = requireField(input.claimHash, "Claim hash");
+  const severity = requireUnsigned(
+    input.projectSeverity,
+    "u8",
+    "Project severity",
+    true,
+  );
+  if (input.action !== 2 && input.action !== 6 && severity !== "0u8") {
+    throw new Error("Only accept and severity decisions may include a severity");
+  }
+  const commitment = requireField(input.decisionCommitment, "Decision commitment");
+  const marker = requireField(input.actionMarker, "Action marker");
+  return buildPreview(
     "review_claim_v3",
-    input,
-    1,
-    3,
-    "Decision commitment",
+    [bountyId, claimHash, `${input.action}u8`, severity, commitment, marker],
+    input.feeMicrocredits,
+    { bountyId, claimHash, action: input.action, operationMarker: marker },
   );
 }
 
@@ -692,28 +712,65 @@ export function buildResolutionActionV3Transaction(input: ActionPreviewInput) {
   );
 }
 
+export const PROTOCOL_V3_DISPUTE_TYPES = {
+  Rejection: 1,
+  Duplicate: 2,
+  Scope: 3,
+  Severity: 4,
+  Reproduction: 5,
+  Remediation: 6,
+} as const;
+
+export type ProtocolV3DisputeType =
+  (typeof PROTOCOL_V3_DISPUTE_TYPES)[keyof typeof PROTOCOL_V3_DISPUTE_TYPES];
+
 export function buildDisputeClaimV3Transaction(input: {
   bountyId: string;
   claimHash: string;
-  action: 1 | 2;
+  disputeType: ProtocolV3DisputeType;
+  requestedSeverity: 0 | 1 | 2 | 3;
   disputeCommitment: string;
   feeAmount: string;
   disputeMarker: string;
   feeMicrocredits: number;
 }) {
+  if (!Number.isSafeInteger(input.disputeType) || input.disputeType < 1 || input.disputeType > 6) {
+    throw new Error("Dispute type is outside the supported range");
+  }
   const bountyId = requireField(input.bountyId, "Bounty ID");
   const claimHash = requireField(input.claimHash, "Claim hash");
+  const requestedSeverity = requireUnsigned(
+    input.requestedSeverity,
+    "u8",
+    "Requested severity",
+    true,
+  );
+  if (input.disputeType === PROTOCOL_V3_DISPUTE_TYPES.Severity) {
+    if (requestedSeverity === "0u8") {
+      throw new Error("Severity disputes require a payable requested severity");
+    }
+  } else if (requestedSeverity !== "0u8") {
+    throw new Error("Only severity disputes may include a requested severity");
+  }
   const commitment = requireField(input.disputeCommitment, "Dispute commitment");
   const feeAmount = requireUnsigned(input.feeAmount, "u64", "Arbitration fee");
   const marker = requireField(input.disputeMarker, "Dispute marker");
   return buildPreview(
     "dispute_claim_v3",
-    [bountyId, claimHash, `${input.action}u8`, commitment, feeAmount, marker],
+    [
+      bountyId,
+      claimHash,
+      `${input.disputeType}u8`,
+      requestedSeverity,
+      commitment,
+      feeAmount,
+      marker,
+    ],
     input.feeMicrocredits,
     {
       bountyId,
       claimHash,
-      action: input.action,
+      action: input.disputeType,
       bondAmount: feeAmount.slice(0, -3),
       operationMarker: marker,
     },
@@ -799,25 +856,27 @@ export function buildFinalizeArbitrationPrelockV3Transaction(
 export function buildFinalizeRejectionV3Transaction(input: {
   bountyId: string;
   claimHash: string;
-  ownerAddress: string;
+  bondRecipient: string;
   bondAmount: string;
+  verdict: 0 | 1 | 2 | 3;
   rejectionMarker: string;
   feeMicrocredits: number;
 }) {
   const bountyId = requireField(input.bountyId, "Bounty ID");
   const claimHash = requireField(input.claimHash, "Claim hash");
-  const owner = requireAddress(input.ownerAddress, "Owner address");
+  const recipient = requireAddress(input.bondRecipient, "Bond recipient");
   const bond = requireUnsigned(input.bondAmount, "u64", "Bond amount");
   const marker = requireField(input.rejectionMarker, "Rejection marker");
   return buildPreview(
     "finalize_rejection_v3",
-    [bountyId, claimHash, owner, bond, marker],
+    [bountyId, claimHash, recipient, bond, `${input.verdict}u8`, marker],
     input.feeMicrocredits,
     {
       bountyId,
       claimHash,
-      recipient: owner,
+      recipient,
       bondAmount: bond.slice(0, -3),
+      action: input.verdict,
       operationMarker: marker,
     },
   );

@@ -110,6 +110,32 @@ export type OnChainClaimV3DisputeBond =
     settledHeight: number | null;
   };
 
+export type OnChainClaimV3ProjectDecision =
+  PublicV3Source<"claim_v3_project_decisions"> & {
+    claimHash: string;
+    bountyId: string;
+    decision: "Accepted" | "Rejection" | "Duplicate" | "OutOfScope" | "Severity" | "CannotReproduce" | "RemediationProposed";
+    decisionCode: number;
+    projectSeverityCode: number;
+    decisionCommitment: string;
+    decidedHeight: number;
+  };
+
+export type OnChainClaimV3DisputeMetadata =
+  PublicV3Source<"claim_v3_dispute_metadata"> & {
+    claimHash: string;
+    bountyId: string;
+    disputeType: "Rejection" | "Duplicate" | "Scope" | "Severity" | "Reproduction" | "Remediation";
+    disputeTypeCode: number;
+    disputeCommitment: string;
+    opener: string;
+    openedHeight: number;
+    status: "Open" | "Accepted" | "Rejected";
+    statusCode: number;
+    requestedSeverityCode: number;
+    finalSeverityCode: number;
+  };
+
 function source<M extends ProtocolV3MappingName>(
   mapping: M,
   config: AleoBountyRegistryConfig,
@@ -604,6 +630,124 @@ export function parseOnChainClaimV3DisputeBond(
   return parsed;
 }
 
+const projectDecisionFields = [
+  "claim_hash",
+  "bounty_id",
+  "decision",
+  "project_severity",
+  "decision_commitment",
+  "decided_height",
+] as const;
+
+export function parseOnChainClaimV3ProjectDecision(
+  raw: string,
+  claimHash: string,
+  config: AleoBountyRegistryConfig,
+): OnChainClaimV3ProjectDecision {
+  field(claimHash, "Claim V3 project decision key");
+  const values = parseStructFields(raw, projectDecisionFields, "Claim V3 project decision");
+  if (values.get("claim_hash") !== claimHash) {
+    throw new Error("Claim V3 project decision key does not match its Claim hash");
+  }
+  const decisionCode = Number(unsigned(values.get("decision")!, "u8", "Project decision"));
+  const decision = ([
+    undefined,
+    "Accepted",
+    "Rejection",
+    "Duplicate",
+    "OutOfScope",
+    "Severity",
+    "CannotReproduce",
+    "RemediationProposed",
+  ] as const)[decisionCode];
+  if (!decision) throw new Error("Claim V3 project decision is unsupported");
+  const projectSeverityCode = Number(
+    unsigned(values.get("project_severity")!, "u8", "Project severity"),
+  );
+  if (projectSeverityCode > 3) throw new Error("Claim V3 project severity is unsupported");
+  const parsed: OnChainClaimV3ProjectDecision = {
+    claimHash,
+    bountyId: field(values.get("bounty_id")!, "Claim V3 project decision Bounty ID"),
+    decision,
+    decisionCode,
+    projectSeverityCode,
+    decisionCommitment: field(
+      values.get("decision_commitment")!,
+      "Claim V3 decision commitment",
+    ),
+    decidedHeight: height(values.get("decided_height")!, "Claim V3 decision height"),
+    ...source("claim_v3_project_decisions", config),
+  };
+  assertNoPrivateFields(parsed);
+  return parsed;
+}
+
+const disputeMetadataFields = [
+  "claim_hash",
+  "bounty_id",
+  "dispute_type",
+  "dispute_commitment",
+  "opener",
+  "opened_height",
+  "status",
+  "requested_severity",
+  "final_severity",
+] as const;
+
+export function parseOnChainClaimV3DisputeMetadata(
+  raw: string,
+  claimHash: string,
+  config: AleoBountyRegistryConfig,
+): OnChainClaimV3DisputeMetadata {
+  field(claimHash, "Claim V3 dispute metadata key");
+  const values = parseStructFields(raw, disputeMetadataFields, "Claim V3 dispute metadata");
+  if (values.get("claim_hash") !== claimHash) {
+    throw new Error("Claim V3 dispute metadata key does not match its Claim hash");
+  }
+  const disputeTypeCode = Number(unsigned(values.get("dispute_type")!, "u8", "Dispute type"));
+  const disputeType = ([
+    undefined,
+    "Rejection",
+    "Duplicate",
+    "Scope",
+    "Severity",
+    "Reproduction",
+    "Remediation",
+  ] as const)[disputeTypeCode];
+  if (!disputeType) throw new Error("Claim V3 dispute type is unsupported");
+  const statusCode = Number(unsigned(values.get("status")!, "u8", "Dispute status"));
+  const status = ([undefined, "Open", "Accepted", "Rejected"] as const)[statusCode];
+  if (!status) throw new Error("Claim V3 dispute status is unsupported");
+  const requestedSeverityCode = Number(
+    unsigned(values.get("requested_severity")!, "u8", "Requested severity"),
+  );
+  const finalSeverityCode = Number(
+    unsigned(values.get("final_severity")!, "u8", "Final severity"),
+  );
+  if (requestedSeverityCode > 3 || finalSeverityCode > 3) {
+    throw new Error("Claim V3 dispute severity is unsupported");
+  }
+  const parsed: OnChainClaimV3DisputeMetadata = {
+    claimHash,
+    bountyId: field(values.get("bounty_id")!, "Claim V3 dispute Bounty ID"),
+    disputeType,
+    disputeTypeCode,
+    disputeCommitment: field(
+      values.get("dispute_commitment")!,
+      "Claim V3 dispute commitment",
+    ),
+    opener: address(values.get("opener")!, "Claim V3 dispute opener"),
+    openedHeight: height(values.get("opened_height")!, "Claim V3 dispute height"),
+    status,
+    statusCode,
+    requestedSeverityCode,
+    finalSeverityCode,
+    ...source("claim_v3_dispute_metadata", config),
+  };
+  assertNoPrivateFields(parsed);
+  return parsed;
+}
+
 export async function fetchOnChainBountyV3Config(
   bountyId: string,
   config: AleoBountyRegistryConfig,
@@ -695,6 +839,34 @@ export async function fetchOnChainClaimV3DisputeBond(
 ) {
   const raw = await fetchMapping("claim_v3_dispute_bonds", claimHash, config, fetcher);
   return raw ? parseOnChainClaimV3DisputeBond(raw, claimHash, config) : null;
+}
+
+export async function fetchOnChainClaimV3ProjectDecision(
+  claimHash: string,
+  config: AleoBountyRegistryConfig,
+  fetcher: RegistryFetch = fetch,
+) {
+  const raw = await fetchMapping(
+    "claim_v3_project_decisions",
+    claimHash,
+    config,
+    fetcher,
+  );
+  return raw ? parseOnChainClaimV3ProjectDecision(raw, claimHash, config) : null;
+}
+
+export async function fetchOnChainClaimV3DisputeMetadata(
+  claimHash: string,
+  config: AleoBountyRegistryConfig,
+  fetcher: RegistryFetch = fetch,
+) {
+  const raw = await fetchMapping(
+    "claim_v3_dispute_metadata",
+    claimHash,
+    config,
+    fetcher,
+  );
+  return raw ? parseOnChainClaimV3DisputeMetadata(raw, claimHash, config) : null;
 }
 
 export async function fetchOnChainV3OperationMarker(

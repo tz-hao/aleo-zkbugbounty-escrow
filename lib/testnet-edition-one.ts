@@ -28,6 +28,8 @@ export const EDITION_ONE_MAPPING_NAMES = [
   "v3_operation_markers",
   "claim_v3_acknowledgements",
   "claim_v3_dispute_bonds",
+  "claim_v3_project_decisions",
+  "claim_v3_dispute_metadata",
 ] as const;
 
 export type EditionOneMappingName = (typeof EDITION_ONE_MAPPING_NAMES)[number];

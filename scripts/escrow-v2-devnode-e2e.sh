@@ -1960,10 +1960,10 @@ main() {
     assert_mapping_matches "v3-award-evidence" claim_v3_evidence "${v3_claim_award}"       "target_system_commitment:${v3_target_system}"       "target_code_hash:${v3_target_code}"
     assert_mapping_matches "v3-award-submitted" claim_v3_states "${v3_claim_award}"       "whitehat_address:${WHITEHAT_ADDRESS}" "status:1u8"
 
-    execute_accepted "v3-begin-review" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" review_claim_v3 "${v3_bounty}"       "${v3_claim_award}" 1u8 "$(( $(date +%s%N) + 512 ))field"       "$(( $(date +%s%N) + 513 ))field"
+    execute_accepted "v3-begin-review" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" review_claim_v3 "${v3_bounty}"       "${v3_claim_award}" 1u8 0u8 "$(( $(date +%s%N) + 512 ))field"       "$(( $(date +%s%N) + 513 ))field"
     assert_mapping_matches "v3-owner-reviewing" claim_v3_states "${v3_claim_award}"       "status:2u8"
 
-    execute_accepted "v3-accept-claim" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" review_claim_v3 "${v3_bounty}"       "${v3_claim_award}" 2u8 "$(( $(date +%s%N) + 514 ))field"       "$(( $(date +%s%N) + 515 ))field"
+    execute_accepted "v3-accept-claim" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" review_claim_v3 "${v3_bounty}"       "${v3_claim_award}" 2u8 3u8 "$(( $(date +%s%N) + 514 ))field"       "$(( $(date +%s%N) + 515 ))field"
     execute_accepted "v3-lock-award" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" lock_reward_v3 "${v3_bounty}"       "${v3_claim_award}" 3000000u64 "$(( $(date +%s%N) + 516 ))field"
     assert_mapping_matches "v3-award-locked" claim_v3_states "${v3_claim_award}"       "status:4u8"
     assert_mapping_matches "v3-award-payout-locked" claim_v3_payouts       "${v3_claim_award}" "reserved_amount:3000000u64" "status:1u8"
@@ -1974,7 +1974,7 @@ main() {
     assert_mapping_present "v3-acknowledgement" claim_v3_acknowledgements       "${v3_claim_award}"
 
     execute_accepted "v3-reproduction-rejected" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" resolution_action_v3 "${v3_bounty}"       "${v3_claim_award}" 2u8 "$(( $(date +%s%N) + 521 ))field"       "$(( $(date +%s%N) + 522 ))field"
-    execute_accepted "v3-open-dispute" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${WHITEHAT_PRIVATE_KEY}" "Whitehat" "${WHITEHAT_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" dispute_claim_v3 "${v3_bounty}"       "${v3_claim_award}" 1u8 "$(( $(date +%s%N) + 523 ))field"       1000000u64 "$(( $(date +%s%N) + 524 ))field"
+    execute_accepted "v3-open-dispute" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${WHITEHAT_PRIVATE_KEY}" "Whitehat" "${WHITEHAT_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" dispute_claim_v3 "${v3_bounty}"       "${v3_claim_award}" 5u8 0u8 "$(( $(date +%s%N) + 523 ))field"       1000000u64 "$(( $(date +%s%N) + 524 ))field"
     assert_mapping_matches "v3-award-disputed" claim_v3_states "${v3_claim_award}"       "status:11u8" "pre_dispute_status:8u8"
     assert_mapping_matches "v3-award-bond" claim_v3_dispute_bonds       "${v3_claim_award}" "payer:${WHITEHAT_ADDRESS}" "amount:1000000u64"       "status:1u8"
 
@@ -2002,12 +2002,12 @@ main() {
     v3_binding_reject=""
     v3_witness_reject=""
 
-    execute_accepted "v3-accept-reject-claim" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" review_claim_v3 "${v3_bounty}"       "${v3_claim_reject}" 2u8 "$(( $(date +%s%N) + 532 ))field"       "$(( $(date +%s%N) + 533 ))field"
+    execute_accepted "v3-accept-reject-claim" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" review_claim_v3 "${v3_bounty}"       "${v3_claim_reject}" 2u8 3u8 "$(( $(date +%s%N) + 532 ))field"       "$(( $(date +%s%N) + 533 ))field"
     execute_accepted "v3-lock-reject-claim" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" lock_reward_v3 "${v3_bounty}"       "${v3_claim_reject}" 3000000u64 "$(( $(date +%s%N) + 534 ))field"
     execute_accepted "v3-deliver-reject-claim" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${WHITEHAT_PRIVATE_KEY}" "Whitehat" "${WHITEHAT_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" disclosure_action_v3       "${v3_bounty}" "${v3_claim_reject}" 1u8       "$(( $(date +%s%N) + 535 ))field" "$(( $(date +%s%N) + 536 ))field"
     execute_accepted "v3-ack-reject-claim" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" disclosure_action_v3 "${v3_bounty}"       "${v3_claim_reject}" 2u8 "$(( $(date +%s%N) + 537 ))field"       "$(( $(date +%s%N) + 538 ))field"
     execute_accepted "v3-reject-reproduction-two" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" resolution_action_v3 "${v3_bounty}"       "${v3_claim_reject}" 2u8 "$(( $(date +%s%N) + 539 ))field"       "$(( $(date +%s%N) + 540 ))field"
-    execute_accepted "v3-open-rejection-dispute" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${WHITEHAT_PRIVATE_KEY}" "Whitehat" "${WHITEHAT_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" dispute_claim_v3 "${v3_bounty}"       "${v3_claim_reject}" 1u8 "$(( $(date +%s%N) + 541 ))field"       1000000u64 "$(( $(date +%s%N) + 542 ))field"
+    execute_accepted "v3-open-rejection-dispute" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${WHITEHAT_PRIVATE_KEY}" "Whitehat" "${WHITEHAT_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" dispute_claim_v3 "${v3_bounty}"       "${v3_claim_reject}" 5u8 0u8 "$(( $(date +%s%N) + 541 ))field"       1000000u64 "$(( $(date +%s%N) + 542 ))field"
     execute_accepted "v3-arbiter-one-reject-vote" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${ARBITER_PRIVATE_KEY}" "Arbiter 1" "${ARBITER_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" cast_arbitration_vote_v3       "${v3_bounty}" "${v3_claim_reject}" 0u8       "$(( $(date +%s%N) + 543 ))field"
 
     expect_chain_rejected "v3-duplicate-arbiter-vote" STEP_TX_ID STEP_FEE_ID       STEP_FEE_TX_ID "${CANDIDATE_DIR}" "${ARBITER_PRIVATE_KEY}" "Arbiter 1"       "${ARBITER_ADDRESS}" "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" execute       cast_arbitration_vote_v3 "${v3_bounty}" "${v3_claim_reject}" 0u8       "$(( $(date +%s%N) + 544 ))field" --skip-execute-proof --broadcast --yes
@@ -2017,7 +2017,7 @@ main() {
 
     v3_program_before_rejection="$(public_credits_balance "${PROGRAM_ID}")"
     v3_owner_before_rejection="$(public_credits_balance "${OWNER_ADDRESS}")"
-    execute_accepted "v3-finalize-rejection" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${arbiter_three_key}" "Arbiter 3"       "${arbiter_three_address}" "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}"       finalize_rejection_v3 "${v3_bounty}" "${v3_claim_reject}"       "${OWNER_ADDRESS}" 1000000u64 "$(( $(date +%s%N) + 546 ))field"
+    execute_accepted "v3-finalize-rejection" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${arbiter_three_key}" "Arbiter 3"       "${arbiter_three_address}" "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}"       finalize_rejection_v3 "${v3_bounty}" "${v3_claim_reject}"       "${OWNER_ADDRESS}" 1000000u64 0u8 "$(( $(date +%s%N) + 546 ))field"
     v3_program_after_rejection="$(public_credits_balance "${PROGRAM_ID}")"
     v3_owner_after_rejection="$(public_credits_balance "${OWNER_ADDRESS}")"
     assert_balance_delta "v3-reject-program-bond" "${v3_program_before_rejection}"       "${v3_program_after_rejection}" -1000000

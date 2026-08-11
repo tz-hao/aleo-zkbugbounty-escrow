@@ -19,6 +19,8 @@ import {
   fetchOnChainClaimV3ArbitrationTally,
   fetchOnChainClaimV3DisputeBond,
   fetchOnChainClaimV3Evidence,
+  fetchOnChainClaimV3ProjectDecision,
+  fetchOnChainClaimV3DisputeMetadata,
   fetchOnChainClaimV3Payout,
   fetchOnChainClaimV3State,
 } from "../../../../../../lib/aleo-v3-registry.ts";
@@ -79,6 +81,8 @@ export async function handleProtocolV3ClaimLookup(
       tally,
       acknowledgement,
       disputeBond,
+      projectDecision,
+      disputeMetadata,
     ] = await Promise.all([
       fetchOnChainClaimReceipt(claimHash, config, options.fetcher),
       fetchOnChainClaimReporter(claimHash, config, options.fetcher),
@@ -88,6 +92,8 @@ export async function handleProtocolV3ClaimLookup(
       fetchOnChainClaimV3ArbitrationTally(claimHash, config, options.fetcher),
       fetchOnChainClaimV3Acknowledgement(claimHash, config, options.fetcher),
       fetchOnChainClaimV3DisputeBond(claimHash, config, options.fetcher),
+      fetchOnChainClaimV3ProjectDecision(claimHash, config, options.fetcher),
+      fetchOnChainClaimV3DisputeMetadata(claimHash, config, options.fetcher),
     ]);
     if (
       !receipt ||
@@ -124,6 +130,8 @@ export async function handleProtocolV3ClaimLookup(
         tally,
         acknowledgement,
         disputeBond,
+        projectDecision,
+        disputeMetadata,
       },
     };
   } catch {

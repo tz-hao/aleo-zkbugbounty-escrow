@@ -127,3 +127,19 @@ V3 Claim 已绑定 Bounty 的目标系统承诺和目标代码哈希，并额外
 6. 再将已验证前端发布到 Vercel Production。
 
 仅部署 Vercel 不会更新 Aleo Program；未完成第 3 步时，线上只能继续使用 V2 的既有链上能力。
+
+
+## R2 争议模型更新
+
+本设计的争议部分以 [V3 争议授权与结算矩阵](protocol-v3-dispute-matrix.zh.md) 为准。它取代本页早期“仅拒绝/超时”的简化描述。
+
+新增的公开映射为：
+
+```text
+claim_v3_project_decisions
+claim_v3_dispute_metadata
+```
+
+因此 V3 的公开映射总数为 11。项目方的 adverse decision、公开 dispute type、开立人、状态、请求等级与最终等级均成为可验证链上状态；`dispute_commitment` 保留为私有证据的承诺，不公开报告内容。
+
+对于 `payment_condition = OnPatchAcceptance`，REPRODUCTION 仲裁的正向结果只恢复到 `ReproductionConfirmed` 并继续修复流程；不会在修复确认前支付奖励。

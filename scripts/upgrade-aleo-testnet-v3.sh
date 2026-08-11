@@ -288,6 +288,8 @@ required_mappings=(
     v3_operation_markers
     claim_v3_acknowledgements
     claim_v3_dispute_bonds
+    claim_v3_project_decisions
+    claim_v3_dispute_metadata
 )
 for function_name in "${required_functions[@]}"; do
     grep -F -q "function ${function_name}:" "${COMPILED_PROGRAM}" ||
@@ -297,7 +299,7 @@ for mapping_name in "${required_mappings[@]}"; do
     grep -F -q "mapping ${mapping_name}:" "${COMPILED_PROGRAM}" ||
         fail "Compiled Program is missing V3 mapping: ${mapping_name}"
 done
-printf 'V3 ABI surface: 13 functions and 9 mappings present\n'
+printf 'V3 ABI surface: 13 functions and 11 mappings present\n'
 
 SOURCE_SHA="$(sha256sum "${LEO_PROJECT_DIR}/src/main.leo" | awk '{print $1}')"
 COMPILED_SHA="$(sha256sum "${COMPILED_PROGRAM}" | awk '{print $1}')"

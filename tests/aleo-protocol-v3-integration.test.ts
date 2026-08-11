@@ -71,7 +71,7 @@ const bounty: OnChainBountyState = {
   mapping: "bounties",
 };
 
-test("Protocol V3 source inspection requires all 13 functions and 9 mappings", () => {
+test("Protocol V3 source inspection requires all 13 functions and 11 mappings", () => {
   for (const source of [compiledSource, leoSource]) {
     const inspection = inspectProtocolV3Source(source);
     assert.equal(inspection.available, true);
@@ -79,7 +79,7 @@ test("Protocol V3 source inspection requires all 13 functions and 9 mappings", (
     assert.deepEqual(inspection.missingMappings, []);
   }
   assert.equal(PROTOCOL_V3_FUNCTIONS.length, 13);
-  assert.equal(PROTOCOL_V3_MAPPINGS.length, 9);
+  assert.equal(PROTOCOL_V3_MAPPINGS.length, 11);
   const incomplete = inspectProtocolV3Source(
     compiledSource.replace("function settle_reward_v3:", "function removed:"),
   );
@@ -121,6 +121,7 @@ test("all 12 public V3 transaction builders follow the Edition 2 ABI", () => {
     buildReviewClaimV3Transaction({
       ...common,
       action: 2,
+      projectSeverity: 3,
       decisionCommitment: "11field",
       actionMarker: "12field",
     }),
@@ -143,7 +144,8 @@ test("all 12 public V3 transaction builders follow the Edition 2 ABI", () => {
     }),
     buildDisputeClaimV3Transaction({
       ...common,
-      action: 1,
+      disputeType: 1,
+      requestedSeverity: 0,
       disputeCommitment: "18field",
       feeAmount: "500000",
       disputeMarker: "19field",
@@ -171,8 +173,9 @@ test("all 12 public V3 transaction builders follow the Edition 2 ABI", () => {
     }),
     buildFinalizeRejectionV3Transaction({
       ...common,
-      ownerAddress: address("a"),
+      bondRecipient: address("a"),
       bondAmount: "500000",
+      verdict: 0,
       rejectionMarker: "23field",
     }),
     buildRefundBountyV3Transaction({
@@ -186,7 +189,7 @@ test("all 12 public V3 transaction builders follow the Edition 2 ABI", () => {
     previews.map((preview) => preview.functionName),
     PROTOCOL_V3_FUNCTIONS.filter((name) => name !== "submit_claim_v3"),
   );
-  const expectedCounts = [9, 3, 5, 4, 5, 5, 6, 4, 7, 7, 5, 3];
+  const expectedCounts = [9, 3, 6, 4, 5, 5, 7, 4, 7, 7, 6, 3];
   assert.deepEqual(previews.map((preview) => preview.inputs.length), expectedCounts);
   assert.equal(JSON.stringify(previews).includes("reporterSecret"), false);
   assert.throws(

@@ -25,13 +25,17 @@ import {
   buildReviewClaimV3Transaction,
   buildSettleRewardV3Transaction,
   PROTOCOL_V3_CAPABILITY,
+  PROTOCOL_V3_DISPUTE_TYPES,
   type ProtocolV3Capability,
+  type ProtocolV3DisputeType,
   type ProtocolV3TransactionPreview,
 } from "@/lib/aleo-protocol-v3";
 import type {
   OnChainBountyV3Config,
   OnChainClaimV3ArbitrationTally,
   OnChainClaimV3DisputeBond,
+  OnChainClaimV3DisputeMetadata,
+  OnChainClaimV3ProjectDecision,
   OnChainClaimV3Evidence,
   OnChainClaimV3Payout,
   OnChainClaimV3State,
@@ -52,12 +56,17 @@ type ClaimBundle = {
   tally: OnChainClaimV3ArbitrationTally | null;
   acknowledgement: { acknowledgement: string } | null;
   disputeBond: OnChainClaimV3DisputeBond | null;
+  projectDecision: OnChainClaimV3ProjectDecision | null;
+  disputeMetadata: OnChainClaimV3DisputeMetadata | null;
 };
 
 type ActionId =
   | "begin-review"
   | "accept-claim"
   | "reject-claim"
+  | "mark-duplicate"
+  | "mark-scope"
+  | "assess-severity"
   | "lock-reward"
   | "deliver-disclosure"
   | "acknowledge-disclosure"
@@ -66,8 +75,7 @@ type ActionId =
   | "propose-patch"
   | "accept-patch"
   | "finalize-unappealed"
-  | "appeal-rejection"
-  | "escalate-timeout"
+  | "open-dispute"
   | "cast-vote"
   | "settle-reward"
   | "finalize-prelock"
@@ -77,6 +85,9 @@ const actionLabels: Record<ActionId, [string, string]> = {
   "begin-review": ["开始审核", "Begin review"],
   "accept-claim": ["受理 Claim", "Accept Claim"],
   "reject-claim": ["提出拒绝", "Propose rejection"],
+  "mark-duplicate": ["标记重复", "Mark duplicate"],
+  "mark-scope": ["标记超出范围", "Mark out of scope"],
+  "assess-severity": ["记录项目方严重程度", "Record project severity"],
   "lock-reward": ["锁定奖励", "Lock reward"],
   "deliver-disclosure": ["登记加密交付", "Record encrypted delivery"],
   "acknowledge-disclosure": ["确认收到密文", "Acknowledge delivery"],
@@ -85,8 +96,7 @@ const actionLabels: Record<ActionId, [string, string]> = {
   "propose-patch": ["提交修复承诺", "Submit patch commitment"],
   "accept-patch": ["确认修复", "Accept patch"],
   "finalize-unappealed": ["终结未申诉拒绝", "Finalize unappealed rejection"],
-  "appeal-rejection": ["申诉拒绝", "Appeal rejection"],
-  "escalate-timeout": ["SLA 超时升级", "Escalate SLA timeout"],
+  "open-dispute": ["发起类型化争议", "Open typed dispute"],
   "cast-vote": ["提交仲裁票", "Cast arbitration vote"],
   "settle-reward": ["结算奖励", "Settle reward"],
   "finalize-prelock": ["仲裁后先锁款", "Lock award after arbitration"],
@@ -106,6 +116,9 @@ export function ProtocolV3Workbench() {
   const [marker, setMarker] = useState("");
   const [amount, setAmount] = useState("");
   const [verdict, setVerdict] = useState<0 | 1 | 2 | 3>(0);
+  const [disputeType, setDisputeType] =
+    useState<ProtocolV3DisputeType>(PROTOCOL_V3_DISPUTE_TYPES.Rejection);
+  const [selectedSeverity, setSelectedSeverity] = useState<1 | 2 | 3>(2);
   const [pendingPreview, setPendingPreview] =
     useState<ProtocolV3TransactionPreview | null>(null);
   const [busy, setBusy] = useState(false);
@@ -213,13 +226,27 @@ export function ProtocolV3Workbench() {
         case "begin-review":
         case "accept-claim":
         case "reject-claim":
+        case "mark-duplicate":
+        case "mark-scope":
+        case "assess-severity": {
+          const reviewAction =
+            action === "begin-review" ? 1 :
+            action === "accept-claim" ? 2 :
+            action === "reject-claim" ? 3 :
+            action === "mark-duplicate" ? 4 :
+            action === "mark-scope" ? 5 : 6;
+          const projectSeverity =
+            reviewAction === 2 ? receiptSeverityCode(bundle.receipt.severity) :
+            reviewAction === 6 ? selectedSeverity : 0;
           preview = buildReviewClaimV3Transaction({
             ...common,
-            action: action === "begin-review" ? 1 : action === "accept-claim" ? 2 : 3,
+            action: reviewAction,
+            projectSeverity,
             decisionCommitment: commitment,
             actionMarker: marker,
           });
           break;
+        }
         case "lock-reward":
           preview = buildLockRewardV3Transaction({
             ...common,
@@ -252,11 +279,14 @@ export function ProtocolV3Workbench() {
             actionMarker: marker,
           });
           break;
-        case "appeal-rejection":
-        case "escalate-timeout":
+        case "open-dispute":
           preview = buildDisputeClaimV3Transaction({
             ...common,
-            action: action === "appeal-rejection" ? 1 : 2,
+            disputeType,
+            requestedSeverity:
+              disputeType === PROTOCOL_V3_DISPUTE_TYPES.Severity
+                ? selectedSeverity
+                : 0,
             disputeCommitment: commitment,
             feeAmount: bundle.policy.arbitrationFeeMicrocredits,
             disputeMarker: marker,
@@ -275,8 +305,9 @@ export function ProtocolV3Workbench() {
             whitehatAddress: bundle.state.whitehatAddress,
             rewardAmount: amount,
             bondAmount:
-              bundle.state.status === "Disputed"
-                ? bundle.disputeBond?.amount ?? "0"
+              bundle.disputeMetadata?.disputeType === "Reproduction" &&
+              bundle.disputeBond?.status === "Pending"
+                ? bundle.disputeBond.amount
                 : "0",
             verdict,
             marker,
@@ -295,8 +326,12 @@ export function ProtocolV3Workbench() {
         case "finalize-rejection":
           preview = buildFinalizeRejectionV3Transaction({
             ...common,
-            ownerAddress: bundle.bounty.owner,
+            bondRecipient:
+              bundle.disputeMetadata?.disputeType === "Remediation" && verdict === 0
+                ? bundle.state.whitehatAddress
+                : bundle.bounty.owner,
             bondAmount: bundle.disputeBond?.amount ?? "0",
+            verdict,
             rejectionMarker: marker,
           });
           break;
@@ -481,6 +516,33 @@ export function ProtocolV3Workbench() {
                     <option value={3}>{text("严重", "Critical")}</option>
                   </select>
                 </label>
+                <label className="grid gap-2 text-xs text-slate-400">
+                  {text("争议类型", "Dispute type")}
+                  <select
+                    className="input-surface focus-ring min-h-11 rounded-md px-3 text-sm"
+                    value={disputeType}
+                    onChange={(event) => setDisputeType(Number(event.target.value) as ProtocolV3DisputeType)}
+                  >
+                    <option value={PROTOCOL_V3_DISPUTE_TYPES.Rejection}>{text("拒绝争议", "Rejection dispute")}</option>
+                    <option value={PROTOCOL_V3_DISPUTE_TYPES.Duplicate}>{text("重复报告争议", "Duplicate dispute")}</option>
+                    <option value={PROTOCOL_V3_DISPUTE_TYPES.Scope}>{text("范围争议", "Scope dispute")}</option>
+                    <option value={PROTOCOL_V3_DISPUTE_TYPES.Severity}>{text("严重程度争议", "Severity dispute")}</option>
+                    <option value={PROTOCOL_V3_DISPUTE_TYPES.Reproduction}>{text("复现争议", "Reproduction dispute")}</option>
+                    <option value={PROTOCOL_V3_DISPUTE_TYPES.Remediation}>{text("修复争议", "Remediation dispute")}</option>
+                  </select>
+                </label>
+                <label className="grid gap-2 text-xs text-slate-400">
+                  {text("项目方 / 请求严重程度", "Project / requested severity")}
+                  <select
+                    className="input-surface focus-ring min-h-11 rounded-md px-3 text-sm"
+                    value={selectedSeverity}
+                    onChange={(event) => setSelectedSeverity(Number(event.target.value) as 1 | 2 | 3)}
+                  >
+                    <option value={1}>{text("中危", "Medium")}</option>
+                    <option value={2}>{text("高危", "High")}</option>
+                    <option value={3}>{text("严重", "Critical")}</option>
+                  </select>
+                </label>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
@@ -593,12 +655,31 @@ function availableActions(bundle: ClaimBundle | null, address: string | null): A
   const owner = address === bundle.bounty.owner;
   const whitehat = address === bundle.state.whitehatAddress;
   const panel = bundle.policy.arbiters.includes(address);
+  const decision = bundle.projectDecision?.decision;
+  const dispute = bundle.disputeMetadata;
   const result: ActionId[] = [];
 
   if (owner) {
-    if (status === "Submitted") result.push("begin-review", "accept-claim", "reject-claim");
-    if (status === "OwnerReviewing") result.push("accept-claim", "reject-claim");
-    if (status === "Accepted") result.push("lock-reward", "reject-claim");
+    if (status === "Submitted") {
+      result.push(
+        "begin-review",
+        "accept-claim",
+        "reject-claim",
+        "mark-duplicate",
+        "mark-scope",
+        "assess-severity",
+      );
+    }
+    if (status === "OwnerReviewing") {
+      result.push(
+        "accept-claim",
+        "reject-claim",
+        "mark-duplicate",
+        "mark-scope",
+        "assess-severity",
+      );
+    }
+    if (status === "Accepted") result.push("lock-reward", "reject-claim", "mark-duplicate", "mark-scope");
     if (status === "DisclosureDelivered") result.push("acknowledge-disclosure");
     if (status === "DisclosureAcknowledged") {
       result.push("confirm-reproduction", "reject-reproduction");
@@ -607,37 +688,55 @@ function availableActions(bundle: ClaimBundle | null, address: string | null): A
     if (status === "PatchProposed" && bundle.policy.paymentCondition === "OnReproduction") {
       result.push("settle-reward");
     }
-    if (status === "PatchAccepted") result.push("settle-reward");
-    if (status === "RewardLocked" || status === "PatchProposed") {
-      result.push("escalate-timeout");
+    if (status === "PatchProposed" && decision === "RemediationProposed") {
+      result.push("open-dispute");
     }
+    if (status === "PatchAccepted") result.push("settle-reward");
   }
 
   if (whitehat) {
     if (status === "RewardLocked") result.push("deliver-disclosure");
     if (status === "PatchProposed") result.push("accept-patch");
-    if (status === "ReproductionRejected" || status === "OwnerRejected") {
-      result.push("appeal-rejection", "finalize-unappealed");
-    }
+    const appealableDecision =
+      decision === "Rejection" ||
+      decision === "Duplicate" ||
+      decision === "OutOfScope" ||
+      decision === "Severity" ||
+      decision === "CannotReproduce";
+    if (appealableDecision) result.push("open-dispute");
     if (
-      status === "Submitted" ||
-      status === "OwnerReviewing" ||
-      status === "Accepted" ||
-      status === "DisclosureDelivered" ||
-      status === "DisclosureAcknowledged" ||
-      status === "ReproductionConfirmed"
+      status === "ReproductionRejected" ||
+      status === "OwnerRejected"
     ) {
-      result.push("escalate-timeout");
+      result.push("finalize-unappealed");
     }
   }
 
   if (panel && status === "Disputed") result.push("cast-vote");
-  if (status === "Disputed") {
-    if (bundle.payout) result.push("settle-reward");
-    else result.push("finalize-prelock");
+  if (status === "Disputed" && dispute) {
+    if (!bundle.payout && (
+      dispute.disputeType === "Rejection" ||
+      dispute.disputeType === "Duplicate" ||
+      dispute.disputeType === "Scope" ||
+      dispute.disputeType === "Severity"
+    )) {
+      result.push("finalize-prelock");
+    }
+    if (bundle.payout && dispute.disputeType === "Reproduction" &&
+        bundle.policy.paymentCondition === "OnPatchAcceptance" && owner) {
+      result.push("confirm-reproduction");
+    }
+    if (bundle.payout && dispute.disputeType === "Reproduction" &&
+        bundle.policy.paymentCondition !== "OnPatchAcceptance") {
+      result.push("settle-reward");
+    }
     result.push("finalize-rejection");
   }
   return [...new Set(result)];
+}
+
+function receiptSeverityCode(severity: OnChainClaimReceipt["severity"]): 1 | 2 | 3 {
+  return severity === "Critical" ? 3 : severity === "High" ? 2 : 1;
 }
 
 function rewardForReceipt(

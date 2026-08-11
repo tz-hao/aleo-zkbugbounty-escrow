@@ -204,6 +204,7 @@ These rules are intentionally fictional protocol invariants for a safe product d
 - [Edition 1 production runbook](docs/edition-1-production-runbook.md)
 - [Edition 1 manual smoke-test plan](docs/testnet-edition-1-smoke-test-plan.md)
 - [Protocol V3 responsible-disclosure and arbitration design](docs/protocol-v3-design.zh.md)
+- [Protocol V3 dispute authorization and settlement matrix](docs/protocol-v3-dispute-matrix.zh.md)
 - [Protocol V3 Local Devnode E2E](docs/protocol-v3-devnode-e2e.zh.md)
 - [Protocol V3 / Testnet Edition 2 upgrade runbook](docs/testnet-edition-2-upgrade-runbook.zh.md)
 
