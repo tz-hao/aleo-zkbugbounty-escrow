@@ -28,6 +28,7 @@ ABI_PATH="${LEO_PROJECT_DIR}/build/zkbugbounty_7f3c92/abi.json"
 RESULT_DIR="${PROJECT_ROOT}/local-upgrade-results"
 TEMP_DIR=""
 PRIVATE_KEY=""
+LEO_UPGRADE_LOG=""
 
 fail() {
     printf 'ERROR: %s\n' "$*" >&2
@@ -39,6 +40,7 @@ cleanup() {
     if [[ -n "${TEMP_DIR}" && -d "${TEMP_DIR}" ]]; then
         rm -f -- "${TEMP_DIR}/leo-result.json"
         rm -f -- "${TEMP_DIR}/testnet-interface.aleo"
+        rm -f -- "${TEMP_DIR}/leo-upgrade.log"
         rmdir -- "${TEMP_DIR}" 2>/dev/null || true
     fi
 }
@@ -369,14 +371,30 @@ upgrade_args=(
 if [[ "${MODE}" == "broadcast" ]]; then
     upgrade_args+=(--broadcast)
 else
-    upgrade_args+=(--print)
+    # A preview is never broadcast. Keep its signed transaction out of the
+    # terminal while still producing the machine-readable temporary result.
+    upgrade_args+=(--print --yes)
 fi
 
-if ! (
-    cd "${LEO_PROJECT_DIR}"
-    PRIVATE_KEY="${PRIVATE_KEY}" "${LEO_BIN}" "${upgrade_args[@]}"
-); then
-    fail "Leo upgrade ${MODE} failed or was declined."
+LEO_UPGRADE_LOG="${TEMP_DIR}/leo-upgrade.log"
+if [[ "${MODE}" == "preview" ]]; then
+    if ! (
+        cd "${LEO_PROJECT_DIR}"
+        PRIVATE_KEY="${PRIVATE_KEY}" "${LEO_BIN}" "${upgrade_args[@]}"
+    ) >"${LEO_UPGRADE_LOG}" 2>&1; then
+        printf 'Leo preview failed. No transaction was broadcast.\n' >&2
+        grep -E -i 'error|cannot upgrade|invalid upgrade|insufficient' "${LEO_UPGRADE_LOG}" |
+            sed -E 's/A(P|Private)Key1[[:alnum:]_]+/[REDACTED_PRIVATE_KEY]/g; s/sign1[[:alnum:]_]+/[REDACTED_SIGNATURE]/g' |
+            tail -n 12 >&2 || true
+        fail "Leo upgrade preview failed or was declined."
+    fi
+else
+    if ! (
+        cd "${LEO_PROJECT_DIR}"
+        PRIVATE_KEY="${PRIVATE_KEY}" "${LEO_BIN}" "${upgrade_args[@]}"
+    ); then
+        fail "Leo upgrade broadcast failed or was declined."
+    fi
 fi
 unset -v PRIVATE_KEY
 
