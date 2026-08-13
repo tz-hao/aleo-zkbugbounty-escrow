@@ -68,8 +68,8 @@ export const en: UiCopy = {
     publiclyVerifiable: "Each Proof explicitly states its verification level",
   },
   home: {
-    kicker: "Private Proof-of-Exploit Protocol for Responsible Disclosure",
-    title: "Prove a bug exists without leaking the exploit",
+    kicker: "ZERO-KNOWLEDGE RESPONSIBLE DISCLOSURE",
+    title: "PROVE THE BUG. KEEP THE EXPLOIT PRIVATE.",
     description: "zkBugBounty runs on Aleo Testnet. Whitehats can use a Private Witness to prove that a security invariant is broken without exposing the Exploit Path, triggering parameters, or a complete PoC.",
     createAction: "Create bounty",
     proofAction: "Enter protocol",

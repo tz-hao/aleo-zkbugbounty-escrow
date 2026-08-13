@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { ExternalLink, Fingerprint, Radio, ShieldCheck } from "lucide-react";
+import { ExternalLink, Fingerprint, Radio } from "lucide-react";
 
 import { useLocale } from "@/components/locale-provider";
 import { ALEO_TESTNET_DEPLOYMENT } from "@/lib/aleo-program";
@@ -19,14 +20,8 @@ export function SiteFooter() {
     <footer className="mt-10 border-t border-white/[0.08] bg-[#05070b]/60">
       <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1.25fr_0.75fr_0.9fr] lg:px-8">
         <div>
-          <Link className="inline-flex items-center gap-3" href="/">
-            <span className="brand-mark flex h-10 w-10 items-center justify-center rounded-lg">
-              <ShieldCheck size={19} aria-hidden="true" />
-            </span>
-            <span>
-              <span className="block text-sm font-semibold text-white">zkBugBounty</span>
-              <span className="mt-0.5 block text-xs text-slate-500">{text("隐私保护披露", "Privacy-preserving disclosure")}</span>
-            </span>
+          <Link aria-label={text("返回首页", "Back to home")} className="focus-ring inline-flex" href="/">
+            <Image alt="ALEO GILT" className="footer-brand-image" height={67} src="/images/aleo-gilt-wordmark.png" width={236} />
           </Link>
           <p className="mt-4 max-w-md text-sm leading-6 text-slate-400">
             {text(
@@ -41,7 +36,7 @@ export function SiteFooter() {
           <nav aria-label={text("页脚工作流导航", "Footer workflow navigation")} className="mt-3 grid gap-2">
             {workflowLinks.map((link) => (
               <Link
-                className="w-fit text-sm text-slate-500 transition hover:text-emerald-100"
+                className="w-fit text-sm text-slate-500 transition hover:text-cyan-100"
                 href={link.href}
                 key={link.href}
               >
@@ -55,7 +50,7 @@ export function SiteFooter() {
           <p className="text-xs font-semibold text-slate-300">{text("协议状态", "Protocol status")}</p>
           <div className="mt-3 grid gap-3 text-sm text-slate-500">
             <span className="inline-flex items-center gap-2">
-              <Radio className="text-emerald-300" size={14} aria-hidden="true" />
+              <Radio className="text-cyan-300" size={14} aria-hidden="true" />
               Aleo Testnet
             </span>
             <span className="inline-flex items-center gap-2">
