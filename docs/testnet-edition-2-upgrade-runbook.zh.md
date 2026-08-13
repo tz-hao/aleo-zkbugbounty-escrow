@@ -8,7 +8,7 @@
 - npm run preview:testnet-edition-2 默认调用 leo upgrade --print，只生成升级预演，不广播。
 - 只有显式执行带 --broadcast 的脚本，并再次输入 UPGRADE EDITION 2，脚本才会请求广播。
 - 广播后不得因为索引延迟重复广播。先读取 Program latest_edition 和公开交易。
-- V3 钱包能力采用失败关闭：Edition 2、13 个 V3 函数、9 个 V3 Mapping、升级交易和费用交易证据任一缺失，前端都保持禁用。
+- V3 钱包能力采用失败关闭：Edition 2、13 个 V3 函数、11 个 V3 Mapping、升级交易和费用交易证据任一缺失，前端都保持禁用。
 
 ## 1. 打开管理员本机 WSL
 
@@ -35,7 +35,7 @@ npm run build
   - leo/bug_proof/build/zkbugbounty_7f3c92/abi.json
   - leo/bug_proof/build/zkbugbounty_7f3c92/zkbugbounty_7f3c92.aleo
 - V1/V2 升级兼容性检查通过。
-- V3 ABI 包含 13 个函数和 9 个 Mapping。
+- V3 ABI 包含 13 个函数和 11 个 Mapping。
 - 测试、Lint 与 Next.js 构建全部通过。
 
 如果任何一步失败，停止升级。
@@ -51,7 +51,7 @@ npm run preview:testnet-edition-2
 1. 核验 Testnet 上当前 Program 必须存在且 latest_edition 必须等于 1。
 2. 扫描项目内潜在私钥字面量。
 3. 重新编译 Program。
-4. 核验管理员构造器、13 个 V3 函数和 9 个 V3 Mapping。
+4. 核验管理员构造器、13 个 V3 函数和 11 个 V3 Mapping。
 5. 计算源代码、编译 Program 和 ABI 的 SHA-256。
 6. 在不回显的交互提示中读取管理员私钥。
 7. 执行 leo upgrade --print。

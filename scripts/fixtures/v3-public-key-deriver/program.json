@@ -1,0 +1,9 @@
+{
+  "program": "v3_public_key_deriver.aleo",
+  "version": "0.1.0",
+  "description": "Local-only public mapping-key derivation fixture for Protocol V3 Devnode tests",
+  "license": "MIT",
+  "leo": "4.4.0",
+  "dependencies": null,
+  "dev_dependencies": null
+}

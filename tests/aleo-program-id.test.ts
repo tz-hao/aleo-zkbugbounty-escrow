@@ -28,7 +28,7 @@ test("canonical Aleo Program ID is consistent and no legacy ID remains", () => {
   assert.equal(CANONICAL_ALEO_PROGRAM_ID, "zkbugbounty_7f3c92.aleo");
   assert.deepEqual(legacyReferences, []);
 
-  const manifestPaths = sourceFiles
+  const manifestPaths = collectSourceFiles("leo")
     .filter((file) => file.endsWith("program.json"))
     .map((file) => relative(process.cwd(), file).replaceAll("\\", "/"));
   assert.deepEqual(manifestPaths, ["leo/bug_proof/program.json"]);

@@ -32,3 +32,4 @@ local-upgrade-results/
 devnode-*.json
 local-devnode/
 local-audits/
+scripts/fixtures/v3-public-key-deriver/build/

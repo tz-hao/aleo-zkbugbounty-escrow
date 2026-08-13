@@ -1,0 +1,63 @@
+{
+  "schema": "zkbugbounty.protocol-v3-r2-final-coverage.v1",
+  "recorded_at": "2026-08-13T12:21:20Z",
+  "network": "local-devnode",
+  "program_id": "zkbugbounty_7f3c92.aleo",
+  "protocol_candidate_commit": "15b3d860948623d66eb957c69336b45af582c398",
+  "canonical_main_leo_sha256_lf": "75883ade8223f549db44c2d2ede0d0834bdafd3f34f5cb4d139f3a6168617247",
+  "checkout_main_leo_sha256_crlf": "500b0c082332a478698bf34af110a228b777f171fa6b0260bab2b5204065df36",
+  "static_cache_key": "c83e6e3d4ab824d7caa74fb8335878ef6528ded79c19c4964c68dfe92ca9147f",
+  "static_gates": {
+    "tests": {
+      "passed": 334,
+      "failed": 0
+    },
+    "worktree_path_resolver": "PASS",
+    "eslint": "PASS",
+    "protocol_v3_harness_static_check": "PASS",
+    "parallel_scheduler_smoke": "PASS",
+    "leo_4_4_fixture_build": "PASS"
+  },
+  "dynamic_coverage": {
+    "result": "PASS",
+    "fresh_ledgers": true,
+    "isolated_localhost_ports": true,
+    "unresolved_dynamic_gaps": 0,
+    "shards": [
+      {
+        "name": "reproduction-remediation",
+        "status": "PASS",
+        "log_sha256": "9707068597af93893172d60f9a2a35e6e8c841104f623896d2856c4b646d94fe"
+      },
+      {
+        "name": "legacy",
+        "status": "PASS",
+        "log_sha256": "c68b884f079a01b67379072b6bf777c41215fbbb1c48bbc1007c209dd015aa61"
+      },
+      {
+        "name": "three-of-three",
+        "status": "PASS",
+        "log_sha256": "8f596be3c29f275f5c3be84fb59b24a81844bf9dcb9b9b6d6ef9cdcca21979fc"
+      },
+      {
+        "name": "two-core",
+        "status": "PASS",
+        "log_sha256": "12f387b579d922ec12d1e90fa32e86c197258b6c3852ffa25a97bb3aba32f926"
+      },
+      {
+        "name": "duplicate-scope",
+        "status": "PASS",
+        "log_sha256": "5adc62699e3fd4237d801cf1869a41327f1fcf6e83b4af5aae6f26a0272654c4"
+      },
+      {
+        "name": "severity",
+        "status": "PASS",
+        "log_sha256": "c46f28ec56d84a46b4a7df8a17ec0afe024e44b0a269e016b96d244c63db9763"
+      }
+    ]
+  },
+  "testnet_transactions": 0,
+  "contains_private_key": false,
+  "contains_signed_payload": false,
+  "contains_private_witness": false
+}

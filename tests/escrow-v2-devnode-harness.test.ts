@@ -4,6 +4,12 @@ import test from "node:test";
 
 const harness = readFileSync("scripts/escrow-v2-devnode-e2e.sh", "utf8");
 const protocolV3Harness = readFileSync("scripts/protocol-v3-devnode-e2e.sh", "utf8");
+const finalV3Coverage = readFileSync("scripts/protocol-v3-final-dynamic-coverage.sh", "utf8");
+const developmentRunner = readFileSync("scripts/protocol-v3-dev-runner.sh", "utf8");
+const developmentScenarios = readFileSync("scripts/protocol-v3-dev-scenarios.sh", "utf8");
+const parallelFinal = readFileSync("scripts/protocol-v3-parallel-final.sh", "utf8");
+const staticHarnessCheck = readFileSync("scripts/check-protocol-v3-harness-static.mjs", "utf8");
+const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as { scripts: Record<string, string> };
 
 const executionTransactionLine = /^[ \t]*-[ \t]*transaction ID:[ \t]*'([^']+)'[ \t]*.*$/;
 const feeIdLine = /^[ \t]*-[ \t]*fee ID:[ \t]*'([^']+)'[ \t]*.*$/;
@@ -37,6 +43,36 @@ function parseAleoU64Literal(raw: string): bigint | undefined {
   return match ? BigInt(match[1]) : undefined;
 }
 
+function parseConfirmedPublicFeeMicrocredits(
+  raw: string,
+  expectedTransactionId: string,
+  expectedTransactionType: "execute" | "fee",
+): bigint | undefined {
+  try {
+    const confirmed = JSON.parse(raw) as {
+      type?: unknown;
+      transaction?: {
+        type?: unknown;
+        id?: unknown;
+        fee?: { transition?: { inputs?: Array<{ type?: unknown; value?: unknown }> } };
+      };
+    };
+    const transaction = confirmed.transaction;
+    if (
+      confirmed.type !== "execute" ||
+      transaction?.type !== expectedTransactionType ||
+      transaction.id !== expectedTransactionId ||
+      transaction.fee?.transition?.inputs?.[0]?.type !== "public"
+    ) {
+      return undefined;
+    }
+    const value = transaction.fee?.transition?.inputs?.[0]?.value;
+    return typeof value === "string" ? parseAleoU64Literal(value) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function readMappingU64ForTest(httpStatus: number, raw: string) {
   if (httpStatus === 404) {
     return { status: "ABSENT" as const };
@@ -58,12 +94,12 @@ function formatMicrocreditsForTest(value: bigint) {
 }
 
 test("Escrow Devnode harness is localhost-only and starts from an isolated ledger", () => {
-  assert.match(harness, /http:\/\/127\.0\.0\.1:3030\|http:\/\/localhost:3030/);
+  assert.match(harness, /"http:\/\/127\.0\.0\.1:\$\{ALEO_E2E_PORT\}"\|"http:\/\/localhost:\$\{ALEO_E2E_PORT\}"/);
   assert.match(harness, /refusing non-local endpoint/);
   assert.match(harness, /local-devnode\/baseline-pre-escrow/);
   assert.match(harness, /local-devnode\/candidate-escrow-v2/);
   assert.match(harness, /local-devnode\/ledger/);
-  assert.match(harness, /"\$\{LEO_BIN\}" devnode start --socket-addr 127\.0\.0\.1:3030/);
+  assert.match(harness, /"\$\{LEO_BIN\}" devnode start --socket-addr "\$\{ALEO_E2E_SOCKET_ADDR\}"/);
   assert.match(harness, /--storage "\$\{ALEO_E2E_LEDGER\}"/);
   assert.doesNotMatch(harness, /api\.explorer\.provable\.com/);
   assert.match(harness, /--clear-storage/);
@@ -72,7 +108,8 @@ test("Escrow Devnode harness is localhost-only and starts from an isolated ledge
 test("Escrow Devnode harness never embeds or persists private credentials", () => {
   assert.match(harness, /set \+x/);
   assert.match(harness, /read -r -s -p/);
-  assert.match(harness, /trap cleanup_all EXIT/);
+  assert.match(harness, /trap final_e2e_exit_guard EXIT/);
+  assert.match(harness, /final_e2e_exit_guard[\s\S]*cleanup_all/);
   assert.match(harness, /trap 'handle_signal 130' INT/);
   assert.match(harness, /trap 'handle_signal 143' TERM/);
   assert.match(harness, /DEVNODE_PRIVATE_KEY=""/);
@@ -80,11 +117,11 @@ test("Escrow Devnode harness never embeds or persists private credentials", () =
   assert.match(harness, /localKeysPersisted: false/);
   assert.doesNotMatch(harness, new RegExp(["APrivate", "Key"].join("")));
   assert.doesNotMatch(harness, /\.env/);
-  assert.doesNotMatch(harness, /json-output|--save/);
+  assert.doesNotMatch(harness, /account import[^\n]*--write/);
   assert.doesNotMatch(harness, /Local-only Devnode bootstrap private key/);
   assert.match(harness, /assert_owner_has_deployment_balance/);
   assert.match(harness, /Do not use a Wallet or Testnet account/);
-  assert.match(harness, /print_sanitized_text "\$\{LAST_OUTPUT\}"/);
+  assert.match(harness, /write_sanitized_diagnostic "leo-command-failure" "\$\{LAST_OUTPUT\}"/);
 });
 
 test("Escrow Devnode harness uses explicit transaction IDs for independent local steps", () => {
@@ -243,6 +280,52 @@ test("Aleo u64 balance parser rejects invalid literals and does not turn missing
   assert.match(harness, /read_mapping_u64 "credits\.aleo\/account"/);
 });
 
+test("confirmed fee parsing handles accepted executions and rejected fee wrappers", () => {
+  const executionId = "at1confirmedexecute";
+  const feeId = "at1confirmedfee";
+  const confirmedExecution = JSON.stringify({
+    status: "accepted",
+    type: "execute",
+    transaction: {
+      type: "execute",
+      id: executionId,
+      fee: {
+        transition: {
+          inputs: [{ type: "public", value: "13028u64" }, { type: "public", value: "0u64" }],
+        },
+      },
+    },
+  });
+  const rejectedFee = JSON.stringify({
+    status: "rejected",
+    type: "execute",
+    transaction: {
+      type: "fee",
+      id: feeId,
+      fee: {
+        transition: {
+          inputs: [{ type: "public", value: "19391u64" }, { type: "public", value: "0u64" }],
+        },
+      },
+    },
+  });
+
+  assert.equal(parseConfirmedPublicFeeMicrocredits(confirmedExecution, executionId, "execute"), 13_028n);
+  assert.equal(parseConfirmedPublicFeeMicrocredits(rejectedFee, feeId, "fee"), 19_391n);
+  assert.equal(parseConfirmedPublicFeeMicrocredits(confirmedExecution, "at1other", "execute"), undefined);
+  assert.equal(parseConfirmedPublicFeeMicrocredits(confirmedExecution, executionId, "fee"), undefined);
+  assert.equal(parseConfirmedPublicFeeMicrocredits(rejectedFee, feeId, "execute"), undefined);
+  assert.equal(parseConfirmedPublicFeeMicrocredits('{"type":"fee","id":"at1confirmedfee"}', feeId, "fee"), undefined);
+  assert.equal(parseConfirmedPublicFeeMicrocredits("not json", feeId, "fee"), undefined);
+  assert.match(harness, /confirmed_public_fee_microcredits\(\)/);
+  assert.match(harness, /const transaction = confirmed\?\.transaction/);
+  assert.match(harness, /transaction\?\.type !== expectedType/);
+  assert.match(harness, /transaction\?\.id !== expectedId/);
+  assert.match(harness, /LAST_CONFIRMED_TRANSACTION_RESPONSE/);
+  assert.match(harness, /CONFIRMED_FEE_LOOKUP_ATTEMPTS/);
+  assert.match(harness, /node --input-type=module -e/);
+});
+
 test("Credits arithmetic uses parsed integer microcredits without Number precision loss", () => {
   const before = parseAleoU64Literal("9374999894112u64");
   const funding = parseAleoU64Literal("10000000u64");
@@ -339,6 +422,7 @@ test("Bootstrap confirmation remains state-first and never re-broadcasts during 
   assert.match(confirmation, /report_fee_transaction_lookup/);
   assert.doesNotMatch(confirmation, /run_leo/);
   assert.equal((bootstrapAccount.match(/run_leo /g) ?? []).length, 1);
+  assert.doesNotMatch(bootstrapAccount, /--no-local|execution_source_args/);
   assert.equal((bootstrap.match(/bootstrap_account /g) ?? []).length, 2);
 });
 
@@ -357,6 +441,18 @@ test("manual-block Devnode advances exactly once after each broadcast before wai
   assert.ok(rejected.indexOf("advance_broadcast_block") < rejected.indexOf("wait_for_rejected_transaction"));
   assert.match(harness, /advancing one local Devnode block for the broadcast/);
   assert.doesNotMatch(accepted, /run_leo/);
+});
+
+test("Devnode block height reads tolerate bounded transient RPC timeouts", () => {
+  const start = harness.indexOf("current_height() {");
+  const end = harness.indexOf("advance_blocks() {", start);
+  const currentHeight = harness.slice(start, end);
+  assert.match(harness, /readonly DEVNODE_HEIGHT_READ_ATTEMPTS=5/);
+  assert.match(currentHeight, /attempt <= DEVNODE_HEIGHT_READ_ATTEMPTS/);
+  assert.match(currentHeight, /curl -fsS --max-time 3/);
+  assert.match(currentHeight, /kill -0 "\$\{ALEO_E2E_DEVNODE_PID\}"/);
+  assert.match(currentHeight, /sleep 1/);
+  assert.match(currentHeight, /remained unavailable after/);
 });
 
 test("Bootstrap diagnostics do not mistake an undeployed program for a transfer failure", () => {
@@ -399,11 +495,12 @@ test("Escrow Devnode harness treats public state as the primary confirmation sig
 test("Escrow Devnode harness uses the same Credits Bootstrap before both modes diverge", () => {
   const mainStart = harness.indexOf("main() {");
   const bootstrapBranch = harness.indexOf('if is_bootstrap_stage; then', mainStart);
+  const developmentBranch = harness.indexOf('if is_development_stage; then', mainStart);
   const sourcePreparation = harness.indexOf('prepare_real_testnet_edition_zero_sources', mainStart);
   const bootstrapCredits = harness.indexOf('bootstrap_test_accounts', mainStart);
   const baselineDeploy = harness.indexOf('deploy_baseline', mainStart);
   const fullPatch = harness.indexOf('patch_local_only_admins', bootstrapBranch);
-  assert.ok(mainStart >= 0 && sourcePreparation > mainStart && bootstrapBranch > sourcePreparation);
+  assert.ok(mainStart >= 0 && sourcePreparation > mainStart && developmentBranch > sourcePreparation && bootstrapBranch > sourcePreparation);
   assert.ok(bootstrapCredits > mainStart && bootstrapCredits < bootstrapBranch);
   assert.ok(bootstrapCredits < baselineDeploy);
   assert.ok(fullPatch > bootstrapBranch && fullPatch < baselineDeploy);
@@ -416,11 +513,13 @@ test("Escrow Devnode harness uses the same Credits Bootstrap before both modes d
   assert.match(harness, /ALEO_E2E_BOOTSTRAP_COMPLETE=0/);
   assert.match(harness, /ALEO_E2E_BOOTSTRAP_COMPLETE=1/);
   assert.doesNotMatch(harness, /bootstrap_local_credits/);
-  assert.match(harness, /if is_bootstrap_stage; then\n    return 0/);
-  const bootstrapReturn = harness.indexOf('if is_bootstrap_stage; then\n    return 0');
-  const whitehatKeyPrompt = harness.indexOf('prompt_secret WHITEHAT_PRIVATE_KEY');
-  const arbiterKeyPrompt = harness.indexOf('prompt_secret ARBITER_PRIVATE_KEY');
-  assert.ok(bootstrapReturn >= 0 && whitehatKeyPrompt > bootstrapReturn && arbiterKeyPrompt > bootstrapReturn);
+  assert.match(harness, /if is_bootstrap_stage; then\n    write_public_report/);
+  const provisionStart = harness.indexOf("provision_local_accounts() {");
+  const bootstrapStart = harness.indexOf("if is_bootstrap_stage; then", mainStart);
+  const whitehatKeyPrompt = harness.indexOf('prompt_secret WHITEHAT_PRIVATE_KEY', provisionStart);
+  const arbiterKeyPrompt = harness.indexOf('prompt_secret ARBITER_PRIVATE_KEY', provisionStart);
+  assert.ok(provisionStart >= 0 && whitehatKeyPrompt > provisionStart && arbiterKeyPrompt > provisionStart);
+  assert.ok(whitehatKeyPrompt < bootstrapStart && arbiterKeyPrompt < bootstrapStart);
 });
 
 test("full E2E cannot reach Whitehat submission before the shared Bootstrap completes", () => {
@@ -488,8 +587,10 @@ test("Bootstrap failure stops the full E2E before deployment and exposes public 
 test("Escrow Devnode harness validates Windows-created worktrees from the root repository", () => {
   assert.match(harness, /git -C "\$\{ROOT_DIR\}" worktree list --porcelain/);
   assert.match(harness, /wslpath -w/);
-  assert.match(harness, /assert_worktree_ref "\$\{CANDIDATE_DIR\}" "\$\{CANDIDATE_REF\}"/);
+  assert.match(harness, /assert_worktree_ref "\$\{CANDIDATE_WORKTREE_DIR\}" "\$\{CANDIDATE_REF\}"/);
   assert.match(harness, /materialize_real_testnet_edition_zero_baseline/);
+  assert.match(harness, /candidate_worktree_status/);
+  assert.match(harness, /-c core\.autocrlf=true --git-dir="\$\{candidate_gitdir\}" --work-tree="\$\{CANDIDATE_WORKTREE_DIR\}" status --porcelain=v1/);
   assert.doesNotMatch(harness, /assert_worktree_ref "\$\{BASELINE_DIR\}" "pre-escrow-upgrade"/);
   assert.doesNotMatch(harness, /git -C "\$\{BASELINE_DIR\}"/);
   assert.doesNotMatch(harness, /git -C "\$\{CANDIDATE_DIR\}"/);
@@ -503,6 +604,20 @@ test("Protocol V3 Devnode harness selects an explicit Candidate and keeps the SH
   assert.match(harness, /MATCH/);
   assert.match(harness, /explicit V3 Candidate worktree/);
 });
+test("Protocol V3 Devnode harness validates the frozen Git blob and permits checkout-only CRLF conversion", () => {
+  assert.match(harness, /V3_R2_CANONICAL_COMMIT="15b3d860948623d66eb957c69336b45af582c398"/);
+  assert.match(harness, /V3_R2_CANONICAL_MAIN_LEO_SHA256="75883ade8223f549db44c2d2ede0d0834bdafd3f34f5cb4d139f3a6168617247"/);
+  assert.match(harness, /assert_protocol_v3_source_integrity/);
+  assert.match(harness, /git -C "\$\{ROOT_DIR\}" show "\$\{expected_ref\}:\$\{MAIN_LEO_RELATIVE_PATH\}"/);
+  assert.match(harness, /normalized = raw\.replace\(b"\\r\\n", b"\\n"\)/);
+  assert.match(harness, /if b"\\r" in normalized/);
+  assert.match(harness, /R2 source integrity: FAIL/);
+  assert.match(harness, /checkout normalized SHA256/);
+  assert.match(harness, /canonical source integrity: PASS/);
+  assert.match(harness, /status --porcelain=v1/);
+  assert.match(harness, /candidate worktree is dirty/);
+});
+
 test("Escrow Devnode harness restores locally patched source without relying on a worktree .git file", () => {
   assert.match(harness, /backup_test_sources/);
   assert.match(harness, /BASELINE_SOURCE_BACKUP/);
@@ -511,6 +626,35 @@ test("Escrow Devnode harness restores locally patched source without relying on 
   assert.match(harness, /cp -- "\$\{BASELINE_SOURCE_BACKUP\}"/);
   assert.match(harness, /cp -- "\$\{BASELINE_PROGRAM_BACKUP\}"/);
   assert.match(harness, /cp -- "\$\{CANDIDATE_SOURCE_BACKUP\}"/);
+});
+
+test("Protocol V3 materializes an isolated WSL Leo execution workspace after source integrity checks", () => {
+  const mainStart = harness.indexOf("main() {");
+  const mainBody = harness.slice(mainStart);
+  const integrityGate = mainBody.indexOf("assert_protocol_v3_source_integrity");
+  const executionMaterialization = mainBody.indexOf("materialize_v3_execution_workspaces");
+
+  assert.match(harness, /readonly BASELINE_WORKTREE_DIR=/);
+  assert.match(harness, /readonly CANDIDATE_WORKTREE_DIR=/);
+  assert.match(harness, /v3_execution_root\(\)/);
+  assert.match(harness, /development execution workspace must be below/);
+  assert.match(harness, /final execution workspace must be below/);
+  assert.match(harness, /materialize_v3_leo_package\(\)/);
+  assert.match(harness, /cmp -s "\$\{source_main\}" "\$\{destination_main\}"/);
+  assert.match(harness, /cmp -s "\$\{source_manifest\}" "\$\{destination_manifest\}"/);
+  assert.match(harness, /BASELINE_DIR="\$\{execution_root\}\/baseline"/);
+  assert.match(harness, /CANDIDATE_DIR="\$\{execution_root\}\/candidate"/);
+  assert.match(harness, /cleanup_v3_execution_workspaces\(\)/);
+  assert.ok(integrityGate >= 0 && executionMaterialization > integrityGate, "source integrity must precede execution-copy creation");
+});
+
+test("Protocol V3 writes runtime-heavy logs and reports to the WSL run directory", () => {
+  assert.match(harness, /configure_v3_runtime_paths\(\)/);
+  assert.match(harness, /REPORT_DIR="\$\{runtime\}\/reports"/);
+  assert.match(harness, /DIAGNOSTIC_DIR="\$\{runtime\}\/logs"/);
+  assert.match(harness, /ALEO_E2E_DEVNODE_LOG="\$\{runtime\}\/devnode\.log"/);
+  assert.match(harness, /development runtime artifacts must be below/);
+  assert.match(harness, /final runtime artifacts must be below/);
 });
 
 test("Escrow Devnode harness compiles its materialized Edition 0 baseline with the Leo 4.4 manifest", () => {
@@ -531,7 +675,9 @@ test("Escrow Devnode harness delegates all production role replacements to the l
 
 test("Escrow Devnode harness uses child-only network variables and a tracked Devnode PID", () => {
   assert.match(harness, /readonly ALEO_E2E_NETWORK="testnet"/);
-  assert.match(harness, /readonly ALEO_E2E_ENDPOINT="\$\{ZKBB_DEVNODE_ENDPOINT:-http:\/\/127\.0\.0\.1:3030\}"/);
+  assert.match(harness, /readonly ALEO_E2E_PORT="\$\{ZKBB_DEVNODE_PORT:-3030\}"/);
+  assert.match(harness, /readonly ALEO_E2E_ENDPOINT="\$\{ZKBB_DEVNODE_ENDPOINT:-http:\/\/127\.0\.0\.1:\$\{ALEO_E2E_PORT\}\}"/);
+  assert.match(harness, /readonly ALEO_E2E_SOCKET_ADDR="127\.0\.0\.1:\$\{ALEO_E2E_PORT\}"/);
   assert.match(harness, /env \\\n\s+"NETWORK=\$\{ALEO_E2E_NETWORK\}"/);
   assert.match(harness, /ALEO_E2E_DEVNODE_PID=\$!/);
   assert.match(harness, /wait_for_http/);
@@ -572,7 +718,7 @@ test("Escrow Devnode harness cleanup is idempotent and cannot leave nounset vari
   assert.match(harness, /if \[\[ "\$\{CLEANUP_DONE:-0\}" == "1" \]\]/);
   assert.match(harness, /handle_signal/);
   assert.match(harness, /OWNER_ADDRESS=""/);
-  assert.doesNotMatch(harness, /unset OWNER_ADDRESS/);
+  assert.match(harness, /unset OWNER_ADDRESS WHITEHAT_ADDRESS ARBITER_ADDRESS/);
   assert.match(harness, /assert_full_e2e_inputs/);
   assert.match(harness, /local owner address is unavailable before source patching/);
   assert.match(harness, /if \[\[ "\$\{BASH_SOURCE\[0\]\}" == "\$0" \]\]/);
@@ -581,7 +727,7 @@ test("Escrow Devnode harness cleanup is idempotent and cannot leave nounset vari
 test("Escrow Devnode harness reports interrupted interactive input instead of continuing", () => {
   assert.match(harness, /input was interrupted/);
   assert.match(harness, /if ! read -r -s -p/);
-  assert.match(harness, /if ! read -r -p/);
+  assert.match(harness, /if ! read -r -s -p/);
 });
 
 test("Escrow Devnode harness supports a no-account local preflight", () => {
@@ -612,6 +758,8 @@ test("Escrow Devnode harness derives its deploy baseline from the real Testnet e
   assert.match(harness, /TESTNET_EDITION_ZERO_FIXTURE=/);
   assert.match(harness, /5f60a222cc989a55285258d1fa89ae46a6aa9e4487a396898e28cf94aa7afdf2/);
   assert.match(harness, /materialize_real_testnet_edition_zero_baseline/);
+  assert.match(harness, /candidate_worktree_status/);
+  assert.match(harness, /-c core\.autocrlf=true --git-dir="\$\{candidate_gitdir\}" --work-tree="\$\{CANDIDATE_WORKTREE_DIR\}" status --porcelain=v1/);
   assert.match(harness, /prepare_real_testnet_edition_zero_sources/);
   assert.match(harness, /\[baseline-source\] real Testnet edition 0 fixture/);
   assert.match(harness, /\[baseline-source\] historical Git baseline used: no/);
@@ -622,11 +770,54 @@ test("Escrow Devnode harness derives its deploy baseline from the real Testnet e
   assert.doesNotMatch(harness, /assert_worktree_ref "\$\{BASELINE_DIR\}" "pre-escrow-upgrade"/);
   assert.doesNotMatch(harness, /api\.explorer\.provable\.com/);
 });
+test("Protocol V3 reproduction arbitration rejects a severity-only verdict and accepts the receipt severity", () => {
+  assert.match(
+    harness,
+    /expect_chain_rejected "v3-reproduction-severity-only-vote"[\s\S]*cast_arbitration_vote_v3[\s\S]*"\$\{v3_claim_award\}" 2u8/,
+  );
+  assert.match(harness, /v3-reproduction-severity-only-tally[\s\S]*assert_mapping_unchanged/);
+  assert.match(harness, /v3-arbiter-one-critical-vote[\s\S]*"\$\{v3_claim_award\}" 3u8/);
+  assert.match(harness, /v3-arbiter-two-critical-vote[\s\S]*"\$\{v3_claim_award\}" 3u8/);
+  assert.match(harness, /v3-critical-quorum[\s\S]*critical_votes:2u8/);
+  assert.match(harness, /v3-settle-critical-award[\s\S]*3000000u64[\s\S]*1000000u64[\s\S]*3u8/);
+  assert.match(harness, /paid_amount:3000000u64/);
+  assert.match(harness, /refunded_amount:7000000u64/);
+});
+
+test("Protocol V3 Devnode harness uses a strict Leo struct reader and prints raw public mapping diagnostics before votes", () => {
+  assert.match(harness, /scripts\/leo-struct-reader\.mjs/);
+  assert.match(harness, /capture_v3_mapping_with_diagnostics/);
+  assert.match(harness, /HTTP content-type:/);
+  assert.match(harness, /raw mapping value:/);
+  assert.match(harness, /bounty_v3_configs\)\n\s+expected_fields=/);
+  assert.match(harness, /claim_v3_dispute_metadata\)\n\s+expected_fields=/);
+  assert.doesNotMatch(harness, /compact="\$\(printf '%s' "\$\{raw\}" \| tr -d/);
+});
+test("Protocol V3 Devnode harness parses dispute type independently from severity", () => {
+  assert.match(harness, /v3_u8_value\(\)[\s\S]*\^\(\[0-9\]\+\)u8\$/);
+  assert.match(harness, /v3_severity_value\(\)[\s\S]*\^\[0-3\]\$/);
+  assert.match(harness, /dispute_type="\$\(v3_u8_value "\$\{dispute_type_literal\}"\)/);
+  assert.match(harness, /verdict="\$\(v3_severity_value "\$\{verdict_literal\}"\)/);
+});
+test("Escrow Devnode diagnostics distinguish rejected execution from a fee transaction lookup", () => {
+  assert.match(harness, /transaction_response_is_rejected_execution_fee/);
+  assert.match(harness, /print_execute_rejection_diagnostics/);
+  assert.match(harness, /original execute tx:/);
+  assert.match(harness, /fee transaction:/);
+  assert.match(harness, /rejection reason:/);
+  assert.match(harness, /transaction_response_matches "\$\{fee_tx_id\}"/);
+});
 test("Protocol V3 Devnode wrapper enables the complete arbitration extension", () => {
   assert.match(protocolV3Harness, /export ZKBB_RUN_PROTOCOL_V3=1/);
   assert.match(protocolV3Harness, /V3_LEO_VERSION="4\.4\.0"/);
   assert.match(protocolV3Harness, /leo-toolchains\/\$\{V3_LEO_VERSION\}\/bin\/leo/);
   assert.match(protocolV3Harness, /Leo 4\.4\.0 is required/);
+  assert.match(protocolV3Harness, /env -u LEO_BIN npm test/);
+  assert.match(protocolV3Harness, /git -c core\.whitespace=cr-at-eol diff --check --/);
+  assert.match(protocolV3Harness, /git diff --ignore-space-at-eol --exit-code -- leo\/bug_proof\/src\/main\.leo/);
+  assert.match(protocolV3Harness, /scripts\/protocol-v3-final-dynamic-coverage\.sh/);
+  assert.match(protocolV3Harness, /node scripts\/check-protocol-v3-harness-static\.mjs/);
+  assert.match(protocolV3Harness, /export LEO_BIN="\$\{V3_E2E_LEO_BIN\}"/);
   assert.match(protocolV3Harness, /exec bash .*escrow-v2-devnode-e2e\.sh/);
 
   const steps = [
@@ -640,9 +831,10 @@ test("Protocol V3 Devnode wrapper enables the complete arbitration extension", (
     "v3-acknowledge-disclosure",
     "v3-reproduction-rejected",
     "v3-open-dispute",
-    "v3-arbiter-one-high-vote",
-    "v3-arbiter-two-high-vote",
-    "v3-settle-high-award",
+    "v3-reproduction-severity-only-vote",
+    "v3-arbiter-one-critical-vote",
+    "v3-arbiter-two-critical-vote",
+    "v3-settle-critical-award",
     "v3-submit-reject-claim",
     "v3-duplicate-arbiter-vote",
     "v3-finalize-rejection",
@@ -663,4 +855,147 @@ test("Protocol V3 Devnode wrapper enables the complete arbitration extension", (
   assert.match(harness, /assert_balance_delta "v3-program-conservation"/);
   assert.match(harness, /record_event "protocol-v3-award-flow" "passed"/);
   assert.match(harness, /record_event "protocol-v3-rejection-flow" "passed"/);
+});
+
+test("Protocol V3 final dynamic coverage is localhost-only, assertion-gated, and covers all dispute routes", () => {
+  assert.match(harness, /source "\$\{ROOT_DIR\}\/scripts\/protocol-v3-final-dynamic-coverage\.sh"/);
+  assert.match(harness, /run_protocol_v3_final_dynamic_coverage/);
+  assert.match(harness, /V3_FINAL_COVERAGE_PASSED/);
+  assert.match(harness, /report_v3_final_failure_once/);
+  assert.match(harness, /final_e2e_exit_guard/);
+  assert.doesNotMatch(harness, /Local Devnode Protocol V3 accepted and rejected arbitration flows passed/);
+
+  for (const [name, type] of [["REJECTION", 1], ["DUPLICATE", 2], ["SCOPE", 3], ["SEVERITY", 4], ["REPRODUCTION", 5], ["REMEDIATION", 6]] as const) {
+    assert.match(finalV3Coverage, new RegExp(`assert_v3_dispute_persistence "${name}"[\\s\\S]* ${type} `));
+  }
+  assert.match(finalV3Coverage, /v3-public-key-deriver/);
+  assert.match(finalV3Coverage, /derive_vote_key/);
+  assert.match(finalV3Coverage, /derive_operation_marker/);
+  assert.match(finalV3Coverage, /--offline --disable-update-check/);
+  assert.doesNotMatch(finalV3Coverage, /DEVNODE_PRIVATE_KEY|PRIVATE_KEY=/);
+  assert.match(finalV3Coverage, /generate_ephemeral_local_account non_arbiter_key non_arbiter_address "ephemeral V3 non-arbiter"/);
+  assert.match(harness, /\(\(\$# == 3\)\) \|\| die "generate_ephemeral_local_account requires key variable, address variable, and label"/);
+  assert.match(finalV3Coverage, /generated non-arbiter unexpectedly belongs to the panel/);
+  assert.match(finalV3Coverage, /non-arbiter rejection: PASS/);
+  assert.match(finalV3Coverage, /duplicate vote rollback: PASS/);
+  assert.match(finalV3Coverage, /V3 failed-finalize atomic rollback: PASS/);
+  assert.match(finalV3Coverage, /finalized dispute replay rejection: PASS/);
+  assert.match(finalV3Coverage, /V3 refund replay: PASS/);
+  assert.match(finalV3Coverage, /confirmed_public_fee_microcredits "\$\{label\}-refund-fee" "\$\{STEP_TX_ID\}" execute/);
+  assert.match(finalV3Coverage, /10#\$\{refund_value\} - 10#\$\{refund_fee\}/);
+  assert.match(finalV3Coverage, /confirmed_public_fee_microcredits "\$\{label\}-refund-replay-fee" "\$\{STEP_FEE_TX_ID\}" fee/);
+  assert.match(finalV3Coverage, /-\$\(\(10#\$\{refund_replay_fee\}\)\)/);
+  assert.match(finalV3Coverage, /immutable panel runtime: PASS/);
+  assert.match(finalV3Coverage, /2\/3 one-vote settlement rejection: PASS/);
+  assert.match(finalV3Coverage, /2\/3 two-vote settlement acceptance: PASS/);
+  assert.match(finalV3Coverage, /3\/3 one-vote settlement rejection: PASS/);
+  assert.match(finalV3Coverage, /3\/3 two-vote settlement rejection: PASS/);
+  assert.match(finalV3Coverage, /3\/3 three-vote settlement acceptance: PASS/);
+  assert.match(finalV3Coverage, /quorum: 3u8/);
+  assert.match(finalV3Coverage, /Protocol V3 R2 FINAL DYNAMIC COVERAGE: PASS/);
+  assert.match(finalV3Coverage, /printf '%s dispute: PASS\\n' "\$\{label\}"/);
+  assert.match(finalV3Coverage, /assert_v3_dispute_persistence "REPRODUCTION"/);
+  assert.match(finalV3Coverage, /six dispute types: PASS/);
+  assert.match(finalV3Coverage, /Credits conservation: 0 microcredits/);
+  assert.doesNotMatch(finalV3Coverage, /https?:\/\//);
+});
+
+test("Protocol V3 final coverage reuses deployed bytecode and skips the redundant V3 sample", () => {
+  const acceptedStart = harness.indexOf("execute_accepted() {");
+  const acceptedEnd = harness.indexOf("check_baseline_program_state() {");
+  const accepted = harness.slice(acceptedStart, acceptedEnd);
+  const rejectedStart = harness.indexOf("expect_chain_rejected() {");
+  const rejectedEnd = harness.indexOf("query_mapping() {");
+  const rejected = harness.slice(rejectedStart, rejectedEnd);
+
+  assert.match(accepted, /execution_source_args=\(\)/);
+  assert.match(accepted, /execution_source_args=\(--no-local\)/);
+  assert.match(rejected, /execution_source_args=\(--no-local\)/);
+  assert.match(harness, /This transfer happens before the baseline program is deployed/);
+  assert.match(harness, /harness_time_begin v3-panel-bootstrap/);
+  assert.match(harness, /protocol-v3-redundant-sample" "skipped-final-matrix-is-superset/);
+  assert.match(harness, /final six-dispute matrix below already contains both/);
+});
+test("Protocol V3 development runner separates static, scenario, changed, and final modes", () => {
+  assert.equal(packageJson.scripts["v3:preflight"], "bash scripts/protocol-v3-dev-runner.sh preflight");
+  assert.equal(packageJson.scripts["v3:e2e"], "bash scripts/protocol-v3-dev-runner.sh e2e");
+  assert.equal(packageJson.scripts["v3:e2e:changed"], "bash scripts/protocol-v3-dev-runner.sh changed");
+  assert.equal(packageJson.scripts["v3:e2e:final"], "bash scripts/protocol-v3-dev-runner.sh final");
+  assert.equal(packageJson.scripts["v3:e2e:final:parallel"], "bash scripts/protocol-v3-dev-runner.sh final-parallel");
+  assert.match(developmentRunner, /run_preflight/);
+  assert.match(developmentRunner, /static gates: cached PASS/);
+  assert.match(developmentRunner, /ESCROW_DEVNODE_STAGE=\$\{harness_stage\}/);
+  assert.match(developmentRunner, /ZKBB_DEV_SNAPSHOT_DIR=/);
+  assert.match(developmentRunner, /run_final\(\)[\s\S]*final mode forbids resume, snapshot, reuse ledger, and stage overrides/);
+  assert.match(developmentRunner, /final-run\.XXXXXX/);
+  assert.match(developmentRunner, /127\.0\.0\.1:3030/);
+});
+
+test("Protocol V3 parallel final isolates fresh-ledger shards and keeps local role keys off disk and process arguments", () => {
+  for (const shard of ["legacy", "two-core", "duplicate-scope", "severity", "reproduction-remediation", "three-of-three"]) {
+    assert.match(parallelFinal, new RegExp(`\\b${shard}\\b`));
+    assert.match(harness, new RegExp(`\\b${shard}\\b`));
+  }
+  assert.match(parallelFinal, /ZKBB_PARALLEL_WORKERS/);
+  assert.match(parallelFinal, /ZKBB_PARALLEL_BASE_PORT/);
+  assert.match(parallelFinal, /printf '%s\\n%s\\n%s\\n'[\s\S]*\|[\s\S]*final-shard/);
+  assert.match(parallelFinal, /mktemp -d "\$\{DEVNODE_CACHE_ROOT\}\/parallel-final\.XXXXXX"/);
+  assert.match(developmentRunner, /mktemp -d "\$\{DEVNODE_CACHE_ROOT\}\/final-run\.XXXXXX"/);
+  assert.match(developmentRunner, /ZKBB_DEVNODE_PORT=\$\{port\}/);
+  assert.match(developmentRunner, /ZKBB_DEVNODE_ENDPOINT=http:\/\/127\.0\.0\.1:\$\{port\}/);
+  assert.match(parallelFinal, /local index="\$2"\s+local port="" log="" pid=""\s+port="\$\(\(10#\$\{BASE_PORT\} \+ index\)\)"/);
+  assert.doesNotMatch(parallelFinal, /local[^\n]*index="\$2"[^\n]*port="\$\(\([^\n]*index/);
+  assert.match(parallelFinal, /Protocol V3 R2 FINAL DYNAMIC COVERAGE: PASS/);
+  assert.match(parallelFinal, /ZKBB_PARALLEL_RESUME_ROOT/);
+  assert.match(parallelFinal, /REUSE PASS/);
+  assert.match(parallelFinal, /resolve_resume_root/);
+  assert.match(parallelFinal, /verify_shard_log/);
+  assert.doesNotMatch(parallelFinal, />[^\n]*(OWNER|WHITEHAT|ARBITER).*KEY/);
+  assert.doesNotMatch(parallelFinal, /export (PARALLEL_OWNER_KEY|PARALLEL_WHITEHAT_KEY|PARALLEL_ARBITER_KEY)/);
+  assert.doesNotMatch(parallelFinal, /https?:\/\/(?!127\.0\.0\.1|localhost)/);
+});
+
+test("Protocol V3 development scenarios are bounded and never select an arbitrary business-state resume", () => {
+  for (const scenario of ["reproduction", "dispute-types", "quorum-2", "quorum-3", "non-arbiter", "duplicate-vote", "settlement-replay", "refund-replay", "atomicity"]) {
+    assert.match(developmentScenarios, new RegExp(`scenario_${scenario.replace(/-/g, "_")}\\(\\)`));
+  }
+  assert.match(developmentScenarios, /run_protocol_v3_development_scenario/);
+  assert.doesNotMatch(developmentScenarios, /https?:\/\//);
+  assert.match(harness, /development_snapshot_path/);
+  assert.match(harness, /clone_development_snapshot/);
+  assert.match(harness, /create_development_snapshot/);
+  assert.match(harness, /snapshot ledger reuse is allowed only for development scenarios/);
+  assert.match(harness, /final mode forbids snapshot or ledger reuse/);
+});
+
+test("Protocol V3 fail-fast credentials are derived, distinct, and unset after local cleanup", () => {
+  const provisionStart = harness.indexOf("provision_local_accounts() {");
+  const startDevnode = harness.indexOf("start_devnode() {");
+  const provision = harness.slice(provisionStart, startDevnode);
+  assert.match(provision, /prompt_secret OWNER_PRIVATE_KEY/);
+  assert.match(provision, /prompt_secret WHITEHAT_PRIVATE_KEY/);
+  assert.match(provision, /prompt_secret ARBITER_PRIVATE_KEY/);
+  assert.match(provision, /derive_local_address/);
+  assert.match(provision, /assert_distinct_local_roles/);
+  assert.match(harness, /unset DEVNODE_PRIVATE_KEY OWNER_PRIVATE_KEY WHITEHAT_PRIVATE_KEY ARBITER_PRIVATE_KEY/);
+  assert.match(harness, /development ledger must be an isolated run ledger/);
+  assert.match(harness, /development and final ledgers must use the WSL filesystem/);
+});
+
+test("Protocol V3 static checker catches helper-arity regressions before Devnode startup", () => {
+  assert.match(staticHarnessCheck, /generate_ephemeral_local_account must reject an invalid arity before Devnode startup/);
+  assert.match(staticHarnessCheck, /requires exactly 3 arguments/);
+  assert.match(developmentRunner, /check-protocol-v3-harness-static\.mjs/);
+  assert.match(harness, /harness_time_begin bootstrap/);
+  assert.match(harness, /harness_time_begin legacy/);
+  assert.match(harness, /harness_time_begin v3-reproduction/);
+  assert.match(harness, /declare -A E2E_TIME_LABEL_STARTED_MS=\(\)/);
+  assert.match(harness, /local label="\$1"\n  local started="\$\{E2E_TIME_LABEL_STARTED_MS\[\$\{label\}\]:-\}"/);
+  assert.match(staticHarnessCheck, /timer labels must be initialized/);
+  for (const stage of ["six-disputes", "quorum-2", "quorum-3", "replay", "atomicity"]) {
+    assert.match(finalV3Coverage, new RegExp(`harness_time_track_begin ${stage}`));
+    assert.match(finalV3Coverage, new RegExp(`harness_time_track_end ${stage}`));
+  }
+  assert.match(harness, /write_sanitized_diagnostic/);
+  assert.match(harness, /local-devnode\/logs/);
 });

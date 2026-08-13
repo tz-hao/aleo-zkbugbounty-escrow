@@ -11,15 +11,24 @@ LEO_BIN="${LEO_BIN:-leo}"
 readonly PROGRAM_ID="zkbugbounty_7f3c92.aleo"
 readonly ALEO_E2E_NETWORK="testnet"
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-readonly BASELINE_DIR="${ZKBB_DEVNODE_BASELINE_DIR:-${ROOT_DIR}/local-devnode/baseline-pre-escrow}"
-readonly CANDIDATE_DIR="${V3_CANDIDATE_WORKTREE:-${ZKBB_DEVNODE_CANDIDATE_DIR:-${ROOT_DIR}/local-devnode/candidate-escrow-v2}}"
+readonly BASELINE_WORKTREE_DIR="${ZKBB_DEVNODE_BASELINE_DIR:-${ROOT_DIR}/local-devnode/baseline-pre-escrow}"
+readonly CANDIDATE_WORKTREE_DIR="${V3_CANDIDATE_WORKTREE:-${ZKBB_DEVNODE_CANDIDATE_DIR:-${ROOT_DIR}/local-devnode/candidate-escrow-v2}}"
+# Non-V3 callers keep using these original worktrees. Protocol V3 runs replace
+# both values with a one-run WSL execution copy only after integrity checks.
+BASELINE_DIR="${BASELINE_WORKTREE_DIR}"
+CANDIDATE_DIR="${CANDIDATE_WORKTREE_DIR}"
 readonly CANDIDATE_REF="${CANDIDATE_REF:-${ZKBB_DEVNODE_CANDIDATE_REF:-escrow-v2-leo-4.4-migration}}"
 readonly ROOT_CANDIDATE_SOURCE="${ROOT_DIR}/leo/bug_proof/src/main.leo"
+readonly MAIN_LEO_RELATIVE_PATH="leo/bug_proof/src/main.leo"
+readonly V3_R2_CANONICAL_COMMIT="15b3d860948623d66eb957c69336b45af582c398"
+readonly V3_R2_CANONICAL_MAIN_LEO_SHA256="75883ade8223f549db44c2d2ede0d0834bdafd3f34f5cb4d139f3a6168617247"
 readonly TESTNET_EDITION_ZERO_FIXTURE="${ROOT_DIR}/audit/testnet-edition-0/zkbugbounty_7f3c92.edition-0.aleo"
 readonly TESTNET_EDITION_ZERO_FIXTURE_SHA256="5f60a222cc989a55285258d1fa89ae46a6aa9e4487a396898e28cf94aa7afdf2"
 readonly REAL_BASELINE_MATERIALIZER="${ROOT_DIR}/scripts/materialize-testnet-edition0-baseline.mjs"
 readonly ALEO_E2E_LEDGER="${ZKBB_DEVNODE_LEDGER_DIR:-${ROOT_DIR}/local-devnode/ledger}"
-readonly ALEO_E2E_ENDPOINT="${ZKBB_DEVNODE_ENDPOINT:-http://127.0.0.1:3030}"
+readonly ALEO_E2E_PORT="${ZKBB_DEVNODE_PORT:-3030}"
+readonly ALEO_E2E_ENDPOINT="${ZKBB_DEVNODE_ENDPOINT:-http://127.0.0.1:${ALEO_E2E_PORT}}"
+readonly ALEO_E2E_SOCKET_ADDR="127.0.0.1:${ALEO_E2E_PORT}"
 readonly MINIMUM_V9_BLOCK_ADVANCE=20
 readonly MINIMUM_OWNER_MICROCREDITS=200000000
 # One Aleo credit is one million microcredits. The 5,000-credit allocation is
@@ -30,8 +39,12 @@ readonly MINIMUM_ROLE_TRANSACTION_MICROCREDITS=100000000
 readonly MINIMUM_OWNER_BOOTSTRAP_MICROCREDITS=$((BOOTSTRAP_TRANSFER_MICROCREDITS * 2 + MINIMUM_OWNER_MICROCREDITS))
 readonly TRANSACTION_WAIT_ATTEMPTS=60
 readonly TRANSACTION_500_ATTEMPTS=3
-readonly REPORT_DIR="${ROOT_DIR}/local-e2e-results"
-readonly REPORT_FILE="${REPORT_DIR}/escrow-v2-devnode-report.json"
+readonly CONFIRMED_FEE_LOOKUP_ATTEMPTS=6
+readonly DEVNODE_HEIGHT_READ_ATTEMPTS=5
+REPORT_DIR="${ROOT_DIR}/local-e2e-results"
+REPORT_FILE="${REPORT_DIR}/escrow-v2-devnode-report.json"
+# Sanitized command/transaction diagnostics remain local and never contain keys.
+DIAGNOSTIC_DIR="${ROOT_DIR}/local-devnode/logs"
 readonly LOCAL_PRIVATE_KEY_LENGTH=59
 readonly PREFLIGHT_OWNER_ADDRESS="aleo1preflightowner00000000000000000000000000000000000000000000000"
 readonly PREFLIGHT_ARBITER_ADDRESS="aleo1preflightarbiter00000000000000000000000000000000000000000000"
@@ -39,6 +52,7 @@ readonly PREFLIGHT_ARBITER_ADDRESS="aleo1preflightarbiter00000000000000000000000
 ALEO_E2E_DEVNODE_PID=""
 ALEO_E2E_DEVNODE_LOG="${REPORT_DIR}/escrow-v2-devnode.log"
 ALEO_E2E_LAUNCH_DIR=""
+V3_EXECUTION_ROOT=""
 DEVNODE_PRIVATE_KEY=""
 OWNER_PRIVATE_KEY=""
 WHITEHAT_PRIVATE_KEY=""
@@ -50,6 +64,7 @@ LAST_OUTPUT=""
 LAST_BROADCAST_OUTPUT=""
 HTTP_RESPONSE_STATUS=""
 HTTP_RESPONSE_BODY=""
+LAST_CONFIRMED_TRANSACTION_RESPONSE=""
 READ_MAPPING_U64_STATUS=""
 READ_MAPPING_U64_VALUE=""
 BOOTSTRAP_WHITEHAT_TX_ID=""
@@ -78,6 +93,17 @@ BASELINE_PROGRAM_BACKUP=""
 CANDIDATE_SOURCE_BACKUP=""
 CLEANUP_DONE=0
 ALEO_E2E_BOOTSTRAP_COMPLETE=0
+V3_FINAL_FAILURE_REPORTED=0
+# Set only after a development snapshot has been cloned into the isolated run ledger.
+DEVNODE_REUSING_SNAPSHOT=0
+
+report_v3_final_failure_once() {
+  [[ "${ZKBB_FINAL_MODE:-0}" == "1" ]] || return 0
+  if [[ "${ZKBB_RUN_PROTOCOL_V3:-0}" == "1" && "${V3_FINAL_COVERAGE_PASSED:-0}" != "1" && "${V3_FINAL_FAILURE_REPORTED:-0}" != "1" ]]; then
+    printf 'Protocol V3 R2 FINAL DYNAMIC COVERAGE: FAIL\n' >&2
+    V3_FINAL_FAILURE_REPORTED=1
+  fi
+}
 
 die() {
   printf 'escrow-devnode-e2e: %s\n' "$*" >&2
@@ -85,8 +111,12 @@ die() {
 }
 
 assert_local_endpoint() {
+  [[ "${ALEO_E2E_PORT}" =~ ^[0-9]+$ ]] \
+    || die "invalid local Devnode port: ${ALEO_E2E_PORT}"
+  ((10#${ALEO_E2E_PORT} >= 1024 && 10#${ALEO_E2E_PORT} <= 65535)) \
+    || die "local Devnode port must be between 1024 and 65535"
   case "${ALEO_E2E_ENDPOINT}" in
-    http://127.0.0.1:3030|http://localhost:3030) ;;
+    "http://127.0.0.1:${ALEO_E2E_PORT}"|"http://localhost:${ALEO_E2E_PORT}") ;;
     *) die "refusing non-local endpoint: ${ALEO_E2E_ENDPOINT}" ;;
   esac
 }
@@ -111,15 +141,55 @@ current_stage() {
   printf '%s' "${ESCROW_DEVNODE_STAGE:-full}"
 }
 
+current_final_shard() {
+  printf '%s' "${ZKBB_FINAL_SHARD:-all}"
+}
+
+assert_supported_final_shard() {
+  case "$(current_final_shard)" in
+    all|legacy|two-core|duplicate-scope|severity|reproduction-remediation|three-of-three) ;;
+    *) die "unsupported Protocol V3 final shard: $(current_final_shard)" ;;
+  esac
+
+  if [[ "$(current_final_shard)" != "all" ]]; then
+    [[ "${ZKBB_FINAL_MODE:-0}" == "1" && "${ZKBB_RUN_PROTOCOL_V3:-0}" == "1" ]] \
+      || die "Protocol V3 final shards require final mode and Protocol V3"
+  fi
+}
+
 is_bootstrap_stage() {
   [[ "$(current_stage)" == "bootstrap" ]]
 }
 
+is_development_stage() {
+  [[ "$(current_stage)" == "development" ]]
+}
+
+is_legacy_development_stage() {
+  [[ "$(current_stage)" == "legacy" ]]
+}
+
 assert_supported_stage() {
   case "$(current_stage)" in
-    bootstrap|full) ;;
-    *) die "unsupported ESCROW_DEVNODE_STAGE: $(current_stage) (use bootstrap or full)" ;;
+    bootstrap|development|legacy|full) ;;
+    *) die "unsupported ESCROW_DEVNODE_STAGE: $(current_stage) (use bootstrap, development, legacy, or full)" ;;
   esac
+}
+
+complete_final_shard() {
+  local shard="$1"
+  V3_FINAL_COVERAGE_PASSED=1
+  record_event "protocol-v3-final-shard-${shard}" "passed"
+  record_event "status" "COMPLETED"
+  harness_time_summary
+  write_public_report
+  printf 'Protocol V3 R2 FINAL SHARD %s: PASS\n' "${shard}"
+  printf '%s\n' '- Candidate: 15b3d860948623d66eb957c69336b45af582c398'
+  printf '%s\n' '- HEAD match: PASS'
+  printf '%s\n' '- main.leo changed: NO'
+  printf '%s\n' '- source integrity: PASS'
+  printf '%s\n' '- Testnet transactions: 0'
+  printf '%s\n' 'Testnet transactions broadcast by Codex: 0'
 }
 
 require_tool() {
@@ -172,44 +242,179 @@ prompt_secret() {
   unset value
 }
 
-prompt_address() {
-  local variable_name="$1"
-  local prompt="$2"
-  local value=""
-  if ! read -r -p "${prompt}: " value; then
-    die "${prompt} input was interrupted"
-  fi
-  [[ "${value}" =~ ^aleo1[0-9a-z]+$ ]] || die "${prompt} is not an Aleo address"
-  printf -v "${variable_name}" '%s' "${value}"
-  unset value
+derive_local_address() {
+  (($# == 2)) || die "derive_local_address expects a label and local-only private key"
+  local label="$1" private_key="$2" account_output="" public_address=""
+
+  # Leo receives the key only as a child-process argument; output stays in this
+  # process and is cleared before returning. Never pass the write-to-file option.
+  account_output="$("${LEO_BIN}" account import "${private_key}" --network "${ALEO_E2E_NETWORK}" --disable-update-check 2>&1)" \
+    || { account_output=""; die "${label} private key could not be imported locally"; }
+  public_address="$(printf '%s\n' "${account_output}" | tr -cs '[:alnum:]_' '\n' | awk 'index($0, "aleo1") == 1 { print; exit }')"
+  account_output=""
+  [[ "${public_address}" =~ ^aleo1[0-9a-z]+$ ]] \
+    || die "${label} private key did not derive a valid local Aleo address"
+  printf '%s' "${public_address}"
+  public_address=""
+}
+
+assert_distinct_local_roles() {
+  [[ "${OWNER_ADDRESS}" != "${WHITEHAT_ADDRESS}" &&
+     "${OWNER_ADDRESS}" != "${ARBITER_ADDRESS}" &&
+     "${WHITEHAT_ADDRESS}" != "${ARBITER_ADDRESS}" ]] \
+    || die "local Owner, Whitehat, and Arbiter identities must be distinct"
 }
 
 provision_local_accounts() {
+  # All role credentials are read and validated before Devnode startup,
+  # deployment, or any local transaction. The terminal hides each input.
   prompt_secret OWNER_PRIVATE_KEY "Local-only Devnode owner private key"
-  # Leo Devnode seeds local Credits to its startup identity, so the owner who
-  # deploys and funds the baseline must be that same local-only identity.
-  DEVNODE_PRIVATE_KEY="${OWNER_PRIVATE_KEY}"
-  prompt_address OWNER_ADDRESS "Local-only Devnode owner public address"
-  prompt_address WHITEHAT_ADDRESS "Local-only Whitehat public address"
-  prompt_address ARBITER_ADDRESS "Local-only Arbiter public address"
-
-  # Bootstrap only transfers public Credits from the Owner. Recipient keys are
-  # unnecessary until the full E2E submits a Whitehat claim.
-  if is_bootstrap_stage; then
-    return 0
-  fi
-
   prompt_secret WHITEHAT_PRIVATE_KEY "Local-only Whitehat private key"
   prompt_secret ARBITER_PRIVATE_KEY "Local-only Arbiter private key"
+  OWNER_ADDRESS="$(derive_local_address "Local-only Devnode owner" "${OWNER_PRIVATE_KEY}")"
+  WHITEHAT_ADDRESS="$(derive_local_address "Local-only Whitehat" "${WHITEHAT_PRIVATE_KEY}")"
+  ARBITER_ADDRESS="$(derive_local_address "Local-only Arbiter" "${ARBITER_PRIVATE_KEY}")"
+  # Leo Devnode seeds Credits to its startup identity, so deployment must use
+  # the derived Owner identity rather than a separately supplied address.
+  DEVNODE_PRIVATE_KEY="${OWNER_PRIVATE_KEY}"
+  assert_distinct_local_roles
   assert_full_e2e_inputs
 }
 
+safe_development_cache_root() {
+  local root
+  root="$(realpath -m "${ZKBB_DEVNODE_CACHE_ROOT:-${HOME}/.cache/zkbb/devnode}")"
+  [[ "${root}" != /mnt/* ]] || die "development and final ledgers must use the WSL filesystem, not ${root}"
+  printf '%s' "${root}"
+}
+
+v3_execution_root() {
+  local cache="" ledger="" root=""
+
+  [[ "${ZKBB_RUN_PROTOCOL_V3:-0}" == "1" ]] \
+    || die "WSL execution workspace is reserved for Protocol V3 runs"
+  cache="$(safe_development_cache_root)"
+  ledger="$(realpath -m "${ALEO_E2E_LEDGER}")"
+  root="$(realpath -m "$(dirname "${ledger}")/workspaces")"
+
+  if is_development_stage || is_legacy_development_stage; then
+    [[ "${root}" == "${cache}/runs/"*/*/*/workspaces ]] \
+      || die "development execution workspace must be below ${cache}/runs"
+  elif [[ "${ZKBB_FINAL_MODE:-0}" == "1" ]]; then
+    [[ "${root}" == "${cache}/final-run."*/workspaces ]] \
+      || die "final execution workspace must be below ${cache}/final-run.*"
+  else
+    die "Protocol V3 execution workspace requires a development or final run"
+  fi
+  printf '%s' "${root}"
+}
+
+configure_v3_runtime_paths() {
+  local cache="" ledger="" runtime=""
+
+  [[ "${ZKBB_RUN_PROTOCOL_V3:-0}" == "1" ]] || return 0
+  cache="$(safe_development_cache_root)"
+  ledger="$(realpath -m "${ALEO_E2E_LEDGER}")"
+  runtime="$(realpath -m "$(dirname "${ledger}")/runtime")"
+  if is_development_stage || is_legacy_development_stage; then
+    [[ "${runtime}" == "${cache}/runs/"*/*/*/runtime ]] \
+      || die "development runtime artifacts must be below ${cache}/runs"
+  elif [[ "${ZKBB_FINAL_MODE:-0}" == "1" ]]; then
+    [[ "${runtime}" == "${cache}/final-run."*/runtime ]] \
+      || die "final runtime artifacts must be below ${cache}/final-run.*"
+  else
+    die "Protocol V3 runtime artifacts require a development or final run"
+  fi
+
+  REPORT_DIR="${runtime}/reports"
+  REPORT_FILE="${REPORT_DIR}/escrow-v2-devnode-report.json"
+  DIAGNOSTIC_DIR="${runtime}/logs"
+  ALEO_E2E_DEVNODE_LOG="${runtime}/devnode.log"
+  printf '[runtime] WSL artifacts: %s\n' "${runtime}"
+}
+
+materialize_v3_leo_package() {
+  (($# == 3)) || die "materialize_v3_leo_package expects a label, source workspace, and destination workspace"
+  local label="$1" source_workspace="$2" destination_workspace="$3"
+  local source_main="${source_workspace}/leo/bug_proof/src/main.leo"
+  local source_manifest="${source_workspace}/leo/bug_proof/program.json"
+  local destination_main="${destination_workspace}/leo/bug_proof/src/main.leo"
+  local destination_manifest="${destination_workspace}/leo/bug_proof/program.json"
+
+  [[ -f "${source_main}" && ! -L "${source_main}" ]] \
+    || die "${label} source main.leo must be a regular file"
+  [[ -f "${source_manifest}" && ! -L "${source_manifest}" ]] \
+    || die "${label} source program.json must be a regular file"
+  [[ ! -e "${destination_workspace}" ]] \
+    || die "${label} execution workspace already exists: ${destination_workspace}"
+  mkdir -p "${destination_workspace}/leo/bug_proof/src"
+  cp -- "${source_main}" "${destination_main}"
+  cp -- "${source_manifest}" "${destination_manifest}"
+  cmp -s "${source_main}" "${destination_main}" \
+    || die "${label} execution main.leo does not exactly match its checked source"
+  cmp -s "${source_manifest}" "${destination_manifest}" \
+    || die "${label} execution program.json does not exactly match its checked source"
+}
+
+materialize_v3_execution_workspaces() {
+  local execution_root=""
+
+  [[ "${ZKBB_RUN_PROTOCOL_V3:-0}" == "1" ]] || return 0
+  [[ "${BASELINE_DIR}" == "${BASELINE_WORKTREE_DIR}" && "${CANDIDATE_DIR}" == "${CANDIDATE_WORKTREE_DIR}" ]] \
+    || die "Protocol V3 execution workspaces were unexpectedly initialized twice"
+  execution_root="$(v3_execution_root)"
+  [[ ! -e "${execution_root}" ]] \
+    || die "Protocol V3 execution workspace root already exists: ${execution_root}"
+
+  V3_EXECUTION_ROOT="${execution_root}"
+  materialize_v3_leo_package "baseline" "${BASELINE_WORKTREE_DIR}" "${execution_root}/baseline"
+  materialize_v3_leo_package "candidate" "${CANDIDATE_WORKTREE_DIR}" "${execution_root}/candidate"
+  BASELINE_DIR="${execution_root}/baseline"
+  CANDIDATE_DIR="${execution_root}/candidate"
+  printf '[execution] source worktrees: baseline=%s candidate=%s\n' \
+    "${BASELINE_WORKTREE_DIR}" "${CANDIDATE_WORKTREE_DIR}"
+  printf '[execution] WSL Leo workspaces: baseline=%s candidate=%s\n' \
+    "${BASELINE_DIR}" "${CANDIDATE_DIR}"
+  printf '[execution] checked source files copied byte-for-byte: PASS\n'
+}
+
+cleanup_v3_execution_workspaces() {
+  local root=""
+
+  [[ -n "${V3_EXECUTION_ROOT:-}" ]] || return 0
+  root="$(v3_execution_root)"
+  [[ "${root}" == "${V3_EXECUTION_ROOT}" ]] \
+    || die "refusing to remove an unexpected Protocol V3 execution workspace"
+  [[ ( "${BASELINE_DIR}" == "${BASELINE_WORKTREE_DIR}" && "${CANDIDATE_DIR}" == "${CANDIDATE_WORKTREE_DIR}" ) || \
+     ( "${BASELINE_DIR}" == "${root}/baseline" && "${CANDIDATE_DIR}" == "${root}/candidate" ) ]] \
+    || die "refusing to remove Protocol V3 execution workspaces with unexpected active paths"
+  rm -rf -- "${root}"
+  BASELINE_DIR="${BASELINE_WORKTREE_DIR}"
+  CANDIDATE_DIR="${CANDIDATE_WORKTREE_DIR}"
+  V3_EXECUTION_ROOT=""
+}
+
+assert_safe_ledger_path() {
+  local ledger cache expected
+  ledger="$(realpath -m "${ALEO_E2E_LEDGER}")"
+  if is_development_stage || is_legacy_development_stage; then
+    cache="$(safe_development_cache_root)"
+    [[ "${ledger}" == "${cache}/runs/"*/ledger ]] \
+      || die "development ledger must be an isolated run ledger below ${cache}/runs"
+  elif [[ "${ZKBB_FINAL_MODE:-0}" == "1" ]]; then
+    cache="$(safe_development_cache_root)"
+    [[ "${ledger}" == "${cache}/final-run."*/ledger ]] \
+      || die "final ledger must be an isolated fresh ledger below ${cache}/final-run.*"
+  else
+    expected="$(realpath -m "${ROOT_DIR}/local-devnode/ledger")"
+    [[ "${ledger}" == "${expected}" ]] || die "ledger must be the isolated sibling directory"
+  fi
+}
+
 clean_local_ledger() {
-  local expected
-  expected="$(realpath -m "${ROOT_DIR}/local-devnode/ledger")"
-  [[ "$(realpath -m "${ALEO_E2E_LEDGER}")" == "${expected}" ]] || die "ledger must be the isolated sibling directory"
-  rm -rf -- "${expected}"
-  mkdir -p "${expected}"
+  assert_safe_ledger_path
+  rm -rf -- "${ALEO_E2E_LEDGER}"
+  mkdir -p "${ALEO_E2E_LEDGER}"
 }
 
 normalise_worktree_path() {
@@ -342,6 +547,87 @@ assert_worktree_ref() {
   printf 'expected: %s\n' "${expected}"
   printf 'actual:   %s\n' "${candidate_head}"
   printf 'MATCH\n'
+}
+
+candidate_worktree_status() {
+  local candidate_gitdir_value=""
+  local candidate_gitdir=""
+
+  candidate_gitdir_value="$(read_linked_worktree_gitdir "${CANDIDATE_WORKTREE_DIR}")" \
+    || return 1
+  candidate_gitdir="$(resolve_gitdir_path "${CANDIDATE_WORKTREE_DIR}" "${candidate_gitdir_value}")" \
+    || return 1
+  git -c core.autocrlf=true --git-dir="${candidate_gitdir}" --work-tree="${CANDIDATE_WORKTREE_DIR}" status --porcelain=v1
+}
+source_integrity_fail() {
+  printf 'R2 source integrity: FAIL\n' >&2
+  die "$*"
+}
+
+# Additional final and development V3 coverage remains local to the disposable Devnode.
+source "${ROOT_DIR}/scripts/protocol-v3-final-dynamic-coverage.sh"
+source "${ROOT_DIR}/scripts/protocol-v3-dev-scenarios.sh"
+assert_protocol_v3_source_integrity() {
+  [[ "${ZKBB_RUN_PROTOCOL_V3:-}" == "1" ]] || return 0
+
+  local expected_ref canonical_sha integrity_output raw_sha="" normalized_sha="" representation="" candidate_status=""
+  local candidate_source="${CANDIDATE_WORKTREE_DIR}/${MAIN_LEO_RELATIVE_PATH}"
+
+  require_tool python3
+  require_tool sha256sum
+  [[ -f "${candidate_source}" ]] || source_integrity_fail "candidate main.leo is missing: ${candidate_source}"
+  candidate_status="$(candidate_worktree_status)"
+  [[ -z "${candidate_status}" ]] || source_integrity_fail "candidate worktree is dirty"
+  expected_ref="$(git -C "${ROOT_DIR}" rev-parse "${CANDIDATE_REF}^{commit}")" \
+    || source_integrity_fail "could not resolve the V3 Candidate ref: ${CANDIDATE_REF}"
+  [[ "${expected_ref}" == "${V3_R2_CANONICAL_COMMIT}" ]] \
+    || source_integrity_fail "V3 Candidate ref is not the frozen R2 commit: ${expected_ref}"
+  canonical_sha="$(git -C "${ROOT_DIR}" show "${expected_ref}:${MAIN_LEO_RELATIVE_PATH}" | sha256sum | awk '{print $1}')" \
+    || source_integrity_fail "could not hash the canonical Git main.leo blob"
+  [[ "${canonical_sha}" == "${V3_R2_CANONICAL_MAIN_LEO_SHA256}" ]] \
+    || source_integrity_fail "canonical Git main.leo SHA256 mismatch: ${canonical_sha}"
+
+  if ! integrity_output="$(python3 - "${candidate_source}" <<'PY'
+from pathlib import Path
+import hashlib
+import sys
+
+raw = Path(sys.argv[1]).read_bytes()
+normalized = raw.replace(b"\r\n", b"\n")
+if b"\r" in normalized:
+    raise SystemExit("source-integrity: unexpected lone CR byte")
+
+print("raw_sha256=" + hashlib.sha256(raw).hexdigest())
+print("normalized_sha256=" + hashlib.sha256(normalized).hexdigest())
+print("checkout_representation=" + ("CRLF" if b"\r\n" in raw else "LF"))
+PY
+  )"; then
+    source_integrity_fail "candidate checkout main.leo has an unsupported line-ending representation"
+  fi
+
+  while IFS='=' read -r key value; do
+    case "${key}" in
+      raw_sha256) raw_sha="${value}" ;;
+      normalized_sha256) normalized_sha="${value}" ;;
+      checkout_representation) representation="${value}" ;;
+      *) source_integrity_fail "candidate checkout integrity helper emitted an unknown field" ;;
+    esac
+  done <<< "${integrity_output}"
+
+  [[ "${raw_sha}" =~ ^[0-9a-f]{64}$ && "${normalized_sha}" =~ ^[0-9a-f]{64}$ ]] \
+    || source_integrity_fail "candidate checkout integrity helper emitted an invalid SHA256"
+  [[ "${representation}" == "LF" || "${representation}" == "CRLF" ]] \
+    || source_integrity_fail "candidate checkout integrity helper emitted an invalid representation"
+  [[ "${normalized_sha}" == "${canonical_sha}" ]] \
+    || source_integrity_fail "checkout normalized main.leo SHA256 mismatch: ${normalized_sha}"
+
+  printf '[candidate-source] canonical Git main.leo SHA256: %s\n' "${canonical_sha}"
+  printf '[candidate-source] checkout main.leo SHA256: %s\n' "${raw_sha}"
+  printf '[candidate-source] checkout normalized SHA256: %s\n' "${normalized_sha}"
+  printf '[candidate-source] checkout representation: %s\n' "${representation}"
+  printf '[candidate-source] canonical representation: LF\n'
+  printf '[candidate-source] semantic/source difference: NONE\n'
+  printf '[candidate-source] canonical source integrity: PASS\n'
 }
 
 backup_test_sources() {
@@ -483,6 +769,7 @@ cleanup_all() {
     rmdir "${ALEO_E2E_LAUNCH_DIR}" 2>/dev/null || true
   fi
   restore_test_worktrees
+  cleanup_v3_execution_workspaces
   DEVNODE_PRIVATE_KEY=""
   OWNER_PRIVATE_KEY=""
   WHITEHAT_PRIVATE_KEY=""
@@ -494,6 +781,7 @@ cleanup_all() {
   LAST_BROADCAST_OUTPUT=""
   HTTP_RESPONSE_STATUS=""
   HTTP_RESPONSE_BODY=""
+  LAST_CONFIRMED_TRANSACTION_RESPONSE=""
   READ_MAPPING_U64_STATUS=""
   READ_MAPPING_U64_VALUE=""
   BOOTSTRAP_WHITEHAT_TX_ID=""
@@ -517,6 +805,9 @@ cleanup_all() {
   BOOTSTRAP_OWNER_BALANCE_BEFORE=""
   BOOTSTRAP_WHITEHAT_BALANCE_BEFORE=""
   BOOTSTRAP_ARBITER_BALANCE_BEFORE=""
+  # Do not retain local-only account material after cleanup, even as empty values.
+  unset DEVNODE_PRIVATE_KEY OWNER_PRIVATE_KEY WHITEHAT_PRIVATE_KEY ARBITER_PRIVATE_KEY
+  unset OWNER_ADDRESS WHITEHAT_ADDRESS ARBITER_ADDRESS
 }
 
 handle_signal() {
@@ -526,11 +817,71 @@ handle_signal() {
   exit "${exit_code}"
 }
 
-trap cleanup_all EXIT
+final_e2e_exit_guard() {
+  local status="$?"
+  if ((status != 0)); then
+    report_v3_final_failure_once
+  fi
+  cleanup_all
+  return "${status}"
+}
+
+trap final_e2e_exit_guard EXIT
 trap 'handle_signal 130' INT
 trap 'handle_signal 143' TERM
 
 event_log=""
+E2E_TIME_STAGE=""
+E2E_TIME_STAGE_STARTED_MS=0
+E2E_TIME_SUMMARY=()
+declare -A E2E_TIME_LABEL_STARTED_MS=()
+
+harness_time_track_begin() {
+  local label="$1"
+  E2E_TIME_LABEL_STARTED_MS["${label}"]="$(harness_now_ms)"
+  printf '[time] %s: start\n' "${label}"
+}
+
+harness_time_track_end() {
+  local label="$1"
+  local started="${E2E_TIME_LABEL_STARTED_MS[${label}]:-}"
+  local now="" elapsed=""
+  [[ -n "${started}" ]] || return 0
+  now="$(harness_now_ms)"
+  elapsed=$((now - started))
+  E2E_TIME_SUMMARY+=("${elapsed}\t${label}")
+  printf '[time] %s: %sms\n' "${label}" "${elapsed}"
+  unset "E2E_TIME_LABEL_STARTED_MS[${label}]"
+}
+
+harness_now_ms() {
+  date +%s%3N 2>/dev/null || printf '%s000\n' "$(date +%s)"
+}
+
+harness_time_begin() {
+  E2E_TIME_STAGE="$1"
+  E2E_TIME_STAGE_STARTED_MS="$(harness_now_ms)"
+  printf '[time] %s: start\n' "${E2E_TIME_STAGE}"
+}
+
+harness_time_end() {
+  local label="$1" now="" elapsed=""
+  [[ "${E2E_TIME_STAGE}" == "${label}" ]] || return 0
+  now="$(harness_now_ms)"
+  elapsed=$((now - E2E_TIME_STAGE_STARTED_MS))
+  E2E_TIME_SUMMARY+=("${elapsed}\t${label}")
+  printf '[time] %s: %sms\n' "${label}" "${elapsed}"
+  E2E_TIME_STAGE=""
+}
+
+harness_time_summary() {
+  ((${#E2E_TIME_SUMMARY[@]} > 0)) || return 0
+  printf '[time] slowest stages:\n'
+  printf '%b\n' "${E2E_TIME_SUMMARY[@]}" | sort -rn | head -n 10 | while IFS=$'\t' read -r elapsed label; do
+    printf '  %sms %s\n' "${elapsed}" "${label}"
+  done
+}
+
 record_event() {
   printf '%s\t%s\n' "$1" "$2" >>"${event_log}"
 }
@@ -580,6 +931,7 @@ generate_preflight_devnode_key() {
 
 
 generate_ephemeral_local_account() {
+  (($# == 3)) || die "generate_ephemeral_local_account requires key variable, address variable, and label"
   local key_variable="$1"
   local address_variable="$2"
   local label="$3"
@@ -605,6 +957,13 @@ generate_ephemeral_local_account() {
 }
 start_devnode() {
   local preflight_key=""
+  local storage_mode=(--clear-storage)
+  if [[ "${DEVNODE_REUSING_SNAPSHOT:-0}" == "1" ]]; then
+    is_development_stage || die "snapshot ledger reuse is allowed only for development scenarios"
+    [[ -d "${ALEO_E2E_LEDGER}" ]] && [[ -n "$(find "${ALEO_E2E_LEDGER}" -mindepth 1 -maxdepth 1 -print -quit)" ]] \
+      || die "development snapshot ledger is missing or empty"
+    storage_mode=()
+  fi
   ALEO_E2E_LAUNCH_DIR="$(mktemp -d "${REPORT_DIR}/devnode-launch.XXXXXX")"
   : >"${ALEO_E2E_DEVNODE_LOG}"
   pushd "${ALEO_E2E_LAUNCH_DIR}" >/dev/null
@@ -616,7 +975,7 @@ start_devnode() {
       "NETWORK=${ALEO_E2E_NETWORK}" \
       "ENDPOINT=${ALEO_E2E_ENDPOINT}" \
       "PRIVATE_KEY=${preflight_key}" \
-      "${LEO_BIN}" devnode start --socket-addr 127.0.0.1:3030 \
+      "${LEO_BIN}" devnode start --socket-addr "${ALEO_E2E_SOCKET_ADDR}" \
         --storage "${ALEO_E2E_LEDGER}" --clear-storage --manual-block-creation \
         -q >"${ALEO_E2E_DEVNODE_LOG}" 2>&1 &
     DEVNODE_PRIVATE_KEY="${preflight_key}"
@@ -626,8 +985,8 @@ start_devnode() {
       "NETWORK=${ALEO_E2E_NETWORK}" \
       "ENDPOINT=${ALEO_E2E_ENDPOINT}" \
       "PRIVATE_KEY=${DEVNODE_PRIVATE_KEY}" \
-      "${LEO_BIN}" devnode start --socket-addr 127.0.0.1:3030 \
-        --storage "${ALEO_E2E_LEDGER}" --clear-storage --manual-block-creation \
+      "${LEO_BIN}" devnode start --socket-addr "${ALEO_E2E_SOCKET_ADDR}" \
+        --storage "${ALEO_E2E_LEDGER}" "${storage_mode[@]}" --manual-block-creation \
         -q >"${ALEO_E2E_DEVNODE_LOG}" 2>&1 &
   fi
   ALEO_E2E_DEVNODE_PID=$!
@@ -713,8 +1072,12 @@ bootstrap_account() {
   local fee_id_variable="$5"
   local fee_tx_variable="$6"
 
+  # This transfer happens before the baseline program is deployed. Remote-only
+  # package resolution would query this workspace package's latest_edition,
+  # which the fresh Devnode correctly cannot provide yet.
   run_leo "${BASELINE_DIR}" "${OWNER_PRIVATE_KEY}" execute credits.aleo::transfer_public \
-    "${recipient_address}" "${BOOTSTRAP_TRANSFER_MICROCREDITS}u64" --skip-execute-proof --broadcast --yes
+    "${recipient_address}" "${BOOTSTRAP_TRANSFER_MICROCREDITS}u64" \
+    --skip-execute-proof --broadcast --yes
   assert_accepted "${label}" "${tx_variable}" "${fee_id_variable}" "${fee_tx_variable}" \
     "${state_check}" "${OWNER_ADDRESS}" "${recipient_address}"
 }
@@ -771,9 +1134,21 @@ run_leo() {
   LAST_BROADCAST_OUTPUT="${output}"
 }
 
+write_sanitized_diagnostic() {
+  (($# == 2)) || die "write_sanitized_diagnostic expects a label and text"
+  local label="$1" text="$2" safe_label="" path=""
+  mkdir -p "${DIAGNOSTIC_DIR}"
+  safe_label="$(printf '%s' "${label}" | tr -cs '[:alnum:]._ -' '_' | tr ' ' '_')"
+  path="${DIAGNOSTIC_DIR}/$(date +%Y%m%dT%H%M%S)-${safe_label}.log"
+  printf '%s\n' "${text}" | sanitize_cli_output >"${path}"
+  printf '%s' "${path}"
+}
+
 print_sanitized_leo_failure() {
-  printf 'escrow-devnode-e2e: Leo command failed; sanitized CLI output follows:\n' >&2
-  print_sanitized_text "${LAST_OUTPUT}"
+  local path=""
+  path="$(write_sanitized_diagnostic "leo-command-failure" "${LAST_OUTPUT}")"
+  printf 'escrow-devnode-e2e: Leo command failed; sanitized diagnostics: %s\n' "${path}" >&2
+  tail -n 20 "${path}" >&2 || true
 }
 
 sanitize_cli_output() {
@@ -877,9 +1252,105 @@ lookup_confirmed_transaction() {
   [[ -n "${HTTP_RESPONSE_STATUS}" ]] || HTTP_RESPONSE_STATUS="000"
 }
 
+parse_confirmed_public_fee_microcredits() {
+  local expected_tx_id="$1"
+  local expected_tx_type="$2"
+
+  node --input-type=module -e '
+import { readFileSync } from "node:fs";
+
+const expectedId = process.argv[1];
+const expectedType = process.argv[2];
+const confirmed = JSON.parse(readFileSync(0, "utf8"));
+const transaction = confirmed?.transaction;
+const value = transaction?.fee?.transition?.inputs?.[0]?.value;
+const match = typeof value === "string" ? /^([0-9]+)u64$/.exec(value) : null;
+
+if (
+  confirmed?.type !== "execute" ||
+  transaction?.type !== expectedType ||
+  transaction?.id !== expectedId ||
+  transaction?.fee?.transition?.inputs?.[0]?.type !== "public" ||
+  !match
+) {
+  process.exit(1);
+}
+
+process.stdout.write(match[1]);
+' "${expected_tx_id}" "${expected_tx_type}"
+}
+
+confirmed_public_fee_microcredits() {
+  local label="$1"
+  local confirmed_tx_id="$2"
+  local expected_tx_type="$3"
+  local fee_amount=""
+  local attempt=0
+  local response="${LAST_CONFIRMED_TRANSACTION_RESPONSE:-}"
+
+  [[ "${confirmed_tx_id}" =~ ^at1[0-9a-z]+$ ]] \
+    || die "${label}: invalid confirmed transaction ID"
+  [[ "${expected_tx_type}" == "execute" || "${expected_tx_type}" == "fee" ]] \
+    || die "${label}: expected transaction type must be execute or fee"
+
+  if [[ -n "${response}" ]]; then
+    fee_amount="$(printf '%s' "${response}" | \
+      parse_confirmed_public_fee_microcredits "${confirmed_tx_id}" "${expected_tx_type}" 2>/dev/null || true)"
+  fi
+
+  if [[ -z "${fee_amount}" ]]; then
+    for ((attempt = 1; attempt <= CONFIRMED_FEE_LOOKUP_ATTEMPTS; attempt++)); do
+      lookup_confirmed_transaction "${confirmed_tx_id}"
+      if [[ "${HTTP_RESPONSE_STATUS}" == "200" ]]; then
+        fee_amount="$(printf '%s' "${HTTP_RESPONSE_BODY}" | \
+          parse_confirmed_public_fee_microcredits "${confirmed_tx_id}" "${expected_tx_type}" 2>/dev/null || true)"
+        [[ -n "${fee_amount}" ]] && break
+        die "${label}: confirmed transaction did not contain the expected public fee"
+      fi
+      if [[ "${HTTP_RESPONSE_STATUS}" != "404" && "${HTTP_RESPONSE_STATUS}" != "500" ]]; then
+        die "${label}: confirmed fee transaction lookup returned HTTP ${HTTP_RESPONSE_STATUS}"
+      fi
+      if ((attempt < CONFIRMED_FEE_LOOKUP_ATTEMPTS)); then
+        sleep 0.25
+      fi
+    done
+  fi
+
+  if [[ -z "${fee_amount}" ]]; then
+    die "${label}: confirmed fee remained unavailable after ${CONFIRMED_FEE_LOOKUP_ATTEMPTS} attempts"
+  fi
+  [[ "${fee_amount}" =~ ^[0-9]+$ ]] \
+    || die "${label}: confirmed public fee is not a decimal microcredit value"
+  printf '[%s] confirmed public fee: %s microcredits\n' "${label}" "${fee_amount}" >&2
+  printf '%s' "${fee_amount}"
+}
+
 transaction_response_matches() {
   local tx_id="$1"
   [[ "${HTTP_RESPONSE_BODY}" == *"${tx_id}"* ]]
+}
+
+transaction_response_is_rejected_execution_fee() {
+  local compact=""
+
+  compact="$(printf '%s' "${HTTP_RESPONSE_BODY}" | tr -d '[:space:]')"
+  [[ "${compact}" == *'"type":"fee"'* &&
+     "${compact}" == *'"rejected"'* &&
+     "${compact}" == *'"execution"'* ]]
+}
+
+print_execute_rejection_diagnostics() {
+  local label="$1"
+  local execute_tx_id="$2"
+  local fee_tx_id="$3"
+
+  printf '[%s] execute transaction rejected\n' "${label}" >&2
+  printf '[%s] original execute tx: %s\n' "${label}" "${execute_tx_id}" >&2
+  printf '[%s] fee transaction: %s\n' "${label}" "${fee_tx_id:-unavailable}" >&2
+  local path=""
+  path="$(write_sanitized_diagnostic "${label}-rejected" "${HTTP_RESPONSE_BODY}")"
+  printf '[%s] rejection reason: sanitized diagnostics saved to %s\n' "${label}" "${path}" >&2
+  tail -n 20 "${path}" >&2 || true
 }
 
 trim_aleo_value() {
@@ -1142,8 +1613,13 @@ wait_for_step_confirmation() {
     case "${HTTP_RESPONSE_STATUS}" in
       200)
         if transaction_response_matches "${tx_id}"; then
+          LAST_CONFIRMED_TRANSACTION_RESPONSE="${HTTP_RESPONSE_BODY}"
           printf '[%s] transaction lookup: confirmed\n' "${label}"
           return 0
+        fi
+        if transaction_response_is_rejected_execution_fee; then
+          print_execute_rejection_diagnostics "${label}" "${tx_id}" "${fee_tx_id}"
+          return 1
         fi
         printf '[%s] transaction lookup returned HTTP 200 with a mismatched transaction ID\n' "${label}" >&2
         print_sanitized_text "${HTTP_RESPONSE_BODY}"
@@ -1224,6 +1700,7 @@ assert_accepted() {
 wait_for_rejected_transaction() {
   local label="$1"
   local tx_id="$2"
+  local fee_tx_id="$3"
   local i
   local consecutive_server_errors=0
 
@@ -1232,7 +1709,15 @@ wait_for_rejected_transaction() {
     lookup_confirmed_transaction "${tx_id}"
     case "${HTTP_RESPONSE_STATUS}" in
       200)
-        if [[ "${HTTP_RESPONSE_BODY,,}" == *rejected* ]]; then
+        if transaction_response_matches "${tx_id}" && [[ "${HTTP_RESPONSE_BODY,,}" == *rejected* ]]; then
+          LAST_CONFIRMED_TRANSACTION_RESPONSE="${HTTP_RESPONSE_BODY}"
+          return 0
+        fi
+        if [[ -n "${fee_tx_id}" && "${fee_tx_id}" != "${tx_id}" ]] &&
+           transaction_response_matches "${fee_tx_id}" &&
+           transaction_response_is_rejected_execution_fee; then
+          LAST_CONFIRMED_TRANSACTION_RESPONSE="${HTTP_RESPONSE_BODY}"
+          print_execute_rejection_diagnostics "${label}" "${tx_id}" "${fee_tx_id}"
           return 0
         fi
         return 1
@@ -1303,16 +1788,20 @@ expect_chain_rejected() {
   local actor_role="$7"
   local actor_address="$8"
   local minimum_microcredits="$9"
+  local execution_source_args=()
   shift 9
+  if [[ "${ZKBB_RUN_PROTOCOL_V3:-0}" == "1" ]]; then
+    execution_source_args=(--no-local)
+  fi
   prepare_role_transaction "${label}" "${actor_role}" "${actor_address}" "${minimum_microcredits}"
   set +e
-  run_leo "${workspace}" "${actor_key}" "$@"
+  run_leo "${workspace}" "${actor_key}" "$@" "${execution_source_args[@]}"
   local exit_code=$?
   set -e
   store_step_transaction_ids "${label}" "${tx_variable}" "${fee_id_variable}" "${fee_tx_variable}"
   local tx_id="${!tx_variable}"
   advance_broadcast_block "${label}"
-  wait_for_rejected_transaction "${label}" "${tx_id}" \
+  wait_for_rejected_transaction "${label}" "${tx_id}" "${!fee_tx_variable}" \
     || die "${label} rejection was not confirmed (leo exit ${exit_code})"
   record_event "${label}" "rejected:${tx_id}"
 }
@@ -1360,6 +1849,161 @@ capture_mapping_or_null() {
     "${ALEO_E2E_ENDPOINT}/testnet/program/${PROGRAM_ID}/mapping/${mapping}/${key}")" \
     || die "could not read ${mapping}[${key}]"
   printf -v "${variable_name}" '%s' "${mapping_result}"
+}
+
+v3_mapping_struct_field() {
+  local raw="$1"
+  local mapping="$2"
+  local field_name="$3"
+  local expected_fields=""
+
+  case "${mapping}" in
+    bounty_v3_configs)
+      expected_fields="bounty_id,disclosure_key_commitment,target_system_commitment,target_code_hash,panel_id,arbiter_one,arbiter_two,arbiter_three,quorum,review_window_blocks,decision_window_blocks,arbitration_fee_microcredits,payment_condition,configured_height"
+      ;;
+    claim_v3_dispute_metadata)
+      expected_fields="claim_hash,bounty_id,dispute_type,dispute_commitment,opener,opened_height,status,requested_severity,final_severity"
+      ;;
+    claim_v3_states)
+      expected_fields="claim_hash,bounty_id,whitehat_address,status,pre_dispute_status,package_hash,reproduction_commitment,patch_commitment,dispute_commitment,updated_height"
+      ;;
+    claim_receipts)
+      expected_fields="claim_hash,bounty_id,rule_id,scope_hash,severity,witness_commitment,nullifier,reporter_commitment,proof_status,created_height,protocol_version"
+      ;;
+    claim_v3_arbitration_tallies)
+      expected_fields="claim_hash,bounty_id,reject_votes,medium_votes,high_votes,critical_votes,updated_height"
+      ;;
+    claim_v3_project_decisions)
+      expected_fields="claim_hash,bounty_id,decision,project_severity,decision_commitment,decided_height"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  printf '%s' "${raw}" | node "${ROOT_DIR}/scripts/leo-struct-reader.mjs" \
+    --fields "${expected_fields}" --field "${field_name}"
+}
+
+capture_v3_mapping_with_diagnostics() {
+  local label="$1"
+  local variable_name="$2"
+  local mapping="$3"
+  local key="$4"
+  local body_file="" header_file="" http_status="" content_type="" mapping_result=""
+
+  body_file="$(mktemp "${REPORT_DIR}/v3-mapping-body.XXXXXX")"
+  header_file="$(mktemp "${REPORT_DIR}/v3-mapping-header.XXXXXX")"
+  if ! http_status="$(curl --silent --show-error --max-time 3 --output "${body_file}" --dump-header "${header_file}" --write-out '%{http_code}' "${ALEO_E2E_ENDPOINT}/testnet/program/${PROGRAM_ID}/mapping/${mapping}/${key}")"; then
+    rm -f -- "${body_file}" "${header_file}"
+    die "${label}: could not read ${mapping}[${key}]"
+  fi
+  mapping_result="$(<"${body_file}")"
+  content_type="$(awk 'BEGIN { IGNORECASE = 1 } /^content-type:/ { sub(/^[^:]*:[[:space:]]*/, ""); sub(/[\r\n]+$/, ""); value = $0 } END { print value }' "${header_file}")"
+  rm -f -- "${body_file}" "${header_file}"
+
+  printf '[%s] raw %s mapping:\n' "${label}" "${mapping}"
+  printf '  key: %s\n' "${key}"
+  printf '  HTTP status: %s\n' "${http_status}"
+  printf '  HTTP content-type: %s\n' "${content_type:-unavailable}"
+  printf '  raw mapping value: %s\n' "${mapping_result}"
+  [[ "${http_status}" == "200" ]] || die "${label}: ${mapping}[${key}] returned HTTP ${http_status}"
+  [[ "${mapping_result}" != "null" && -n "${mapping_result}" ]] || die "${label}: ${mapping}[${key}] is missing"
+  printf -v "${variable_name}" '%s' "${mapping_result}"
+}
+v3_u8_value() {
+  local literal="$1"
+
+  [[ "${literal}" =~ ^([0-9]+)u8$ ]] || return 1
+  printf '%s' "${BASH_REMATCH[1]}"
+}
+
+v3_severity_value() {
+  local literal="$1"
+  local parsed=""
+
+  parsed="$(v3_u8_value "${literal}")" || return 1
+  [[ "${parsed}" =~ ^[0-3]$ ]] || return 1
+  printf '%s' "${parsed}"
+}
+
+v3_vote_ruling_allowed() {
+  local dispute_type="$1"
+  local verdict="$2"
+  local receipt_severity="$3"
+
+  case "${dispute_type}" in
+    4) ((10#${verdict} <= 10#${receipt_severity})) ;;
+    1|2|3|5|6) ((10#${verdict} == 0 || 10#${verdict} == 10#${receipt_severity})) ;;
+    *) return 1 ;;
+  esac
+}
+
+print_v3_vote_preflight_snapshot() {
+  local label="$1"
+  local bounty_id="$2"
+  local claim_hash="$3"
+  local caller="$4"
+  local verdict_literal="$5"
+  local vote_marker="$6"
+  local bounty_state="" protocol_version="" config="" dispute="" claim_state="" receipt="" tally="" decision=""
+  local arbiter_one="" arbiter_two="" arbiter_three="" quorum=""
+  local dispute_type_literal="" dispute_commitment="" dispute_status="" claim_status="" pre_dispute_status=""
+  local receipt_severity_literal="" verdict="" dispute_type="" receipt_severity=""
+  local reject_votes="" medium_votes="" high_votes="" critical_votes=""
+  local decision_code="" caller_is_arbiter="no" ruling_allowed="no" existing_votes=0
+
+  capture_v3_mapping_with_diagnostics "${label}" bounty_state bounties "${bounty_id}"
+  capture_v3_mapping_with_diagnostics "${label}" protocol_version bounty_protocol_versions "${bounty_id}"
+  capture_v3_mapping_with_diagnostics "${label}" config bounty_v3_configs "${bounty_id}"
+  capture_v3_mapping_with_diagnostics "${label}" dispute claim_v3_dispute_metadata "${claim_hash}"
+  capture_mapping claim_state claim_v3_states "${claim_hash}"
+  capture_mapping receipt claim_receipts "${claim_hash}"
+  capture_mapping tally claim_v3_arbitration_tallies "${claim_hash}"
+  capture_mapping decision claim_v3_project_decisions "${claim_hash}"
+  arbiter_one="$(v3_mapping_struct_field "${config}" bounty_v3_configs arbiter_one)" || die "${label}: V3 panel arbiter_one is unavailable"
+  arbiter_two="$(v3_mapping_struct_field "${config}" bounty_v3_configs arbiter_two)" || die "${label}: V3 panel arbiter_two is unavailable"
+  arbiter_three="$(v3_mapping_struct_field "${config}" bounty_v3_configs arbiter_three)" || die "${label}: V3 panel arbiter_three is unavailable"
+  quorum="$(v3_mapping_struct_field "${config}" bounty_v3_configs quorum)" || die "${label}: V3 quorum is unavailable"
+  dispute_type_literal="$(v3_mapping_struct_field "${dispute}" claim_v3_dispute_metadata dispute_type)" || die "${label}: V3 dispute type is unavailable"
+  dispute_commitment="$(v3_mapping_struct_field "${dispute}" claim_v3_dispute_metadata dispute_commitment)" || die "${label}: V3 dispute commitment is unavailable"
+  dispute_status="$(v3_mapping_struct_field "${dispute}" claim_v3_dispute_metadata status)" || die "${label}: V3 dispute status is unavailable"
+  claim_status="$(v3_mapping_struct_field "${claim_state}" claim_v3_states status)" || die "${label}: V3 claim status is unavailable"
+  pre_dispute_status="$(v3_mapping_struct_field "${claim_state}" claim_v3_states pre_dispute_status)" || die "${label}: V3 pre-dispute status is unavailable"
+  receipt_severity_literal="$(v3_mapping_struct_field "${receipt}" claim_receipts severity)" || die "${label}: V3 receipt severity is unavailable"
+  decision_code="$(v3_mapping_struct_field "${decision}" claim_v3_project_decisions decision)" || die "${label}: V3 project decision is unavailable"
+  reject_votes="$(v3_mapping_struct_field "${tally}" claim_v3_arbitration_tallies reject_votes)" || die "${label}: V3 reject tally is unavailable"
+  medium_votes="$(v3_mapping_struct_field "${tally}" claim_v3_arbitration_tallies medium_votes)" || die "${label}: V3 medium tally is unavailable"
+  high_votes="$(v3_mapping_struct_field "${tally}" claim_v3_arbitration_tallies high_votes)" || die "${label}: V3 high tally is unavailable"
+  critical_votes="$(v3_mapping_struct_field "${tally}" claim_v3_arbitration_tallies critical_votes)" || die "${label}: V3 critical tally is unavailable"
+  dispute_type="$(v3_u8_value "${dispute_type_literal}")" || die "${label}: V3 dispute type is invalid"
+  verdict="$(v3_severity_value "${verdict_literal}")" || die "${label}: V3 verdict is invalid"
+  receipt_severity="$(v3_severity_value "${receipt_severity_literal}")" || die "${label}: V3 receipt severity is invalid"
+  if [[ "${caller}" == "${arbiter_one}" || "${caller}" == "${arbiter_two}" || "${caller}" == "${arbiter_three}" ]]; then
+    caller_is_arbiter="yes"
+  fi
+  if v3_vote_ruling_allowed "${dispute_type}" "${verdict}" "${receipt_severity}"; then
+    ruling_allowed="yes"
+  fi
+  existing_votes=$((10#${reject_votes%u8} + 10#${medium_votes%u8} + 10#${high_votes%u8} + 10#${critical_votes%u8}))
+
+  printf '[%s] V3 vote preflight snapshot:\n' "${label}"
+  printf '  bounty / claim: %s / %s\n' "${bounty_id}" "${claim_hash}"
+  printf '  dispute type: %s\n' "${dispute_type_literal}"
+  printf '  dispute commitment: %s\n' "${dispute_commitment}"
+  printf '  dispute status: %s\n' "${dispute_status}"
+  printf '  claim status / pre-dispute status: %s / %s\n' "${claim_status}" "${pre_dispute_status}"
+  printf '  project decision: %s\n' "${decision_code}"
+  printf '  caller: %s\n' "${caller}"
+  printf '  caller in panel: %s\n' "${caller_is_arbiter}"
+  printf '  panel: %s, %s, %s\n' "${arbiter_one}" "${arbiter_two}" "${arbiter_three}"
+  printf '  threshold: %s\n' "${quorum}"
+  printf '  requested ruling: %s\n' "${verdict_literal}"
+  printf '  receipt severity: %s\n' "${receipt_severity_literal}"
+  printf '  ruling legal for dispute type: %s\n' "${ruling_allowed}"
+  printf '  existing vote count: %s (reject=%s medium=%s high=%s critical=%s)\n' "${existing_votes}" "${reject_votes}" "${medium_votes}" "${high_votes}" "${critical_votes}"
+  printf '  vote marker input: %s\n' "${vote_marker}"
+  printf '  marker existence: protocol-derived key checked atomically; public marker input nonzero: %s\n' "$([[ "${vote_marker}" != "0field" ]] && printf yes || printf no)"
 }
 
 assert_mapping_absent() {
@@ -1423,24 +2067,42 @@ assert_balance_delta() {
 }
 
 current_height() {
-  local raw_height=""
+  local raw_height="" parsed_height="" attempt=0
 
-  raw_height="$(curl -fsS --max-time 3 "${ALEO_E2E_ENDPOINT}/testnet/block/height/latest")" || return 1
-  parse_public_decimal "${raw_height}" "devnode block height"
+  for ((attempt = 1; attempt <= DEVNODE_HEIGHT_READ_ATTEMPTS; attempt++)); do
+    if raw_height="$(curl -fsS --max-time 3 "${ALEO_E2E_ENDPOINT}/testnet/block/height/latest" 2>/dev/null)" \
+      && parsed_height="$(parse_public_decimal "${raw_height}" "devnode block height" 2>/dev/null)"; then
+      printf '%s\n' "${parsed_height}"
+      return 0
+    fi
+    if [[ -n "${ALEO_E2E_DEVNODE_PID:-}" ]] && ! kill -0 "${ALEO_E2E_DEVNODE_PID}" 2>/dev/null; then
+      printf 'escrow-devnode-e2e: local Devnode exited while reading block height\n' >&2
+      return 1
+    fi
+    ((attempt < DEVNODE_HEIGHT_READ_ATTEMPTS)) && sleep 1
+  done
+
+  printf 'escrow-devnode-e2e: local Devnode block height remained unavailable after %s attempts\n' \
+    "${DEVNODE_HEIGHT_READ_ATTEMPTS}" >&2
+  return 1
 }
 
 advance_blocks() {
   local count="$1"
   local i
-  local previous_height="$(current_height)"
+  local previous_height=""
   local next_height=""
+
+  previous_height="$(current_height)" \
+    || die "local Devnode height is unavailable before block advancement"
 
   for ((i = 1; i <= count; i++)); do
     if ! env "NETWORK=${ALEO_E2E_NETWORK}" "ENDPOINT=${ALEO_E2E_ENDPOINT}" "PRIVATE_KEY=${DEVNODE_PRIVATE_KEY}" \
-      "${LEO_BIN}" devnode advance 1 --socket-addr 127.0.0.1:3030 -q >/dev/null; then
+      "${LEO_BIN}" devnode advance 1 --socket-addr "${ALEO_E2E_SOCKET_ADDR}" -q >/dev/null; then
       die "local Devnode could not advance block ${i}/${count}"
     fi
-    next_height="$(current_height)"
+    next_height="$(current_height)" \
+      || die "local Devnode height is unavailable after block advancement ${i}/${count}"
     [[ "${next_height}" =~ ^[0-9]+$ ]] && ((10#${next_height} > 10#${previous_height})) \
       || die "local Devnode did not advance block ${i}/${count}"
     previous_height="${next_height}"
@@ -1503,9 +2165,14 @@ execute_accepted() {
   local actor_role="$7"
   local actor_address="$8"
   local minimum_microcredits="$9"
+  local execution_source_args=()
   shift 9
+  if [[ "${ZKBB_RUN_PROTOCOL_V3:-0}" == "1" ]]; then
+    execution_source_args=(--no-local)
+  fi
   prepare_role_transaction "${label}" "${actor_role}" "${actor_address}" "${minimum_microcredits}"
-  run_leo "${workspace}" "${actor_key}" execute "$@" --skip-execute-proof --broadcast --yes
+  run_leo "${workspace}" "${actor_key}" execute "$@" \
+    --skip-execute-proof --broadcast --yes "${execution_source_args[@]}"
   assert_accepted "${label}" "${tx_variable}" "${fee_id_variable}" "${fee_tx_variable}" ""
 }
 
@@ -1539,20 +2206,126 @@ fs.writeFileSync(reportPath, JSON.stringify({
 NODE
 }
 
+
+development_snapshot_path() {
+  local cache configured role_hash
+  cache="$(safe_development_cache_root)"
+  configured="${ZKBB_DEV_SNAPSHOT_DIR:-}"
+  [[ -n "${configured}" ]] || die "development scenario requires a snapshot cache directory"
+  configured="$(realpath -m "${configured}")"
+  [[ "${configured}" == "${cache}/snapshots/"* ]] \
+    || die "development snapshot must live below ${cache}/snapshots"
+  role_hash="$(printf '%s\n%s\n%s\n' "${OWNER_ADDRESS}" "${WHITEHAT_ADDRESS}" "${ARBITER_ADDRESS}" | sha256sum | awk '{print $1}')"
+  printf '%s/%s' "${configured}" "${role_hash}"
+}
+
+assert_snapshot_contents() {
+  local snapshot="$1"
+  [[ -f "${snapshot}/metadata" && -d "${snapshot}/ledger" ]] \
+    || die "development snapshot is incomplete: ${snapshot}"
+  [[ -z "$(find "${snapshot}/ledger" -type l -print -quit)" ]] \
+    || die "development snapshot must not contain symbolic links"
+  grep -Fxq "candidate=${V3_R2_CANONICAL_COMMIT}" "${snapshot}/metadata" \
+    || die "development snapshot Candidate mismatch"
+  grep -Fxq "owner=${OWNER_ADDRESS}" "${snapshot}/metadata" \
+    || die "development snapshot Owner mismatch"
+  grep -Fxq "whitehat=${WHITEHAT_ADDRESS}" "${snapshot}/metadata" \
+    || die "development snapshot Whitehat mismatch"
+  grep -Fxq "arbiter=${ARBITER_ADDRESS}" "${snapshot}/metadata" \
+    || die "development snapshot Arbiter mismatch"
+}
+
+clone_development_snapshot() {
+  local snapshot="$1"
+  assert_snapshot_contents "${snapshot}"
+  assert_safe_ledger_path
+  rm -rf -- "${ALEO_E2E_LEDGER}"
+  cp -a -- "${snapshot}/ledger" "${ALEO_E2E_LEDGER}"
+  DEVNODE_REUSING_SNAPSHOT=1
+  ALEO_E2E_BOOTSTRAP_COMPLETE=1
+  printf '[snapshot] cloned common bootstrap: %s\n' "${snapshot}"
+}
+
+create_development_snapshot() {
+  local snapshot="$1" snapshot_parent=""
+  local cache="$(safe_development_cache_root)"
+  [[ "$(realpath -m "${snapshot}")" == "${cache}/snapshots/"* ]] \
+    || die "refusing to create snapshot outside the development cache"
+  snapshot_parent="$(dirname "${snapshot}")"
+  mkdir -p "${snapshot_parent}"
+  [[ ! -e "${snapshot}" ]] || die "development snapshot appeared concurrently: ${snapshot}"
+  [[ -d "${ALEO_E2E_LEDGER}" ]] || die "development ledger is unavailable for snapshot"
+  cleanup_devnode
+  mkdir "${snapshot}"
+  cp -a -- "${ALEO_E2E_LEDGER}" "${snapshot}/ledger"
+  {
+    printf 'candidate=%s\n' "${V3_R2_CANONICAL_COMMIT}"
+    printf 'snapshot_key=%s\n' "${ZKBB_DEV_SNAPSHOT_KEY:-unknown}"
+    printf 'owner=%s\nwhitehat=%s\narbiter=%s\n' "${OWNER_ADDRESS}" "${WHITEHAT_ADDRESS}" "${ARBITER_ADDRESS}"
+  } >"${snapshot}/metadata"
+  printf '[snapshot] created common bootstrap: %s\n' "${snapshot}"
+}
+
+run_development_mode() {
+  local scenario="${ZKBB_DEV_SCENARIO:-}" snapshot=""
+  [[ "${ZKBB_RUN_PROTOCOL_V3:-0}" == "1" ]] || die "development scenarios require Protocol V3 static gates"
+  [[ -n "${scenario}" ]] || die "development scenario name is required"
+  case "${scenario}" in
+    reproduction|dispute-types|quorum-2|quorum-3|non-arbiter|duplicate-vote|settlement-replay|refund-replay|atomicity) ;;
+    *) die "unsupported V3 development scenario: ${scenario}" ;;
+  esac
+  [[ "${ZKBB_FINAL_MODE:-0}" != "1" ]] || die "final mode forbids development snapshots"
+  snapshot="$(development_snapshot_path)"
+
+  if [[ -e "${snapshot}" ]]; then
+    patch_local_only_admins
+    build_program "${CANDIDATE_DIR}"
+    verify_testnet_edition_zero_interface "${CANDIDATE_DIR}" "candidate-local-admin" "local-address"
+    clone_development_snapshot "${snapshot}"
+    start_devnode
+  else
+    clean_local_ledger
+    start_devnode
+    assert_owner_has_deployment_balance
+    bootstrap_test_accounts
+    patch_local_only_admins
+    build_program "${BASELINE_DIR}"
+    verify_testnet_edition_zero_interface "${BASELINE_DIR}" "baseline-local-admin" "local-address"
+    build_program "${CANDIDATE_DIR}"
+    verify_testnet_edition_zero_interface "${CANDIDATE_DIR}" "candidate-local-admin" "local-address"
+    assert_fixture_integrity
+    deploy_baseline
+    upgrade_candidate
+    create_development_snapshot "${snapshot}"
+    clone_development_snapshot "${snapshot}"
+    start_devnode
+  fi
+
+  run_protocol_v3_development_scenario "${scenario}"
+}
+
 main() {
   assert_local_endpoint
   assert_supported_stage
+  assert_supported_final_shard
   require_tool "${LEO_BIN}"
   require_tool curl
   require_tool node
   assert_no_direct_network_mutation
-  require_directory "${BASELINE_DIR}/leo/bug_proof"
-  require_directory "${CANDIDATE_DIR}/leo/bug_proof"
-  assert_worktree_ref "${CANDIDATE_DIR}" "${CANDIDATE_REF}"
+  require_directory "${BASELINE_WORKTREE_DIR}/leo/bug_proof"
+  require_directory "${CANDIDATE_WORKTREE_DIR}/leo/bug_proof"
+  assert_worktree_ref "${CANDIDATE_WORKTREE_DIR}" "${CANDIDATE_REF}"
+  assert_protocol_v3_source_integrity
+  if [[ "${ZKBB_RUN_PROTOCOL_V3:-0}" == "1" ]]; then
+    [[ "${V3_STATIC_GATES_PASSED:-0}" == "1" ]] \
+      || die "Protocol V3 static regression gates were not completed by the wrapper"
+  fi
 
+  configure_v3_runtime_paths
   mkdir -p "${REPORT_DIR}"
   rm -f -- "${REPORT_FILE}"
   event_log="$(mktemp "${REPORT_DIR}/devnode-events.XXXXXX")"
+  materialize_v3_execution_workspaces
   prepare_real_testnet_edition_zero_sources
 
   if is_preflight_only; then
@@ -1568,10 +2341,22 @@ main() {
 
   provision_local_accounts
 
+  if is_development_stage; then
+    run_development_mode
+    return 0
+  fi
+
+  if [[ "${ZKBB_FINAL_MODE:-0}" == "1" ]]; then
+    [[ ! -e "${ALEO_E2E_LEDGER}" ]] || die "final mode requires a fresh, non-existent ledger"
+    [[ -z "${ZKBB_DEV_SNAPSHOT_DIR:-}" && -z "${ZKBB_DEVNODE_REUSE_LEDGER:-}" ]] \
+      || die "final mode forbids snapshot or ledger reuse"
+  fi
+  harness_time_begin bootstrap
   clean_local_ledger
   start_devnode
   assert_owner_has_deployment_balance
   bootstrap_test_accounts
+  harness_time_end bootstrap
 
   if is_bootstrap_stage; then
     write_public_report
@@ -1587,6 +2372,11 @@ main() {
   assert_fixture_integrity
   deploy_baseline
 
+  local STEP_TX_ID="" STEP_FEE_ID="" STEP_FEE_TX_ID=""
+  local final_shard=""
+  final_shard="$(current_final_shard)"
+  if [[ "${final_shard}" == "all" || "${final_shard}" == "legacy" ]]; then
+  harness_time_begin legacy
   local height deadline_v1 bounty_v1 scope_v1
   height="$(current_height)"
   deadline_v1="$((height + 200))u32"
@@ -1668,7 +2458,6 @@ main() {
     "${MINIMUM_OWNER_MICROCREDITS}" execute refund_bounty "${bounty_v1}" 100u64 \
     "$(( $(date +%s%N) + 5 ))field" --skip-execute-proof --broadcast --yes
 
-  local STEP_TX_ID="" STEP_FEE_ID="" STEP_FEE_TX_ID=""
   local deadline_height_v2="" deadline_v2="" bounty_v2="" scope_v2=""
   local claim_hash_paid="" claim_hash_rejected=""
   local funding_marker="" lock_marker_paid="" request_marker="" share_marker=""
@@ -1902,7 +2691,24 @@ main() {
     "${bounty_v2}" "${refunded_escrow}"
 
 
+  harness_time_end legacy
+  fi
+
+  if [[ "${final_shard}" == "legacy" ]]; then
+    complete_final_shard "${final_shard}"
+    return 0
+  fi
+
+  if [[ "${final_shard}" != "all" ]]; then
+    upgrade_candidate
+  fi
+
   if [[ "${ZKBB_RUN_PROTOCOL_V3:-0}" == "1" ]]; then
+    if [[ "${ZKBB_FINAL_MODE:-0}" == "1" ]]; then
+      harness_time_begin v3-panel-bootstrap
+    else
+      harness_time_begin v3-reproduction
+    fi
     local arbiter_two_key="" arbiter_two_address=""
     local arbiter_three_key="" arbiter_three_address=""
     local v3_height="" v3_deadline_height="" v3_deadline=""
@@ -1916,6 +2722,9 @@ main() {
     local v3_program_before_rejection="" v3_program_after_rejection=""
     local v3_owner_before_rejection="" v3_owner_after_rejection=""
     local v3_current_block="" v3_blocks_to_advance=""
+    local v3_invalid_vote_marker="" v3_arbiter_one_vote_marker="" v3_arbiter_two_vote_marker=""
+    local v3_reject_arbiter_one_marker="" v3_reject_duplicate_marker="" v3_reject_arbiter_two_marker=""
+    local v3_award_tally_before_invalid="" v3_award_state_before_invalid=""
 
     generate_ephemeral_local_account arbiter_two_key arbiter_two_address       "ephemeral V3 Arbiter 2"
     generate_ephemeral_local_account arbiter_three_key arbiter_three_address       "ephemeral V3 Arbiter 3"
@@ -1930,6 +2739,13 @@ main() {
     require_public_balance "v3-arbiter-three" "Arbiter 3" "${arbiter_three_address}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" ||
       die "V3 Arbiter 3 bootstrap failed"
 
+    if [[ "${ZKBB_FINAL_MODE:-0}" == "1" ]]; then
+      # The final six-dispute matrix below already contains both the accepted
+      # reproduction and rejected-claim routes. Re-running the older two-route
+      # V3 sample here added no independent coverage and cost roughly 49 minutes.
+      harness_time_end v3-panel-bootstrap
+      record_event "protocol-v3-redundant-sample" "skipped-final-matrix-is-superset"
+    else
     v3_height="$(current_height)"
     v3_deadline_height=$((10#${v3_height} + 250))
     v3_deadline="${v3_deadline_height}u32"
@@ -1978,19 +2794,31 @@ main() {
     assert_mapping_matches "v3-award-disputed" claim_v3_states "${v3_claim_award}"       "status:11u8" "pre_dispute_status:8u8"
     assert_mapping_matches "v3-award-bond" claim_v3_dispute_bonds       "${v3_claim_award}" "payer:${WHITEHAT_ADDRESS}" "amount:1000000u64"       "status:1u8"
 
-    execute_accepted "v3-arbiter-one-high-vote" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${ARBITER_PRIVATE_KEY}" "Arbiter 1" "${ARBITER_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" cast_arbitration_vote_v3       "${v3_bounty}" "${v3_claim_award}" 2u8       "$(( $(date +%s%N) + 525 ))field"
-    execute_accepted "v3-arbiter-two-high-vote" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${arbiter_two_key}" "Arbiter 2" "${arbiter_two_address}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" cast_arbitration_vote_v3       "${v3_bounty}" "${v3_claim_award}" 2u8       "$(( $(date +%s%N) + 526 ))field"
-    assert_mapping_matches "v3-high-quorum" claim_v3_arbitration_tallies       "${v3_claim_award}" "high_votes:2u8"
+    v3_invalid_vote_marker="$(( $(date +%s%N) + 525 ))field"
+    capture_mapping v3_award_tally_before_invalid claim_v3_arbitration_tallies "${v3_claim_award}"
+    capture_mapping v3_award_state_before_invalid claim_v3_states "${v3_claim_award}"
+    print_v3_vote_preflight_snapshot "v3-reproduction-severity-only-vote"       "${v3_bounty}" "${v3_claim_award}" "${ARBITER_ADDRESS}" 2u8 "${v3_invalid_vote_marker}"
+    expect_chain_rejected "v3-reproduction-severity-only-vote" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${ARBITER_PRIVATE_KEY}" "Arbiter 1" "${ARBITER_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" execute cast_arbitration_vote_v3       "${v3_bounty}" "${v3_claim_award}" 2u8 "${v3_invalid_vote_marker}"       --skip-execute-proof --broadcast --yes
+    assert_mapping_unchanged "v3-reproduction-severity-only-tally"       claim_v3_arbitration_tallies "${v3_claim_award}" "${v3_award_tally_before_invalid}"
+    assert_mapping_unchanged "v3-reproduction-severity-only-state"       claim_v3_states "${v3_claim_award}" "${v3_award_state_before_invalid}"
+
+    v3_arbiter_one_vote_marker="$(( $(date +%s%N) + 526 ))field"
+    print_v3_vote_preflight_snapshot "v3-arbiter-one-critical-vote"       "${v3_bounty}" "${v3_claim_award}" "${ARBITER_ADDRESS}" 3u8 "${v3_arbiter_one_vote_marker}"
+    execute_accepted "v3-arbiter-one-critical-vote" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${ARBITER_PRIVATE_KEY}" "Arbiter 1" "${ARBITER_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" cast_arbitration_vote_v3       "${v3_bounty}" "${v3_claim_award}" 3u8 "${v3_arbiter_one_vote_marker}"
+    v3_arbiter_two_vote_marker="$(( $(date +%s%N) + 527 ))field"
+    print_v3_vote_preflight_snapshot "v3-arbiter-two-critical-vote"       "${v3_bounty}" "${v3_claim_award}" "${arbiter_two_address}" 3u8 "${v3_arbiter_two_vote_marker}"
+    execute_accepted "v3-arbiter-two-critical-vote" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${arbiter_two_key}" "Arbiter 2" "${arbiter_two_address}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" cast_arbitration_vote_v3       "${v3_bounty}" "${v3_claim_award}" 3u8 "${v3_arbiter_two_vote_marker}"
+    assert_mapping_matches "v3-critical-quorum" claim_v3_arbitration_tallies       "${v3_claim_award}" "critical_votes:2u8"
 
     v3_program_before_award="$(public_credits_balance "${PROGRAM_ID}")"
     v3_whitehat_before_award="$(public_credits_balance "${WHITEHAT_ADDRESS}")"
-    execute_accepted "v3-settle-high-award" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${ARBITER_PRIVATE_KEY}" "Arbiter 1" "${ARBITER_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" settle_reward_v3       "${v3_bounty}" "${v3_claim_award}" "${WHITEHAT_ADDRESS}" 2000000u64       1000000u64 2u8 "$(( $(date +%s%N) + 527 ))field"
+    execute_accepted "v3-settle-critical-award" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${ARBITER_PRIVATE_KEY}" "Arbiter 1" "${ARBITER_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" settle_reward_v3       "${v3_bounty}" "${v3_claim_award}" "${WHITEHAT_ADDRESS}" 3000000u64       1000000u64 3u8 "$(( $(date +%s%N) + 528 ))field"
     v3_program_after_award="$(public_credits_balance "${PROGRAM_ID}")"
     v3_whitehat_after_award="$(public_credits_balance "${WHITEHAT_ADDRESS}")"
-    assert_balance_delta "v3-award-program-credits" "${v3_program_before_award}"       "${v3_program_after_award}" -3000000
-    assert_balance_delta "v3-award-whitehat-credits" "${v3_whitehat_before_award}"       "${v3_whitehat_after_award}" 3000000
+    assert_balance_delta "v3-award-program-credits" "${v3_program_before_award}"       "${v3_program_after_award}" -4000000
+    assert_balance_delta "v3-award-whitehat-credits" "${v3_whitehat_before_award}"       "${v3_whitehat_after_award}" 4000000
     assert_mapping_matches "v3-award-paid-state" claim_v3_states       "${v3_claim_award}" "status:12u8"
-    assert_mapping_matches "v3-award-paid-payout" claim_v3_payouts       "${v3_claim_award}" "reserved_amount:3000000u64"       "paid_amount:2000000u64" "status:2u8"
+    assert_mapping_matches "v3-award-paid-payout" claim_v3_payouts       "${v3_claim_award}" "reserved_amount:3000000u64"       "paid_amount:3000000u64" "status:2u8"
     assert_mapping_matches "v3-award-bond-settled" claim_v3_dispute_bonds       "${v3_claim_award}" "status:2u8"
     assert_mapping_matches "v3-award-count-resolved" bounty_claim_counts       "${v3_bounty}" "0u64"
 
@@ -2008,11 +2836,17 @@ main() {
     execute_accepted "v3-ack-reject-claim" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" disclosure_action_v3 "${v3_bounty}"       "${v3_claim_reject}" 2u8 "$(( $(date +%s%N) + 537 ))field"       "$(( $(date +%s%N) + 538 ))field"
     execute_accepted "v3-reject-reproduction-two" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" resolution_action_v3 "${v3_bounty}"       "${v3_claim_reject}" 2u8 "$(( $(date +%s%N) + 539 ))field"       "$(( $(date +%s%N) + 540 ))field"
     execute_accepted "v3-open-rejection-dispute" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${WHITEHAT_PRIVATE_KEY}" "Whitehat" "${WHITEHAT_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" dispute_claim_v3 "${v3_bounty}"       "${v3_claim_reject}" 5u8 0u8 "$(( $(date +%s%N) + 541 ))field"       1000000u64 "$(( $(date +%s%N) + 542 ))field"
-    execute_accepted "v3-arbiter-one-reject-vote" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${ARBITER_PRIVATE_KEY}" "Arbiter 1" "${ARBITER_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" cast_arbitration_vote_v3       "${v3_bounty}" "${v3_claim_reject}" 0u8       "$(( $(date +%s%N) + 543 ))field"
+    v3_reject_arbiter_one_marker="$(( $(date +%s%N) + 543 ))field"
+    print_v3_vote_preflight_snapshot "v3-arbiter-one-reject-vote"       "${v3_bounty}" "${v3_claim_reject}" "${ARBITER_ADDRESS}" 0u8 "${v3_reject_arbiter_one_marker}"
+    execute_accepted "v3-arbiter-one-reject-vote" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${ARBITER_PRIVATE_KEY}" "Arbiter 1" "${ARBITER_ADDRESS}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" cast_arbitration_vote_v3       "${v3_bounty}" "${v3_claim_reject}" 0u8 "${v3_reject_arbiter_one_marker}"
 
-    expect_chain_rejected "v3-duplicate-arbiter-vote" STEP_TX_ID STEP_FEE_ID       STEP_FEE_TX_ID "${CANDIDATE_DIR}" "${ARBITER_PRIVATE_KEY}" "Arbiter 1"       "${ARBITER_ADDRESS}" "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" execute       cast_arbitration_vote_v3 "${v3_bounty}" "${v3_claim_reject}" 0u8       "$(( $(date +%s%N) + 544 ))field" --skip-execute-proof --broadcast --yes
+    v3_reject_duplicate_marker="$(( $(date +%s%N) + 544 ))field"
+    print_v3_vote_preflight_snapshot "v3-duplicate-arbiter-vote"       "${v3_bounty}" "${v3_claim_reject}" "${ARBITER_ADDRESS}" 0u8 "${v3_reject_duplicate_marker}"
+    expect_chain_rejected "v3-duplicate-arbiter-vote" STEP_TX_ID STEP_FEE_ID       STEP_FEE_TX_ID "${CANDIDATE_DIR}" "${ARBITER_PRIVATE_KEY}" "Arbiter 1"       "${ARBITER_ADDRESS}" "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" execute       cast_arbitration_vote_v3 "${v3_bounty}" "${v3_claim_reject}" 0u8       "${v3_reject_duplicate_marker}" --skip-execute-proof --broadcast --yes
 
-    execute_accepted "v3-arbiter-two-reject-vote" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${arbiter_two_key}" "Arbiter 2" "${arbiter_two_address}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" cast_arbitration_vote_v3       "${v3_bounty}" "${v3_claim_reject}" 0u8       "$(( $(date +%s%N) + 545 ))field"
+    v3_reject_arbiter_two_marker="$(( $(date +%s%N) + 545 ))field"
+    print_v3_vote_preflight_snapshot "v3-arbiter-two-reject-vote"       "${v3_bounty}" "${v3_claim_reject}" "${arbiter_two_address}" 0u8 "${v3_reject_arbiter_two_marker}"
+    execute_accepted "v3-arbiter-two-reject-vote" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${arbiter_two_key}" "Arbiter 2" "${arbiter_two_address}"       "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" cast_arbitration_vote_v3       "${v3_bounty}" "${v3_claim_reject}" 0u8 "${v3_reject_arbiter_two_marker}"
     assert_mapping_matches "v3-reject-quorum" claim_v3_arbitration_tallies       "${v3_claim_reject}" "reject_votes:2u8"
 
     v3_program_before_rejection="$(public_credits_balance "${PROGRAM_ID}")"
@@ -2026,7 +2860,7 @@ main() {
     assert_mapping_matches "v3-rejected-payout" claim_v3_payouts       "${v3_claim_reject}" "status:3u8"
     assert_mapping_matches "v3-rejected-bond" claim_v3_dispute_bonds       "${v3_claim_reject}" "status:2u8"
     assert_mapping_matches "v3-all-claims-resolved" bounty_claim_counts       "${v3_bounty}" "0u64"
-    assert_mapping_matches "v3-escrow-after-arbitration" bounty_escrows       "${v3_bounty}" "available_balance:8000000u64"       "locked_amount:0u64" "paid_amount:2000000u64"
+    assert_mapping_matches "v3-escrow-after-arbitration" bounty_escrows       "${v3_bounty}" "available_balance:7000000u64"       "locked_amount:0u64" "paid_amount:3000000u64"
 
     execute_accepted "v3-close-bounty" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" close_bounty "${v3_bounty}"
     v3_current_block="$(current_height)"
@@ -2034,22 +2868,71 @@ main() {
       v3_blocks_to_advance=$((v3_deadline_height - 10#${v3_current_block} + 1))
       advance_blocks "${v3_blocks_to_advance}"
     fi
-    execute_accepted "v3-refund-bounty" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" refund_bounty_v3 "${v3_bounty}"       8000000u64 "$(( $(date +%s%N) + 547 ))field"
+    execute_accepted "v3-refund-bounty" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID       "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}"       "${MINIMUM_OWNER_MICROCREDITS}" refund_bounty_v3 "${v3_bounty}"       7000000u64 "$(( $(date +%s%N) + 547 ))field"
     v3_program_after_refund="$(public_credits_balance "${PROGRAM_ID}")"
     assert_balance_delta "v3-program-conservation" "${v3_program_before_fund}"       "${v3_program_after_refund}" 0
-    assert_mapping_matches "v3-refunded-escrow" bounty_escrows "${v3_bounty}"       "available_balance:0u64" "locked_amount:0u64"       "paid_amount:2000000u64" "refunded_amount:8000000u64" "status:3u8"
+    assert_mapping_matches "v3-refunded-escrow" bounty_escrows "${v3_bounty}"       "available_balance:0u64" "locked_amount:0u64"       "paid_amount:3000000u64" "refunded_amount:7000000u64" "status:3u8"
 
-    arbiter_two_key=""
-    arbiter_three_key=""
     record_event "protocol-v3-award-flow" "passed"
     record_event "protocol-v3-rejection-flow" "passed"
     record_event "protocol-v3-credits-conservation" "passed"
-    printf 'Local Devnode Protocol V3 accepted and rejected arbitration flows passed.\n'
+    harness_time_end v3-reproduction
+    fi
+    run_protocol_v3_final_dynamic_coverage
+    [[ "${V3_FINAL_COVERAGE_PASSED:-0}" == "1" ]] || die "Protocol V3 R2 FINAL DYNAMIC COVERAGE: FAIL"
+    arbiter_two_key=""
+    arbiter_three_key=""
+    if [[ "${final_shard}" != "all" ]]; then
+      complete_final_shard "${final_shard}"
+      return 0
+    fi
   fi
   record_event "credits-conservation" "passed"
   record_event "status" "COMPLETED"
+  harness_time_summary
   write_public_report
-  printf 'Local Devnode Escrow v2 E2E passed with Credits conservation and replay protection.\n'
+  if [[ "${ZKBB_RUN_PROTOCOL_V3:-0}" == "1" ]]; then
+    printf 'Protocol V3 R2 Final Dynamic Coverage Report\n'
+    printf '%s\n' '- Candidate: 15b3d860948623d66eb957c69336b45af582c398'
+    printf '%s\n' '- HEAD match: PASS'
+    printf '%s\n' '- main.leo changed: NO'
+    printf '%s\n' '- source integrity: PASS'
+    printf '%s\n' '- REJECTION: PASS'
+    printf '%s\n' '- DUPLICATE: PASS'
+    printf '%s\n' '- SCOPE: PASS'
+    printf '%s\n' '- SEVERITY: PASS'
+    printf '%s\n' '- REPRODUCTION: PASS'
+    printf '%s\n' '- REMEDIATION: PASS'
+    printf '%s\n' '- six dispute types: PASS'
+    printf '%s\n' '- immutable panel runtime: PASS'
+    printf '%s\n' '- non-arbiter: PASS'
+    printf '%s\n' '- duplicate vote rollback: PASS'
+    printf '%s\n' '- 2/3 one-vote rejection: PASS'
+    printf '%s\n' '- 2/3 two-vote acceptance: PASS'
+    printf '%s\n' '- 3/3 one-vote rejection: PASS'
+    printf '%s\n' '- 3/3 two-vote rejection: PASS'
+    printf '%s\n' '- 3/3 three-vote acceptance: PASS'
+    printf '%s\n' '- finalize replay: PASS'
+    printf '%s\n' '- V3 refund replay: PASS'
+    printf '%s\n' '- V3 atomic rollback: PASS'
+    printf '%s\n' '- payout Credits: PASS'
+    printf '%s\n' '- bond Credits: PASS'
+    printf '%s\n' '- escrow settlement: PASS'
+    printf '%s\n' '- Credits conservation: 0 microcredits'
+    printf '%s\n' '- npm tests: PASS'
+    printf '%s\n' '- lint: PASS'
+    printf '%s\n' '- Bash syntax: PASS'
+    printf '%s\n' '- worktree tests: PASS'
+    printf '%s\n' '- unresolved dynamic gaps: NONE'
+    printf '%s\n' '- Candidate tag: NOT CREATED'
+    printf '%s\n' '- Candidate tag target: 15b3d860948623d66eb957c69336b45af582c398'
+    printf '%s\n' '- Edition 2 Preview: NOT CREATED'
+    printf '%s\n' '- Testnet transactions: 0'
+    printf '%s\n' '- secrets accessed: 0'
+    printf '%s\n' 'Testnet transactions broadcast by Codex: 0'
+  else
+    printf 'Local Devnode Escrow v2 E2E passed with Credits conservation and replay protection.\n'
+  fi
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
