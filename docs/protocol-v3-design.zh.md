@@ -6,7 +6,7 @@ V3 将“白帽证明、公开收据、托管资金”升级为可审计的责�
 
 ## 当前状态
 
-V3 Leo 源码已在本地完成编译，并通过 V1/V2 ABI 兼容检查；Testnet 当前仍是 V2。V3 钱包操作必须等新 Program Edition 链上确认后才能启用，Vercel 前端部署不会替代合约升级。
+V3 Leo 源码已完成编译并通过 V1/V2 ABI 兼容检查；Testnet 已升级并公开验证为 Program Edition 2。前端仍会逐次读取 Edition、V3 ABI 与已记录的升级交易证据；其中任一校验失败即禁用 V3 钱包操作，Vercel 前端部署不会替代合约升级。
 
 ## 不可改变的隐私边界
 
@@ -121,12 +121,12 @@ V3 Claim 已绑定 Bounty 的目标系统承诺和目标代码哈希，并额外
 
 1. 在本地 Devnode 完成 V3 的所有正常与恶意路径测试。
 2. 审核 Leo ABI 和 Credits 结算边界。
-3. 由 Program Admin 使用 Testnet 钱包签名 Program Edition 升级并支付手续费。
-4. 记录升级交易 ID、Edition 和 ABI 指纹。
-5. 前端探测到 V3 ABI 后才启用真实 V3 钱包操作。
-6. 再将已验证前端发布到 Vercel Production。
+3. 由 Program Admin 使用 Testnet 钱包签名 Program Edition 2 升级并支付手续费（已完成）。
+4. 记录并独立验证升级交易 ID、Edition 和 ABI 指纹（已完成）。
+5. 只有当前公开状态同时满足 Edition 2、V3 ABI 和升级证据时，前端才启用真实 V3 钱包操作（已接通）。
+6. 部署 Vercel Preview 并完成钱包人工验收后，才可提升到 Production。
 
-仅部署 Vercel 不会更新 Aleo Program；未完成第 3 步时，线上只能继续使用 V2 的既有链上能力。
+仅部署 Vercel 不会更新 Aleo Program；前端必须继续以链上探测结果为准，不可回退到浏览器状态。
 
 
 ## R2 争议模型更新

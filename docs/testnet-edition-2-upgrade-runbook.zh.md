@@ -107,12 +107,12 @@ npm run verify:testnet-edition-2 -- \
 
 ## 6. 记录公开证据并启用前端
 
-确认验证通过后，编辑 lib/aleo-program.ts 中的 ALEO_TESTNET_V3_UPGRADE_EVIDENCE：
+确认验证通过后，编辑 lib/aleo-program.ts 中的 ALEO_TESTNET_V3_UPGRADE_EVIDENCE。本次已记录的公开证据为：
 
 ~~~ts
 export const ALEO_TESTNET_V3_UPGRADE_EVIDENCE = {
-  transactionId: "at1...",
-  feeTransactionId: "at1...",
+  transactionId: "at1e8yuz289ygf249s96dd6eqszcvywvkrmw3lxzdt4gl96e6a3lu8s4dt499",
+  feeTransactionId: "at18q2xfeqchrynkhtysxrjypmc7te53qesm4asjq7rc7mzccy0wsqq8p09vn",
   expectedEdition: ALEO_TESTNET_V3_EXPECTED_EDITION,
 };
 ~~~

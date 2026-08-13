@@ -22,6 +22,10 @@ import {
   PROTOCOL_V3_MAPPINGS,
 } from "../lib/aleo-protocol-v3.ts";
 import {
+  ALEO_TESTNET_PROGRAM_OWNER,
+  ALEO_TESTNET_V3_UPGRADE_EVIDENCE,
+} from "../lib/aleo-program.ts";
+import {
   parseOnChainBountyV3Config,
   parseOnChainClaimV3ArbitrationTally,
   parseOnChainClaimV3DisputeBond,
@@ -255,7 +259,7 @@ test("submit_claim_v3 serializes bindings and private witness as two ABI structs
   assert.match(inputs[4], /reporter_secret: 30field/);
 });
 
-test("V3 capability remains fail-closed on Edition 1 and pending evidence on Edition 2", async () => {
+test("V3 capability remains fail-closed until verified Edition 2 evidence is available", async () => {
   const fetcher = async (input: string | URL | Request) => {
     const url = String(input);
     if (url.endsWith("/latest_edition")) {
@@ -268,16 +272,49 @@ test("V3 capability remains fail-closed on Edition 1 and pending evidence on Edi
   assert.equal(editionOne.walletRequestEnabled, false);
   assert.equal(editionOne.currentEdition, 1);
 
-  const editionTwo = await fetchProtocolV3Capability(async (input) => {
+  const savedEvidence = {
+    transactionId: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId,
+    feeTransactionId: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId,
+  };
+  try {
+    ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId = null;
+    ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId = null;
+    const pendingEvidence = await fetchProtocolV3Capability(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/latest_edition")) {
+        return new Response("2", { status: 200 });
+      }
+      return new Response(JSON.stringify(compiledSource), { status: 200 });
+    });
+    assert.equal(pendingEvidence.status, "DeploymentEvidencePending");
+    assert.equal(pendingEvidence.walletRequestEnabled, false);
+    assert.equal(pendingEvidence.upgradeEvidenceVerified, false);
+  } finally {
+    ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId = savedEvidence.transactionId;
+    ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId = savedEvidence.feeTransactionId;
+  }
+
+  const verified = await fetchProtocolV3Capability(async (input) => {
     const url = String(input);
-    if (url.endsWith("/latest_edition")) {
-      return new Response("2", { status: 200 });
+    if (url.endsWith("/latest_edition")) return new Response("2", { status: 200 });
+    if (url.endsWith(`/transaction/${ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId}`)) {
+      return Response.json({
+        id: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId,
+        type: "deploy",
+        owner: { address: ALEO_TESTNET_PROGRAM_OWNER },
+        deployment: {
+          edition: 2,
+          program_owner: ALEO_TESTNET_PROGRAM_OWNER,
+          program: compiledSource,
+        },
+      });
     }
+    if (url.includes("/transaction/")) return Response.json({});
     return new Response(JSON.stringify(compiledSource), { status: 200 });
   });
-  assert.equal(editionTwo.status, "DeploymentEvidencePending");
-  assert.equal(editionTwo.walletRequestEnabled, false);
-  assert.equal(editionTwo.upgradeEvidenceVerified, false);
+  assert.equal(verified.status, "Available");
+  assert.equal(verified.walletRequestEnabled, true);
+  assert.equal(verified.upgradeEvidenceVerified, true);
 });
 
 test("strict V3 Mapping parsers reject unknown fields and decode every public state family", () => {
@@ -336,12 +373,12 @@ test("strict V3 Mapping parsers reject unknown fields and decode every public st
   );
 });
 
-test("generic public Mapping allowlist includes all V3 mappings and Edition 2 verifier requires evidence", () => {
+test("generic public Mapping allowlist includes all V3 mappings and Edition 2 verifier uses recorded evidence", () => {
   for (const mapping of PROTOCOL_V3_MAPPINGS) {
     assert.equal(isEditionOneMappingName(mapping), true);
   }
   const parsed = parseEditionTwoVerifierArguments([]);
   assert.equal(parsed.expectedEdition, 2);
-  assert.equal(parsed.upgradeTransactionId, "");
-  assert.equal(parsed.feeTransactionId, "");
+  assert.equal(parsed.upgradeTransactionId, ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId);
+  assert.equal(parsed.feeTransactionId, ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId);
 });

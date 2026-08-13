@@ -45,7 +45,7 @@ export const ALEO_TESTNET_V3_UPGRADE_EVIDENCE: {
   feeTransactionId: string | null;
   expectedEdition: typeof ALEO_TESTNET_V3_EXPECTED_EDITION;
 } = {
-  transactionId: null,
-  feeTransactionId: null,
+  transactionId: "at1e8yuz289ygf249s96dd6eqszcvywvkrmw3lxzdt4gl96e6a3lu8s4dt499",
+  feeTransactionId: "at18q2xfeqchrynkhtysxrjypmc7te53qesm4asjq7rc7mzccy0wsqq8p09vn",
   expectedEdition: ALEO_TESTNET_V3_EXPECTED_EDITION,
 };

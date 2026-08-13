@@ -43,6 +43,6 @@
 
 ## 发布边界
 
-- 当前 Testnet 仍是 Edition 1；V3 钱包操作保持禁用，直到公开升级证据和 ABI 指纹都被记录并验证。
+- Testnet 已确认 Program Edition 2；前端已记录公开升级证据，但每次钱包操作仍须同时验证当前 Edition、V3 ABI 与证据交易，任一失败即关闭 V3 能力。
 - Protocol V3 pre-candidate `a0434764669102ba636ac4cf07be377ddd0270a7` 在最终 E2E 覆盖审计中被作废：当时六类争议没有成为明确、可验证的链上状态。该提交从未部署到 Testnet。
 - 本地 Devnode 验证不构成 Testnet Edition 2 升级授权。

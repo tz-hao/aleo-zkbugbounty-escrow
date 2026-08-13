@@ -7,7 +7,7 @@ zkBugBounty is a privacy-first responsible disclosure protocol prototype on Aleo
 - **Live DApp:** [aleo-gilt.vercel.app](https://aleo-gilt.vercel.app)
 - **Aleo Program:** `zkbugbounty_7f3c92.aleo`
 - **Network:** Aleo Testnet
-- **Current program edition:** `1`
+- **Current program edition:** `2` (Protocol V3 upgrade verified on Testnet)
 
 ![zkBugBounty protocol overview](public/images/zkbugbounty-readme-protocol-v1.png)
 
@@ -221,10 +221,10 @@ The runbook covers stale frontend deployment, wallet connection failures, wrong 
 - Credits escrow, release, refund, and replay guards validated on Local Devnode
 - Production deployment, public Edition 1 verifier, and manual Smoke tooling
 - Protocol V3 local contract, typed wallet workbenches, immutable per-Bounty panel, and fail-closed Edition 2 capability gate
+- Program Edition 2 upgrade confirmed on Testnet; public upgrade evidence recorded and V3 wallet capability gate enabled
 
 ### Next
 
-- Administrator-run Testnet Program Edition 2 upgrade and public evidence verification
 - Human-run Testnet Credits escrow acceptance flow with fresh test data
 - Broader invariant libraries beyond DemoVault
 - Formal protocol review and external security audit
