@@ -51,11 +51,12 @@ npm run preview:testnet-edition-2
 1. 核验 Testnet 上当前 Program 必须存在且 latest_edition 必须等于 1。
 2. 扫描项目内潜在私钥字面量。
 3. 重新编译 Program。
-4. 核验管理员构造器、13 个 V3 函数和 11 个 V3 Mapping。
-5. 计算源代码、编译 Program 和 ABI 的 SHA-256。
-6. 在不回显的交互提示中读取管理员私钥。
-7. 执行 leo upgrade --print。
-8. 仅把不含签名载荷和私钥的摘要写入 local-upgrade-results/。
+4. 读取当前 Testnet Edition 1 的真实 Program 接口，并逐项核对候选合约保留的接口；此步骤失败时不会提示私钥。
+5. 核验管理员构造器、13 个 V3 函数和 11 个 V3 Mapping。
+6. 计算源代码、编译 Program 和 ABI 的 SHA-256。
+7. 在不回显的交互提示中读取管理员私钥。
+8. 执行 leo upgrade --print。
+9. 仅把不含签名载荷和私钥的摘要写入 local-upgrade-results/。
 
 看到 Preview complete. No transaction was broadcast. 才表示预演路径结束。预演不产生可上链使用的交易 ID。
 

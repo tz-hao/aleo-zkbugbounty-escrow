@@ -38,6 +38,7 @@ cleanup() {
     unset -v PRIVATE_KEY 2>/dev/null || true
     if [[ -n "${TEMP_DIR}" && -d "${TEMP_DIR}" ]]; then
         rm -f -- "${TEMP_DIR}/leo-result.json"
+        rm -f -- "${TEMP_DIR}/testnet-interface.aleo"
         rmdir -- "${TEMP_DIR}" 2>/dev/null || true
     fi
 }
@@ -237,6 +238,7 @@ require_command find
 require_command sha256sum
 require_command git
 require_command mktemp
+require_command node
 
 LEO_VERSION="$("${LEO_BIN}" --version)"
 [[ "${LEO_VERSION}" == "leo 4.4.0"* ]] ||
@@ -265,6 +267,21 @@ printf 'Current Testnet edition: %s\n' "${CURRENT_EDITION}"
 
 [[ -f "${COMPILED_PROGRAM}" ]] || fail "Compiled Program was not produced."
 [[ -f "${ABI_PATH}" ]] || fail "ABI was not produced."
+
+TEMP_DIR="$(mktemp -d)"
+TESTNET_INTERFACE_BASELINE="${TEMP_DIR}/testnet-interface.aleo"
+if ! "${LEO_BIN}" query program "${EXPECTED_PROGRAM_ID}" \
+    --edition "${CURRENT_EDITION}" \
+    --network "${NETWORK}" \
+    --endpoint "${ENDPOINT}" >"${TESTNET_INTERFACE_BASELINE}"; then
+    fail "Unable to read the current Testnet Program interface."
+fi
+
+node --experimental-strip-types \
+    "${PROJECT_ROOT}/scripts/check-aleo-upgrade-interface.mjs" \
+    "${TESTNET_INTERFACE_BASELINE}" \
+    "${COMPILED_PROGRAM}" ||
+    fail "Compiled Program changes a preserved Testnet interface."
 
 grep -F -q "program ${EXPECTED_PROGRAM_ID};" "${COMPILED_PROGRAM}" ||
     fail "Compiled Program ID mismatch."
@@ -315,7 +332,6 @@ ABI_SHA="$(sha256sum "${ABI_PATH}" | awk '{print $1}')"
 GIT_COMMIT="$(git -C "${PROJECT_ROOT}" rev-parse HEAD 2>/dev/null || true)"
 
 mkdir -p -- "${RESULT_DIR}"
-TEMP_DIR="$(mktemp -d)"
 RAW_RESULT="${TEMP_DIR}/leo-result.json"
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 PUBLIC_EVIDENCE="${RESULT_DIR}/edition-2-${MODE}-${TIMESTAMP}.json"
