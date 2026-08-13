@@ -56,6 +56,9 @@ http_status() {
         --silent \
         --show-error \
         --location \
+        --retry 3 \
+        --retry-delay 2 \
+        --retry-all-errors \
         --output /dev/null \
         --write-out '%{http_code}' \
         --connect-timeout 10 \
@@ -108,6 +111,9 @@ read_public_edition() {
         --silent \
         --show-error \
         --location \
+        --retry 3 \
+        --retry-delay 2 \
+        --retry-all-errors \
         --connect-timeout 10 \
         --max-time 30 \
         "${ENDPOINT}/${NETWORK}/program/${EXPECTED_PROGRAM_ID}/latest_edition" |
