@@ -348,7 +348,7 @@ upgrade_args=(
     --network "${NETWORK}"
     --endpoint "${ENDPOINT}"
     --network-retries 6
-    --json-output "${RAW_RESULT}"
+    "--json-output=${RAW_RESULT}"
 )
 if [[ "${MODE}" == "broadcast" ]]; then
     upgrade_args+=(--broadcast)
