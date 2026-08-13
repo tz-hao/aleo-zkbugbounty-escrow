@@ -64,7 +64,7 @@ http_status() {
 }
 
 scan_for_private_key_literals() {
-    local key_marker
+    local private_key_pattern
     local path
     local root
     local -a scan_files=()
@@ -80,7 +80,9 @@ scan_for_private_key_literals() {
         "${LEO_PROJECT_DIR}/inputs"
     )
 
-    key_marker="A""PrivateKey"
+    # Match an actual Aleo private-key-shaped literal, not the harmless
+    # `APrivateKey` marker used by client-side redaction code.
+    private_key_pattern="A""PrivateKey1[[:alnum:]_]{20,}"
     for root in "${scan_roots[@]}"; do
         if [[ -d "${root}" ]]; then
             while IFS= read -r -d '' path; do
@@ -90,7 +92,7 @@ scan_for_private_key_literals() {
     done
     while IFS= read -r path; do
         suspect_files+=("${path}")
-    done < <(grep -I -l -- "${key_marker}" "${scan_files[@]}" || true)
+    done < <(grep -I -E -l -- "${private_key_pattern}" "${scan_files[@]}" || true)
 
     if ((${#suspect_files[@]} > 0)); then
         printf 'ERROR: Potential Aleo private-key literals were found:\n' >&2
@@ -357,7 +359,7 @@ fi
 unset -v PRIVATE_KEY
 
 [[ -f "${RAW_RESULT}" ]] || fail "Leo did not produce its JSON result."
-if grep -I -q -- "A""PrivateKey" "${RAW_RESULT}"; then
+if grep -I -E -q -- "A""PrivateKey1[[:alnum:]_]{20,}" "${RAW_RESULT}"; then
     fail "Sensitive material was detected in the Leo result. It will not be copied or printed."
 fi
 
