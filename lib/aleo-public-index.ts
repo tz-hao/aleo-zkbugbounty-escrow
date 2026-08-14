@@ -13,7 +13,9 @@ import { fetchOnChainClaimReceipt } from "./aleo-claim-receipt-registry.ts";
 import { fetchOnChainNullifierState } from "./aleo-nullifier-registry.ts";
 import {
   fetchOnChainBountyV3Config,
+  fetchOnChainClaimV3Evidence,
   type OnChainBountyV3Config,
+  type OnChainClaimV3Evidence,
 } from "./aleo-v3-registry.ts";
 import {
   CANONICAL_ALEO_PROGRAM_ID,
@@ -52,11 +54,13 @@ export type IndexedClaim = {
   transactionId: string;
   transactionStatus: "Accepted";
   mappingStatus: MappingVerificationStatus;
+  protocolVersion: 1 | 2 | 3;
   claimHash: string;
   bountyId: string;
   nullifier: string;
   receipt?: OnChainClaimReceipt;
   nullifierState?: OnChainNullifierState;
+  v3Evidence?: OnChainClaimV3Evidence;
 };
 
 export type AleoPublicIndexPage =
@@ -101,6 +105,7 @@ type BountyV3PolicyDiscovery = {
 
 type ClaimDiscovery = {
   transactionId: string;
+  protocolVersion: 1 | 2 | 3;
   bountyId: string;
   scopeHash: string;
   ruleId: DemoVaultRuleId;
@@ -109,6 +114,15 @@ type ClaimDiscovery = {
   nullifier: string;
   reporterCommitment: string;
   severity: OnChainClaimReceipt["severity"];
+  v3Binding?: ClaimV3BindingDiscovery;
+};
+
+type ClaimV3BindingDiscovery = {
+  targetSystemCommitment: string;
+  targetStateCommitment: string;
+  targetCodeHash: string;
+  executionCommitment: string;
+  reportCommitment: string;
 };
 
 const ruleByField: Record<string, DemoVaultRuleId> = {
@@ -125,7 +139,7 @@ const severityByLiteral: Record<string, OnChainClaimReceipt["severity"]> = {
 };
 
 type BountyProgramFunctionName = "create_bounty" | "create_bounty_v3";
-type ClaimProgramFunctionName = "submit_claim" | "submit_claim_v2";
+type ClaimProgramFunctionName = "submit_claim" | "submit_claim_v2" | "submit_claim_v3";
 type IndexedProgramFunctionName = BountyProgramFunctionName | ClaimProgramFunctionName;
 
 const BOUNTY_PROGRAM_FUNCTIONS: readonly BountyProgramFunctionName[] = [
@@ -134,6 +148,7 @@ const BOUNTY_PROGRAM_FUNCTIONS: readonly BountyProgramFunctionName[] = [
 ];
 
 const CLAIM_PROGRAM_FUNCTIONS: readonly ClaimProgramFunctionName[] = [
+  "submit_claim_v3",
   "submit_claim",
   "submit_claim_v2",
 ];
@@ -227,6 +242,22 @@ const BOUNTY_V3_POLICY_FIELDS = [
   "arbitration_fee_microcredits",
   "payment_condition",
 ] as const;
+const CLAIM_V3_BINDING_FIELDS = [
+  "target_system_commitment",
+  "target_state_commitment",
+  "target_code_hash",
+  "execution_commitment",
+  "report_commitment",
+] as const;
+const CLAIM_V3_PROOF_FIELDS = [
+  "verified",
+  "severity",
+  "claim_hash",
+  "witness_commitment",
+  "nullifier",
+  "reporter_commitment",
+  ...CLAIM_V3_BINDING_FIELDS,
+] as const;
 
 function parseUnsignedPublicLiteral(value: string, suffix: "u8" | "u32" | "u64", label: string) {
   const match = value.match(new RegExp(`^([0-9]+)${suffix}$`));
@@ -289,6 +320,24 @@ function parseBountyV3Policy(raw: string): BountyV3PolicyDiscovery {
   };
 }
 
+function parseClaimV3Binding(raw: string, label: string): ClaimV3BindingDiscovery {
+  const fields = parseFlatStruct(raw, CLAIM_V3_BINDING_FIELDS);
+  const fieldLiteral = (name: (typeof CLAIM_V3_BINDING_FIELDS)[number]) => {
+    const value = fields.get(name)!;
+    if (!isAleoFieldLiteral(value) || value === "0field") {
+      throw new Error(`Aleo ${label} ${name} is invalid`);
+    }
+    return value;
+  };
+  return {
+    targetSystemCommitment: fieldLiteral("target_system_commitment"),
+    targetStateCommitment: fieldLiteral("target_state_commitment"),
+    targetCodeHash: fieldLiteral("target_code_hash"),
+    executionCommitment: fieldLiteral("execution_commitment"),
+    reportCommitment: fieldLiteral("report_commitment"),
+  };
+}
+
 export function parseIndexedBountyTransaction(
   entry: unknown,
   functionName: BountyProgramFunctionName = "create_bounty",
@@ -321,6 +370,68 @@ export function parseIndexedClaimTransaction(
 ): ClaimDiscovery {
   const { transactionId, transition } = canonicalTransition(entry, functionName);
   const inputs = asArray(transition.inputs, functionName + " inputs");
+  if (functionName === "submit_claim_v3") {
+    if (inputs.length !== 5) throw new Error("Aleo submit_claim_v3 input count mismatch");
+    const bountyId = publicValue(inputs[0], "bounty ID");
+    const scopeHash = publicValue(inputs[1], "scope hash");
+    const ruleField = publicValue(inputs[2], "rule ID");
+    if (!isAleoFieldLiteral(bountyId) || !isAleoFieldLiteral(scopeHash)) {
+      throw new Error("Aleo submit_claim_v3 public identifiers are invalid");
+    }
+    const ruleId = ruleByField[ruleField];
+    if (!ruleId || asRecord(inputs[4], "private submit_claim_v3 witness").type !== "private") {
+      throw new Error("Aleo submit_claim_v3 public inputs are unsupported");
+    }
+    const binding = parseClaimV3Binding(
+      publicValue(inputs[3], "submit_claim_v3 binding"),
+      "submit_claim_v3 binding",
+    );
+    const outputs = asArray(transition.outputs, "submit_claim_v3 outputs");
+    const publicOutputs = outputs.filter(
+      (output) => asRecord(output, "submit_claim_v3 output").type === "public",
+    );
+    if (publicOutputs.length !== 1) {
+      throw new Error("Aleo submit_claim_v3 must have one public proof output");
+    }
+    const proof = parseFlatStruct(
+      publicValue(publicOutputs[0], "submit_claim_v3 proof output"),
+      CLAIM_V3_PROOF_FIELDS,
+    );
+    const severity = severityByLiteral[proof.get("severity")!];
+    if (!severity || proof.get("verified") !== "true") {
+      throw new Error("Aleo submit_claim_v3 proof output is unsupported");
+    }
+    for (const key of ["claim_hash", "witness_commitment", "nullifier", "reporter_commitment"] as const) {
+      if (!isAleoFieldLiteral(proof.get(key)!)) {
+        throw new Error("Aleo submit_claim_v3 " + key + " is invalid");
+      }
+    }
+    const proofBinding = parseClaimV3Binding(
+      `{${CLAIM_V3_BINDING_FIELDS.map((name) => `${name}: ${proof.get(name)!}`).join(",")}}`,
+      "submit_claim_v3 proof",
+    );
+    if (CLAIM_V3_BINDING_FIELDS.some((name) => {
+      const key = name.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()) as keyof ClaimV3BindingDiscovery;
+      return binding[key] !== proofBinding[key];
+    })) {
+      throw new Error("Aleo submit_claim_v3 bindings do not match");
+    }
+    const result: ClaimDiscovery = {
+      transactionId,
+      protocolVersion: 3,
+      bountyId,
+      scopeHash,
+      ruleId,
+      claimHash: proof.get("claim_hash")!,
+      witnessCommitment: proof.get("witness_commitment")!,
+      nullifier: proof.get("nullifier")!,
+      reporterCommitment: proof.get("reporter_commitment")!,
+      severity,
+      v3Binding: binding,
+    };
+    assertNoPrivateFields(result);
+    return result;
+  }
   if (inputs.length !== 16) throw new Error("Aleo " + functionName + " input count mismatch");
   const bountyId = publicValue(inputs[0], "bounty ID");
   const scopeHash = publicValue(inputs[1], "scope hash");
@@ -369,6 +480,7 @@ export function parseIndexedClaimTransaction(
   }
   const result: ClaimDiscovery = {
     transactionId,
+    protocolVersion: functionName === "submit_claim_v2" ? 2 : 1,
     bountyId,
     scopeHash,
     ruleId,
@@ -609,7 +721,8 @@ function claimMatchesDiscovery(
   discovery: ClaimDiscovery,
 ) {
   return Boolean(
-    receipt.claimHash === discovery.claimHash &&
+    receipt.protocolVersion === discovery.protocolVersion &&
+      receipt.claimHash === discovery.claimHash &&
       receipt.bountyId === discovery.bountyId &&
       receipt.scopeHash === discovery.scopeHash &&
       receipt.ruleId === discovery.ruleId &&
@@ -619,6 +732,23 @@ function claimMatchesDiscovery(
       receipt.reporterCommitment === discovery.reporterCommitment &&
       nullifierState.nullifier === discovery.nullifier &&
       nullifierState.bountyId === discovery.bountyId,
+  );
+}
+
+function claimV3EvidenceMatchesDiscovery(
+  evidence: OnChainClaimV3Evidence,
+  discovery: ClaimDiscovery,
+) {
+  const binding = discovery.v3Binding;
+  return Boolean(
+    binding &&
+      evidence.claimHash === discovery.claimHash &&
+      evidence.bountyId === discovery.bountyId &&
+      evidence.targetSystemCommitment === binding.targetSystemCommitment &&
+      evidence.targetStateCommitment === binding.targetStateCommitment &&
+      evidence.targetCodeHash === binding.targetCodeHash &&
+      evidence.executionCommitment === binding.executionCommitment &&
+      evidence.reportCommitment === binding.reportCommitment,
   );
 }
 
@@ -782,25 +912,36 @@ export async function listIndexedClaims(
     discoveries,
     async (discovery): Promise<IndexedClaim> => {
       try {
-        const [receipt, nullifierState] = await Promise.all([
+        const [receipt, nullifierState, v3Evidence] = await Promise.all([
           fetchOnChainClaimReceipt(discovery.claimHash, config.registry, fetcher),
           fetchOnChainNullifierState(discovery.nullifier, config.registry, fetcher),
+          discovery.protocolVersion === 3
+            ? fetchOnChainClaimV3Evidence(discovery.claimHash, config.registry, fetcher)
+            : Promise.resolve(null),
         ]);
-        const mappingStatus = !receipt || !nullifierState
+        const baseMappingVerified = Boolean(
+          receipt && nullifierState && claimMatchesDiscovery(receipt, nullifierState, discovery),
+        );
+        const v3MappingVerified = discovery.protocolVersion !== 3 || Boolean(
+          v3Evidence && claimV3EvidenceMatchesDiscovery(v3Evidence, discovery),
+        );
+        const mappingStatus = !receipt || !nullifierState || (discovery.protocolVersion === 3 && !v3Evidence)
           ? "Missing"
-          : claimMatchesDiscovery(receipt, nullifierState, discovery)
+          : baseMappingVerified && v3MappingVerified
             ? "Verified"
             : "Mismatch";
         const item: IndexedClaim = {
           transactionId: discovery.transactionId,
           transactionStatus: "Accepted",
           mappingStatus,
+          protocolVersion: discovery.protocolVersion,
           claimHash: discovery.claimHash,
           bountyId: discovery.bountyId,
           nullifier: discovery.nullifier,
           ...(mappingStatus === "Verified" && receipt && nullifierState
             ? { receipt, nullifierState }
             : {}),
+          ...(mappingStatus === "Verified" && v3Evidence ? { v3Evidence } : {}),
         };
         assertNoPrivateFields(item);
         return item;
@@ -809,6 +950,7 @@ export async function listIndexedClaims(
           transactionId: discovery.transactionId,
           transactionStatus: "Accepted",
           mappingStatus: "Unavailable",
+          protocolVersion: discovery.protocolVersion,
           claimHash: discovery.claimHash,
           bountyId: discovery.bountyId,
           nullifier: discovery.nullifier,

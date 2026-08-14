@@ -20,6 +20,9 @@ const scopeHash = "165263616045655158386888829934414575403field";
 const v3BountyId = "324520600032579539532461584551766874442field";
 const v3ScopeHash = "213025675297070227183471899359684190473field";
 const v3TransactionId = "at1nhjm30xah3jee2syzuj8npegh66fmqes4efdjvfgn6e2p087jsrszrg8my";
+const v3ClaimTransactionId = "at1p8d0nxp7kk3ldauzneed3pex94ltqgzudkz4r4507h6nayaq45qqagumcd";
+const v3ClaimHash = "3004390140681728096045346875029088562296985409242501393048515695516003017397field";
+const v3ClaimNullifier = "1229541512745417172544782570267526495364740183584510452929353586743042129929field";
 const claimHash = "15007field";
 const nullifier = "10002field";
 
@@ -145,6 +148,57 @@ const claimEntry = {
   },
 };
 
+const v3ClaimBinding = `{
+  target_system_commitment: 102field,
+  target_state_commitment: 1001field,
+  target_code_hash: 103field,
+  execution_commitment: 1002field,
+  report_commitment: 1003field
+}`;
+
+const claimV3Entry = {
+  status: "accepted",
+  type: "execute",
+  transaction: {
+    type: "execute",
+    id: v3ClaimTransactionId,
+    execution: {
+      transitions: [
+        {
+          program: "zkbugbounty_7f3c92.aleo",
+          function: "submit_claim_v3",
+          inputs: [
+            { type: "public", value: v3BountyId },
+            { type: "public", value: v3ScopeHash },
+            { type: "public", value: "1field" },
+            { type: "public", value: v3ClaimBinding },
+            { type: "private", value: "ciphertext-v3-private-witness" },
+          ],
+          outputs: [
+            {
+              type: "public",
+              value: `{
+                verified: true,
+                severity: 3u8,
+                claim_hash: ${v3ClaimHash},
+                witness_commitment: 271945813620327881279198815917270206437307457970544614185997910230758064221field,
+                nullifier: ${v3ClaimNullifier},
+                reporter_commitment: 4667546704681816136691267007790926678445529057751623995357760965806650197849field,
+                target_system_commitment: 102field,
+                target_state_commitment: 1001field,
+                target_code_hash: 103field,
+                execution_commitment: 1002field,
+                report_commitment: 1003field
+              }`,
+            },
+            { type: "future", value: "public-finalize-reference" },
+          ],
+        },
+      ],
+    },
+  },
+};
+
 const bountyMapping = `{
   owner_address: aleo1hxrwn37uvt8jm5cks6wvxk44vx6vcgtmvwcsygqamuq6gr4ywuxs000q0w,
   scope_hash: ${scopeHash},
@@ -209,6 +263,31 @@ const receiptMapping = `{
   proof_status: 1u8,
   created_height: 18050000u32,
   protocol_version: 1u8
+}`;
+
+const v3ReceiptMapping = `{
+  claim_hash: ${v3ClaimHash},
+  bounty_id: ${v3BountyId},
+  rule_id: 1field,
+  scope_hash: ${v3ScopeHash},
+  severity: 3u8,
+  witness_commitment: 271945813620327881279198815917270206437307457970544614185997910230758064221field,
+  nullifier: ${v3ClaimNullifier},
+  reporter_commitment: 4667546704681816136691267007790926678445529057751623995357760965806650197849field,
+  proof_status: 1u8,
+  created_height: 18716352u32,
+  protocol_version: 3u8
+}`;
+
+const v3EvidenceMapping = `{
+  claim_hash: ${v3ClaimHash},
+  bounty_id: ${v3BountyId},
+  target_system_commitment: 102field,
+  target_state_commitment: 1001field,
+  target_code_hash: 103field,
+  execution_commitment: 1002field,
+  report_commitment: 1003field,
+  submitted_height: 18716352u32
 }`;
 
 test("public index configuration is canonical and HTTPS-only", () => {
@@ -334,6 +413,7 @@ test("claim index ignores encrypted inputs and verifies receipt plus nullifier m
   const discovery = parseIndexedClaimTransaction(claimEntry);
   assert.deepEqual(discovery, {
     transactionId: claimTransactionId,
+    protocolVersion: 1,
     bountyId,
     scopeHash,
     ruleId: "vault-accounting-safety",
@@ -363,6 +443,7 @@ test("claim index ignores encrypted inputs and verifies receipt plus nullifier m
   const registry = await listIndexedClaims(0, 10, config, fetcher);
   assert.equal(registry.kind, "claims");
   assert.equal(registry.items[0].mappingStatus, "Verified");
+  assert.equal(registry.items[0].protocolVersion, 1);
   assert.equal(registry.items[0].receipt?.proofStatus, "Verified");
   assert.equal(registry.items[0].nullifierState?.used, true);
 });
@@ -375,6 +456,7 @@ test("claim index parses submit_claim_v2 public output without reading witness c
   const discovery = parseIndexedClaimTransaction(v2Entry, "submit_claim_v2");
 
   assert.equal(discovery.transactionId, v2Entry.transaction.id);
+  assert.equal(discovery.protocolVersion, 2);
   assert.equal(discovery.claimHash, claimHash);
   assert.equal(discovery.nullifier, nullifier);
   assert.equal(JSON.stringify(discovery).includes("ciphertext-test"), false);
@@ -401,6 +483,67 @@ test("claim index parses submit_claim_v2 public output without reading witness c
   assert.equal(registry.items[0]?.transactionId, v2Entry.transaction.id);
   assert.equal(registry.items[0]?.receipt?.protocolVersion, 2);
   assert.equal(registry.items[0]?.mappingStatus, "Verified");
+});
+
+test("V3 Claim discovery verifies receipt, nullifier, and immutable evidence mappings", async () => {
+  const discovery = parseIndexedClaimTransaction(claimV3Entry, "submit_claim_v3");
+  assert.equal(discovery.protocolVersion, 3);
+  assert.equal(discovery.claimHash, v3ClaimHash);
+  assert.equal(discovery.v3Binding?.targetStateCommitment, "1001field");
+  assert.equal(JSON.stringify(discovery).includes("ciphertext-v3-private-witness"), false);
+
+  const fetcher: TransactionFetch = async (input, init) => {
+    const url = String(input);
+    if (url === config.rpcEndpoint) {
+      const request = JSON.parse(String(init?.body)) as {
+        params?: { functionName?: string };
+      };
+      return Response.json({
+        jsonrpc: "2.0",
+        result: request.params?.functionName === "submit_claim_v3" ? [claimV3Entry] : [],
+      });
+    }
+    if (url.includes(`/mapping/claim_receipts/${v3ClaimHash}`)) return new Response(v3ReceiptMapping);
+    if (url.includes(`/mapping/nullifiers/${v3ClaimNullifier}`)) return new Response(JSON.stringify(v3BountyId));
+    if (url.includes(`/mapping/claim_v3_evidence/${v3ClaimHash}`)) return new Response(v3EvidenceMapping);
+    throw new Error(`Unexpected URL ${url}`);
+  };
+
+  const registry = await listIndexedClaims(0, 10, config, fetcher);
+  const indexed = registry.items.find((item) => item.transactionId === v3ClaimTransactionId);
+  assert.equal(indexed?.transactionStatus, "Accepted");
+  assert.equal(indexed?.protocolVersion, 3);
+  assert.equal(indexed?.mappingStatus, "Verified");
+  assert.equal(indexed?.receipt?.protocolVersion, 3);
+  assert.equal(indexed?.v3Evidence?.submittedHeight, 18_716_352);
+});
+
+test("V3 Claim never becomes Mapping Verified when immutable evidence differs", async () => {
+  const fetcher: TransactionFetch = async (input, init) => {
+    const url = String(input);
+    if (url === config.rpcEndpoint) {
+      const request = JSON.parse(String(init?.body)) as {
+        params?: { functionName?: string };
+      };
+      return Response.json({
+        jsonrpc: "2.0",
+        result: request.params?.functionName === "submit_claim_v3" ? [claimV3Entry] : [],
+      });
+    }
+    if (url.includes(`/mapping/claim_receipts/${v3ClaimHash}`)) return new Response(v3ReceiptMapping);
+    if (url.includes(`/mapping/nullifiers/${v3ClaimNullifier}`)) return new Response(JSON.stringify(v3BountyId));
+    if (url.includes(`/mapping/claim_v3_evidence/${v3ClaimHash}`)) {
+      return new Response(v3EvidenceMapping.replace("target_state_commitment: 1001field", "target_state_commitment: 1004field"));
+    }
+    throw new Error(`Unexpected URL ${url}`);
+  };
+
+  const registry = await listIndexedClaims(0, 10, config, fetcher);
+  const indexed = registry.items.find((item) => item.transactionId === v3ClaimTransactionId);
+  assert.equal(indexed?.transactionStatus, "Accepted");
+  assert.equal(indexed?.mappingStatus, "Mismatch");
+  assert.equal(indexed?.receipt, undefined);
+  assert.equal(indexed?.v3Evidence, undefined);
 });
 test("public index falls back to Provable Explorer discovery when RPC is unavailable", async () => {
   const fetcher: TransactionFetch = async (input) => {
@@ -447,6 +590,7 @@ test("public index API reports unavailable and never falls back to local demo da
   assert.equal(route.includes("localStorage"), false);
   assert.match(panel, /交易已确认不等于映射已验证/);
   assert.match(panel, /未使用模拟数据或本地存储回退/);
+  assert.match(panel, /协议 V3/);
 });
 
 test("claim index globally orders verified receipts before pagination", async () => {
@@ -473,7 +617,11 @@ test("claim index globally orders verified receipts before pagination", async ()
       };
       return Response.json({
         jsonrpc: "2.0",
-        result: request.params?.functionName === "submit_claim_v2" ? [v2Entry] : [claimEntry],
+        result: request.params?.functionName === "submit_claim_v2"
+          ? [v2Entry]
+          : request.params?.functionName === "submit_claim"
+            ? [claimEntry]
+            : [],
       });
     }
     if (url.includes(`/mapping/claim_receipts/${newerClaimHash}`)) {

@@ -199,6 +199,11 @@ export function AleoPublicIndex() {
                 <div className="flex flex-wrap items-center gap-2">
                   <IndexStatus status={item.mappingStatus} />
                   <span className="text-xs text-slate-500">{text("交易已确认", "Transaction accepted")}</span>
+                  {item.protocolVersion === 3 ? (
+                    <span className="rounded border border-violet-300/25 bg-violet-300/10 px-2 py-0.5 text-xs font-semibold text-violet-100">
+                      {text("协议 V3", "Protocol V3")}
+                    </span>
+                  ) : null}
                 </div>
                 <p className="mt-3 break-all font-mono text-xs text-cyan-100">{item.claimHash}</p>
                 {item.receipt ? (
@@ -217,7 +222,7 @@ export function AleoPublicIndex() {
                 <Link className="focus-ring secondary-action w-fit" href={`/public-claims/${encodeURIComponent(item.claimHash)}`}>
                   {text("公开收据", "Public receipt")}
                 </Link>
-                {item.mappingStatus === "Verified" && item.receipt?.protocolVersion === 2 ? (
+                {item.mappingStatus === "Verified" && item.receipt && item.receipt.protocolVersion >= 2 ? (
                   <Link className="focus-ring secondary-action w-fit" href={`/triage?claimHash=${encodeURIComponent(item.claimHash)}`}>
                     {text("链上分诊", "On-chain triage")}
                   </Link>
