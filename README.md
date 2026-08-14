@@ -1,234 +1,179 @@
 # zkBugBounty
 
-**zkBugBounty lets whitehats prove a bug exists without leaking the exploit.**
+> **zkBugBounty lets whitehats prove a bug exists without leaking the exploit.**
+>
+> zkBugBounty 让白帽能够证明漏洞存在，而不泄露利用细节。
 
-zkBugBounty is a privacy-first responsible disclosure protocol prototype on Aleo Testnet. It lets a whitehat prove that a DemoVault security invariant is broken, while keeping the witness, exploit path, proof-of-concept, triggering parameters, and reporter secret outside public storage and public UI.
+zkBugBounty 是一个运行在 **Aleo Testnet** 上的隐私优先、责任披露（Responsible Disclosure）协议原型。白帽可以在设备端以私有 DemoVault 见证证明安全约束被破坏；链上仅记录可验证的承诺、收据、状态与 Credits 托管账本，不保存漏洞利用路径、PoC、触发参数或私有见证。
 
-- **Live DApp:** [aleo-gilt.vercel.app](https://aleo-gilt.vercel.app)
-- **Aleo Program:** `zkbugbounty_7f3c92.aleo`
-- **Network:** Aleo Testnet
-- **Current program edition:** `2` (Protocol V3 upgrade verified on Testnet)
+| 项目 | 当前状态 |
+| --- | --- |
+| 在线 DApp | [aleo-gilt.vercel.app](https://aleo-gilt.vercel.app) |
+| Aleo Program | [`zkbugbounty_7f3c92.aleo`](https://testnet.explorer.provable.com/program/zkbugbounty_7f3c92.aleo) |
+| 网络 | Aleo Testnet |
+| 已部署版本 | Edition `2` / Protocol V3 |
+| 合约语言 | Leo 4.4 |
+| 前端 | Next.js 16, React 19, TypeScript, Tailwind CSS |
 
 ![zkBugBounty protocol overview](public/images/zkbugbounty-readme-protocol-v1.png)
 
-> **Private proof in the browser. Public verification on Aleo.** The image shows the protocol boundary: private DemoVault inputs stay device-side; the chain receives only public commitments, receipts, and escrow state.
+## 为什么需要它
 
-| Step | Private boundary | Public Aleo state |
-| --- | --- | --- |
-| 1. Prove | DemoVault witness stays in the browser | No witness is uploaded |
-| 2. Commit | Reporter secret and exploit details stay private | Commitment, Claim Receipt, and Nullifier |
-| 3. Resolve | Encrypted details are only shared with the project owner | Escrow, payout, triage, and replay-protection state |
+传统漏洞赏金往往迫使研究员在获得信任、奖励锁定或修复前先交出 PoC。这会产生矛盾：披露得足够详细才容易被相信，但过早披露又可能给攻击者提供可操作的利用信息。
 
-## Project Overview
+zkBugBounty 将“**证明影响存在**”与“**交付利用细节**”分开：
 
-### Problem Statement
+1. 白帽在本地生成私有约束证明；
+2. Aleo 记录公开 Claim Receipt、Witness Commitment、Reporter Commitment 与一次性 Nullifier；
+3. 项目方基于链上状态审核、锁定奖励并请求加密披露；
+4. 加密细节只发送给固定接收方；
+5. 复现、修复、争议、仲裁和 Credits 结算拥有可审计的链上状态机。
 
-Traditional vulnerability-bounty workflows force researchers to disclose an exploit or a detailed proof-of-concept before a project has verified, triaged, and patched the issue. That creates a difficult tradeoff: a credible report may leak the exact information an attacker needs, while a minimal report may be impossible for the project to trust or prioritize.
+收据只证明私有输入满足已部署的 DemoVault 约束与协议绑定。它不是对真实生产系统漏洞、复现结果或修复有效性的自动判定。
 
-### Solution
+## Protocol V3：责任披露、仲裁与结算
 
-zkBugBounty separates **proof of impact** from **exploit disclosure**:
-
-- A whitehat prepares a private DemoVault witness locally and proves a selected security invariant can be violated.
-- The Aleo Program records only public commitments, a verified Claim Receipt, and a one-time Nullifier.
-- The project owner can follow a responsible-disclosure state machine without exposing exploit details to the public registry.
-- Edition 1 adds real Credits-backed bounty escrow, reward locking, encrypted-detail attestation, patch marking, payout, refund guards, and replay protection.
-
-The public receipt proves only that the submitted private input satisfied the configured circuit and protocol bindings. It is a qualification for project review and reward reservation, not final confirmation of a real vulnerability.
-Protocol V3 then separates owner review, reward lock, encrypted delivery, reproduction, remediation, dispute, panel verdict, and settlement.
-
-## Blockchain Relevance
-
-| Area | How zkBugBounty uses it |
-| --- | --- |
-| Aleo / Leo | A Leo 4.4 Program enforces bounty, claim, disclosure, and escrow transitions on Aleo Testnet. |
-| Zero-knowledge boundary | Private witness data stays on the device-side proving boundary; only commitments and public receipt fields enter the protocol. |
-| On-chain provenance | `bounties`, `claim_receipts`, `nullifiers`, and escrow mappings create a public, independently verifiable protocol trail. |
-| Replay protection | The Program Final rejects reused Nullifiers and operation markers, including duplicate payout and funding attempts. |
-| Real Credits escrow | Edition 1 moves funding, reward release, and refund accounting into the Program instead of a frontend-only status model. |
-
-## Hackathon Value
-
-zkBugBounty is a practical privacy-native security product rather than a generic proof demo. The end-to-end journey is:
+当前 Testnet Program 为 **Edition 2 / Protocol V3**。V3 把赏金配置、仲裁面板和付款条件固定在 Bounty 创建时，避免项目方在收到 Claim 后更换规则或仲裁员。
 
 ```text
-Project Owner creates bounty
-        -> Whitehat proves a DemoVault invariant break privately
-        -> Aleo Claim Receipt + Nullifier are written publicly
-        -> Owner locks reward and requests encrypted details
-        -> Whitehat attests encrypted details for the owner
-        -> Owner marks patched and releases Credits reward
-        -> Anyone verifies the public protocol state
+Submitted
+  -> OwnerReviewing
+     -> Accepted -> RewardLocked
+     -> OwnerRejected -> Disputed | Rejected
+RewardLocked
+  -> DisclosureDelivered -> DisclosureAcknowledged
+  -> ReproductionConfirmed -> PatchProposed -> PatchAccepted -> Paid
+  -> ReproductionRejected -> Disputed | Rejected
+Disputed
+  -> panel decision / SLA default -> RewardLocked | Paid | Rejected
 ```
 
-The DApp has an explicit Demo Mode for product walkthroughs and a Real Mode that uses Leo Wallet for user-approved Testnet transactions. Real Mode never silently falls back to Mock data or browser persistence.
+### 参与者
 
-## Technical Architecture
-
-```text
-┌──────────────────────────────────────────────────────────────┐
-│                    Next.js 16 Browser DApp                   │
-│  Public registry reads ────────> Provable public API          │
-│  Leo Wallet ── user approves ──> Aleo Testnet transaction     │
-└───────────────┬───────────────────────────────┬──────────────┘
-                │                               │
-     device-only private boundary          public protocol state
-                │                               │
-                ▼                               ▼
-        Private DemoVault witness      zkbugbounty_7f3c92.aleo
-        reporter secret                 Bounty / Claim Receipt / Nullifier
-        encrypted disclosure details    Escrow / payout / triage mappings
-```
-
-Private data is never sent to `/api/aleo/prove`; that endpoint intentionally returns HTTP `410` in Real Mode. The server does not prove, store, or log private witnesses.
-
-## Core Technology Stack
-
-| Layer | Technology |
+| 角色 | 链上职责 |
 | --- | --- |
-| Smart contract | Leo 4.4, Aleo Testnet, `zkbugbounty_7f3c92.aleo` |
-| Frontend | Next.js 16 App Router, React 19, TypeScript, Tailwind CSS |
-| Wallet | Leo Wallet Adapter with Aleo Testnet minimum permissions |
-| Public verification | Provable public API, typed mapping parsers, bounded transaction polling |
-| Proof demo | Device-side MockVault invariant evaluator with four DemoVault rules |
-| Deployment | Vercel Production |
+| Project Owner | 创建与充值 Bounty、审核 Claim、确认加密披露、记录复现与修复决定。 |
+| Whitehat | 提交私有证明、交付加密报告、确认修复、对可申诉决定发起争议。 |
+| Arbitration Panel | 仅在争议期对固定的 Bounty 面板进行一次性投票。 |
+| Public User | 读取公开收据、映射与状态；无法读取漏洞细节。 |
 
-## Aleo Program
+### V3 链上入口
 
-The canonical Program source is [`leo/bug_proof/src/main.leo`](leo/bug_proof/src/main.leo).
-
-### Public Registries
-
-| Mapping | Purpose |
+| 入口 | 作用 |
 | --- | --- |
-| `bounties` | Public Bounty configuration and Active/Closed state |
-| `claim_receipts` | Verified public Claim Receipt metadata |
-| `nullifiers` | One-time claim replay protection |
-| `bounty_escrows` | Credits funding, available balance, locked, paid, and refunded amounts |
-| `claim_payouts` | Reward recipient and terminal payout state |
-| `claim_triage_states` | Responsible-disclosure state without exploit contents |
-| `escrow_operation_markers` | Funding, lock, release, refund, patch, and disclosure replay guards |
+| `create_bounty_v3` | 固化范围、规则、奖励、付款条件、披露公钥承诺与仲裁面板。 |
+| `submit_claim_v3` | 写入经绑定的 Claim Receipt、Reporter、Nullifier 与公开证据承诺。 |
+| `fund_bounty_v3` | 将真实 Testnet Credits 转入 Bounty 托管。 |
+| `review_claim_v3` | 项目方开始审核、受理、提出可申诉决定或评估严重程度。 |
+| `lock_reward_v3` | 按已配置的奖励档位锁定资金。 |
+| `disclosure_action_v3` | 记录加密包交付与项目方确认，不写入明文。 |
+| `resolution_action_v3` | 记录复现、修复提议、白帽接受修复或无申诉终结。 |
+| `dispute_claim_v3` / `cast_arbitration_vote_v3` | 发起争议并由固定面板按门槛投票。 |
+| `settle_reward_v3` / `finalize_*_v3` | 按付款条件或仲裁结论结算奖励与保证金。 |
+| `refund_bounty_v3` | 仅在没有未解决责任时退款，且受一次性标记保护。 |
 
-### Key Public Entrypoints
+V1/V2 历史接口与映射保持兼容；V2 Claim 不会被伪装为 V3 Claim。前端在发起任何真实 Wallet 请求前都会验证公开 Program Edition、ABI 和链上能力。
 
-| Entrypoint | Purpose |
+## 隐私与安全边界
+
+### 不进入公开链或前端持久化的数据
+
+- Private Witness 与所有隐藏变化量；
+- Reporter Secret、私有调用序列与私有状态；
+- Exploit Path、PoC、触发参数与漏洞明文；
+- 加密披露包的明文与解密密钥。
+
+`/api/aleo/prove` 在真实模式明确返回 HTTP `410`。服务器不会接收、证明、打印或保存 Private Witness；真实证明与签名仅在 Leo Wallet 的设备端边界完成。
+
+### 可公开验证的最小状态
+
+| Mapping | 内容 |
 | --- | --- |
-| `create_bounty` | Registers a public bounty with scope, rule, tiers, deadline, and owner. |
-| `submit_claim` / `submit_claim_v2` | Verifies the invariant result and writes a Claim Receipt plus Nullifier. |
-| `fund_bounty_v2` | Funds a bounty escrow with Aleo Credits. |
-| `lock_reward_v2` | Reserves the rule-and-severity reward for a verified claim. |
-| `request_disclosure` | Moves a claim into the owner-only encrypted disclosure phase. |
-| `attest_encrypted_details` | Records a public package commitment, never the encrypted plaintext. |
-| `mark_patched` | Records completion of the remediation stage. |
-| `release_reward_v2` | Releases locked Credits to the verified whitehat. |
-| `refund_bounty_v2` | Allows one guarded refund only when the bounty has no unresolved obligations. |
+| `bounties` / `bounty_v3_configs` | 赏金配置、规则、截止高度、付款条件与不可变仲裁配置。 |
+| `claim_receipts` / `claim_reporters` | 已验证 Claim 的公开收据与报告人归属。 |
+| `nullifiers` | 一次性 Claim 防重放。 |
+| `bounty_escrows` / `claim_v3_payouts` | Credits 托管、锁定和最终结算状态。 |
+| `claim_v3_states` / `claim_v3_evidence` | 责任披露阶段与最小证据承诺。 |
+| `claim_v3_arbitration_*` | 争议投票、门槛与裁决状态。 |
+| `*_operation_markers` | 充值、锁定、披露、付款、退款等操作的重放保护。 |
 
-Legacy economic entrypoints are intentionally fail-closed. Edition 1 actions use the `_v2` Credits-aware flow.
+公开注册表只展示可验证元数据，并明确标注 `Exploit Details: Hidden` 与 `Private Witness: Never Stored`。
 
-## Security and Privacy Boundaries
+## DemoVault：安全演示边界
 
-- Private Witness, reporter secret, hidden deltas, private call sequence, proof-of-concept, exploit path, and triggering parameters are not stored in the public claim, browser persistence, URL, logs, or public UI.
-- `canViewPrivateWitness()` is always `false`: the system never saves a private witness to retrieve later.
-- Public errors are normalized to a code, short reason, practical recovery advice, and a public transaction ID when one exists.
-- HTTP `404` during transaction indexing is treated as `not_indexed_yet`, never as a rejected transaction.
-- Pending Wallet requests are rate-bounded, cancelable on component unmount, and protected against duplicate submission.
-
-## Local Development
-
-### Requirements
-
-- Node.js 20+
-- npm
-- Leo 4.4 for Program compilation (optional for frontend-only work)
-- Leo Wallet browser extension for manual Real Mode transactions
-
-### Run the DApp
-
-```bash
-npm install
-npm run dev
-```
-
-Open `http://localhost:3000`.
-
-### Validate the Repository
-
-```bash
-npm run test
-npm run lint
-npm run build
-```
-
-Compile the canonical Leo Program in WSL or Linux:
-
-```bash
-cd leo/bug_proof
-leo build
-```
-
-### Public Testnet Verification
-
-These commands only use public endpoints. They do not request a key, sign a transaction, or broadcast.
-
-```bash
-npm run verify:testnet-edition-1
-npm run smoke:assistant -- template --step fund_bounty_v2
-npm run smoke:identifiers
-```
-
-For a public mapping lookup:
-
-```bash
-npm run verify:testnet-mapping -- --mapping bounties --key <bounty_id_field>
-```
-
-## Demo Flow
-
-1. Open **Create Bounty** and select one of the four DemoVault safety rules.
-2. In **Submit Proof**, use Demo Mode for a safe walkthrough or Real Mode for a manually approved Leo Wallet flow.
-3. Read verified receipts in **Public Claims**; they show public metadata only.
-4. Use **Triage** to inspect the responsible-disclosure sequence and public operation markers.
-5. Follow the [Edition 1 smoke test plan](docs/testnet-edition-1-smoke-test-plan.md) for any manual Testnet acceptance run.
-
-## DemoVault Rules
+项目使用四个虚构的 DemoVault 约束来演示证明语义：
 
 1. `vaultBalance >= totalClaims`
 2. `totalClaims <= totalDeposits`
 3. `reservedRewards <= vaultBalance`
 4. `withdrawLimit <= vaultBalance`
 
-These rules are intentionally fictional protocol invariants for a safe product demonstration. zkBugBounty does not scan real contracts, publish real exploit instructions, or provide an attack tool.
+它们不扫描真实合约、不生成攻击载荷，也不证明外部生产系统真实存在漏洞。V3 可绑定目标系统承诺与代码哈希，但 DemoVault 电路尚不验证外部链状态或真实执行记录；生产化需要接入可验证状态根、认证测试记录或目标链执行证明。
 
-## Operations
+## 架构
 
-- [Edition 1 production runbook](docs/edition-1-production-runbook.md)
-- [Edition 1 manual smoke-test plan](docs/testnet-edition-1-smoke-test-plan.md)
-- [Protocol V3 responsible-disclosure and arbitration design](docs/protocol-v3-design.zh.md)
-- [Protocol V3 dispute authorization and settlement matrix](docs/protocol-v3-dispute-matrix.zh.md)
-- [Protocol V3 Local Devnode E2E](docs/protocol-v3-devnode-e2e.zh.md)
-- [Protocol V3 / Testnet Edition 2 upgrade runbook](docs/testnet-edition-2-upgrade-runbook.zh.md)
+```text
+Next.js DApp
+  ├─ 公开 Registry 读取 ──────────────> Provable 公共 API
+  ├─ Leo Wallet（用户人工签名） ─────> Aleo Testnet Transaction
+  └─ Device-side private boundary
+       ├─ DemoVault witness
+       ├─ Reporter Secret
+       └─ encrypted disclosure plaintext
 
-The runbook covers stale frontend deployment, wallet connection failures, wrong network, rejected transactions, indexing delay, mapping verification, and frontend-only rollback. An Aleo Program edition cannot be rolled back from the frontend.
+zkbugbounty_7f3c92.aleo
+  ├─ Claim Receipt + Nullifier + Reporter
+  ├─ Bounty / Escrow / Payout mappings
+  └─ V3 disclosure / dispute / arbitration state
+```
 
-## Roadmap
+Real Mode 从不回退到 Mock、localStorage 或服务端私有证明。Demo Mode 仅用于安全的产品走查，不能替代任何链上验收。
 
-### Completed
+## 本地运行与验证
 
-- Aleo Testnet Program deployment and Edition 1 upgrade
-- Wallet-signed bounty creation and claim submission
-- Public Bounty, Claim Receipt, Nullifier, and Escrow registry reads
-- Duplicate Nullifier rejection on Testnet
-- Credits escrow, release, refund, and replay guards validated on Local Devnode
-- Production deployment, public Edition 1 verifier, and manual Smoke tooling
-- Protocol V3 local contract, typed wallet workbenches, immutable per-Bounty panel, and fail-closed Edition 2 capability gate
-- Program Edition 2 upgrade confirmed on Testnet; public upgrade evidence recorded and V3 wallet capability gate enabled
+### 环境
 
-### Next
+- Node.js 20+
+- npm
+- Leo 4.4（编译 Leo Program 时需要）
+- Leo Wallet 浏览器扩展（真实 Testnet 钱包操作时需要）
 
-- Human-run Testnet Credits escrow acceptance flow with fresh test data
-- Broader invariant libraries beyond DemoVault
-- Formal protocol review and external security audit
-- Production-grade encrypted disclosure delivery between verified participants
+```bash
+npm install
+npm run dev
+```
+
+打开 `http://localhost:3000`。
+
+```bash
+npm run test
+npm run lint
+npm run build
+npm run leo:build
+```
+
+下列命令只查询公开 Testnet 信息，不要求密钥、不签名也不广播：
+
+```bash
+npm run verify:testnet-edition-1
+npm run verify:testnet-edition-2
+npm run verify:testnet-mapping -- --mapping bounties --key <bounty_id_field>
+```
+
+## 公开资源
+
+- [在线 DApp](https://aleo-gilt.vercel.app)
+- [Aleo Program Explorer](https://testnet.explorer.provable.com/program/zkbugbounty_7f3c92.aleo)
+- [Protocol V3 设计](docs/protocol-v3-design.zh.md)
+- [V3 争议授权与结算矩阵](docs/protocol-v3-dispute-matrix.zh.md)
+- [V3 Local Devnode E2E](docs/protocol-v3-devnode-e2e.zh.md)
+
+## 当前限制与下一步
+
+- V3 合约与 Edition 2 已部署并公开验证；每次真实操作仍依赖 Leo Wallet 的人工签名和链上 Mapping 验证。
+- Credits 结算、重放保护和失败原子性已经在 Local Devnode 完整 E2E 中验证；需要以全新 Testnet 数据完成持续的人工端到端验收。
+- 加密披露的收件人绑定与链上承诺已实现；生产级交付仍需配套密钥分发、持久化与外部安全审计。
+- 需要正式协议审计，以及超出 DemoVault 的可验证不变量库。
 
 ## License
 
