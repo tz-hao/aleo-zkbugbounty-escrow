@@ -1,3 +1,5 @@
+import { diagnoseShieldWalletTransactionError } from "./shield-wallet-diagnostics.ts";
+
 export type AleoTransactionState =
   | "idle"
   | "wallet_disconnected"
@@ -64,8 +66,8 @@ export function transactionFeedback(
 ): PublicTransactionFeedback {
   const defaults: Record<AleoTransactionState, Omit<PublicTransactionFeedback, "state">> = {
     idle: { code: "IDLE", message: "尚未创建交易请求。", advice: "请先核对公开 Transaction Preview。" },
-    wallet_disconnected: { code: "WALLET_DISCONNECTED", message: "Wallet 未连接。", advice: "连接 Leo Wallet 并确认 Aleo Testnet 后重试。" },
-    wrong_network: { code: "WRONG_NETWORK", message: "Wallet 当前不在 Aleo Testnet。", advice: "切换到 Aleo Testnet（testnetbeta）后重试。" },
+    wallet_disconnected: { code: "WALLET_DISCONNECTED", message: "Shield 未连接。", advice: "连接 Shield 并确认 Aleo Testnet 后重试。" },
+    wrong_network: { code: "WRONG_NETWORK", message: "Shield 当前不在 Aleo Testnet。", advice: "切换到 Aleo Testnet 后重试。" },
     awaiting_signature: { code: "AWAITING_SIGNATURE", message: "正在等待 Wallet 签名。", advice: "不要重复提交同一操作。" },
     signature_rejected: { code: "SIGNATURE_REJECTED", message: "交易已取消或 Wallet 签名被拒绝。", advice: "未广播交易；核对 Preview 后可手动重新请求。" },
     generating_transaction: { code: "GENERATING_TRANSACTION", message: "正在生成 Wallet 交易请求。", advice: "请保持此页面打开，不要重复提交。" },
@@ -74,17 +76,31 @@ export function transactionFeedback(
     accepted: { code: "ACCEPTED", message: "交易已被节点接受，仍需等待 Confirmed 与 Mapping 核验。", advice: "继续轮询，不要重新提交。" },
     confirmed: { code: "CONFIRMED", message: "交易已 Confirmed。", advice: "继续核验预期 Public Mapping 状态。", indexStatus: "found" },
     rejected: { code: "REJECTED", message: "交易已被 Testnet 明确拒绝。", advice: "检查公开 rejection summary 与 Mapping 前置状态后再创建新 Preview。" },
-    failed: { code: "BROADCAST_FAILED", message: "Transaction could not be completed.", advice: "检查网络后重新生成 Preview；系统不会自动重新签名或广播。" },
+    failed: { code: "WALLET_REQUEST_FAILED", message: "Shield 未能完成这笔交易。", advice: "确认钱包已解锁、处于 Aleo Testnet 且拥有足够的 Public Credits 支付交易费；刷新后重新生成 Preview。系统不会自动重签或广播。" },
     timeout: { code: "POLL_TIMEOUT", message: "在限定时间内未获得交易确认。", advice: "稍后使用公开 Transaction ID 继续查询；不要立即重新提交。", indexStatus: "not_found_after_timeout" },
   };
   return { state, ...defaults[state], ...overrides };
 }
 
 export function classifyWalletTransactionFailure(error: unknown): PublicTransactionFeedback {
-  const text = error instanceof Error ? error.message.toLowerCase() : "";
-  if (/(reject|denied|declined|cancel)/.test(text)) return transactionFeedback("signature_rejected");
-  if (/(network|testnet|chain)/.test(text)) return transactionFeedback("wrong_network");
-  if (/(disconnect|not connected|wallet.*unavailable)/.test(text)) return transactionFeedback("wallet_disconnected");
+  const diagnostic = diagnoseShieldWalletTransactionError(error);
+  if (diagnostic.issue === "SignatureRejected") return transactionFeedback("signature_rejected");
+  if (diagnostic.issue === "NetworkMismatch") return transactionFeedback("wrong_network");
+  if (diagnostic.issue === "WalletDisconnected") return transactionFeedback("wallet_disconnected");
+  if (diagnostic.issue === "WalletLocked") {
+    return transactionFeedback("failed", {
+      code: "WALLET_LOCKED",
+      message: diagnostic.message,
+      advice: "解锁 Shield 后重新生成 Preview，并手动发起一次新的签名请求。",
+    });
+  }
+  if (diagnostic.issue === "PopupUnavailable") {
+    return transactionFeedback("failed", {
+      code: "WALLET_POPUP_UNAVAILABLE",
+      message: diagnostic.message,
+      advice: "允许本站打开 Shield 弹窗，再重新生成 Preview 并请求签名。",
+    });
+  }
   return transactionFeedback("failed");
 }
 

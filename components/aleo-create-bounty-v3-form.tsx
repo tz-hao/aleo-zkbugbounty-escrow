@@ -344,7 +344,7 @@ export function AleoCreateBountyV3Form() {
           {wallet.connectionState !== "Connected" ? (
             <button className="primary-action" type="button" onClick={() => void wallet.connect()}>
               <WalletCards size={16} aria-hidden="true" />
-              {text("连接 Leo Wallet", "Connect Leo Wallet")}
+              {text("连接 Shield", "Connect Shield")}
             </button>
           ) : null}
           <button
@@ -362,6 +362,14 @@ export function AleoCreateBountyV3Form() {
             {text("请求创建签名", "Request creation signature")}
           </button>
         </div>
+        {enabled && !preview ? (
+          <p className="text-xs leading-5 text-slate-500">
+            {text(
+              "请先填完 V3 固定策略并点击“生成交易预览”；只有预览中的 9 个公开输入确认无误后，才会向钱包请求签名。",
+              "Complete the immutable V3 policy and build the transaction preview first. The wallet signature is requested only after the nine public inputs have been reviewed.",
+            )}
+          </p>
+        ) : null}
       </form>
 
       {!enabled ? (

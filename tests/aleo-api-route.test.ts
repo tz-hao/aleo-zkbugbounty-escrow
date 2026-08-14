@@ -12,9 +12,9 @@ test("aleo prove API refuses all server-side private proving", () => {
 
   assert.equal(response.status, 410);
   assert.deepEqual(response.body, {
-    error: "Server-side private proving is disabled. Use Leo Wallet device-side submit_claim_v2.",
+    error: "Server-side private proving is disabled. Use Shield device-side submit_claim_v2.",
     privateInputsAccepted: false,
-    mode: "leo-wallet-device",
+    mode: "shield-device",
   });
 });
 
@@ -29,7 +29,7 @@ test("aleo prove GET exposes only the public device-proof capability", async () 
   const body = await response.json();
 
   assert.equal(response.status, 200);
-  assert.equal(body.mode, "leo-wallet-device");
+  assert.equal(body.mode, "shield-device");
   assert.equal(body.programId, "zkbugbounty_7f3c92.aleo");
   assert.equal(body.functionName, "submit_claim_v2");
   assert.equal(body.serverProofEnabled, false);

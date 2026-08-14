@@ -142,10 +142,10 @@ npm run build
 - V3 能力门与 13 个构建器：lib/aleo-protocol-v3.ts
 - V3 严格 Mapping 解析：lib/aleo-v3-registry.ts
 - V3 只读 API：app/api/aleo/v3/
-- Leo Wallet 请求：components/aleo-wallet-provider.tsx
+- Shield 请求：components/aleo-wallet-provider.tsx
 - 三角色工作台：components/protocol-v3-workbench.tsx
 
-钱包操作只在浏览器调用 Leo Wallet Adapter。服务器 API 只读公开链状态，POST 提交会返回 405。
+钱包操作只在浏览器调用 Shield 适配器。服务器 API 只读公开链状态，POST 提交会返回 405。
 
 ## 故障处理
 
@@ -153,5 +153,5 @@ npm run build
 - 链上已是 Edition 2、但脚本没有解析出 ID：不要重播；先查公开 Program 与交易。
 - 交易 ID 已有、验证失败：不要写入能力门常量；核对 Program ID、管理员地址、Edition 和源码。
 - ABI 哈希变化：重新完成本地编译、测试、审查和预演。
-- 钱包提示网络错误：确认 Leo Wallet 位于 Aleo Testnet。
+- 钱包提示网络错误：确认 Shield 位于 Aleo Testnet。
 - 任何私钥疑似落盘：停止操作，隔离文件并按钱包安全流程轮换凭据。

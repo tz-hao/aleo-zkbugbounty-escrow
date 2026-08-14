@@ -5,7 +5,7 @@
 ## 0. 使用前检查
 
 1. 打开站点后，右上角默认显示中文；需要英文时选择 `EN`，URL 会保留为 `?lang=en`。语言偏好不会写入 localStorage。
-2. 对真实链上操作，使用已解锁的 Leo Wallet，并确认网络为 `Aleo Testnet / testnetbeta`。
+2. 对真实链上操作，使用已解锁的 Shield，并确认网络为 `Aleo Testnet`。
 3. 确认公开 Program ID 为 `zkbugbounty_7f3c92.aleo`，且页面网络状态可读取 Testnet 高度。
 4. 只在 Wallet 弹窗内人工确认交易。页面中的 `Wallet Submitted`、`Transaction Confirmed`、`Mapping Verified` 是三个不同状态。
 5. 在任何公开字段中都不要填入漏洞利用细节、PoC、触发参数、Private Witness、隐藏增量或 Reporter Secret。
@@ -24,13 +24,13 @@
 
 ### 2.1 Aleo Testnet 模式的填写顺序
 
-1. 在顶部连接 Leo Wallet，并确认 `Aleo Testnet`。
+1. 在顶部连接 Shield，并确认 `Aleo Testnet`。
 2. 等待网络徽章显示 Testnet 当前高度；不可用时先重试，不要生成交易。
 3. 选择安全规则，填写 Scope、奖励档位、有效期和公开交易费。
 4. 点击 `生成公开标识 / Generate public identifiers`。
 5. 逐项确认生成的 `Bounty ID` 与 `Scope Hash`，然后点击 `生成 Transaction Preview`。
 6. 核对 Preview 的 Program、Function、8 个公开输入和 Fee。
-7. 点击 `请求 Wallet 签名 / Request Wallet signature`，仅在 Leo Wallet 弹窗中人工确认。
+7. 点击 `请求 Wallet 签名 / Request Wallet signature`，仅在 Shield 弹窗中人工确认。
 8. 跳转 `/create-bounty/result` 后，用公开 Transaction ID 与 Bounty ID 完成确认和 Mapping 验证。
 
 ### 2.2 字段说明
@@ -167,7 +167,7 @@ Verification Level 必须被区分：`Mock Simulation`、本地 Leo 开发执行
 
 | 现象 | 处理方式 |
 | --- | --- |
-| Wallet extension unavailable | 安装并解锁 Leo Wallet，然后刷新页面。 |
+| Wallet extension unavailable | 安装并解锁 Shield，然后刷新页面。 |
 | Wrong network | 在 Wallet 中切换到 `Aleo Testnet / testnetbeta`，再重新连接。 |
 | Connection rejected | 在 Connected sites 移除本站后重新授权；不需要也不应输入私钥到网页。 |
 | Wallet locked | 解锁扩展后重新连接。 |

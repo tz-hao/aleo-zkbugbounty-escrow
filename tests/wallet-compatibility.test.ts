@@ -7,12 +7,12 @@ import {
   normalizeWalletTransactionStatus,
   WALLET_COMPATIBILITY,
 } from "../lib/wallet-compatibility.ts";
-import { diagnoseLeoWalletTransactionError } from "../lib/leo-wallet-diagnostics.ts";
+import { diagnoseShieldWalletTransactionError } from "../lib/shield-wallet-diagnostics.ts";
 
-test("only Leo Wallet is represented as formally verified", () => {
+test("only Shield is represented as formally verified", () => {
   const verified = WALLET_COMPATIBILITY.filter((wallet) => wallet.verification === "Verified");
-  assert.deepEqual(verified.map((wallet) => wallet.name), ["Leo Wallet"]);
-  assert.equal(verified[0].walletChainId, "testnetbeta");
+  assert.deepEqual(verified.map((wallet) => wallet.name), ["Shield Wallet"]);
+  assert.equal(verified[0].walletChainId, "testnet");
   assert.equal(WALLET_COMPATIBILITY[1].verification, "NotVerified");
 });
 
@@ -29,6 +29,7 @@ test("wallet response ID is not confused with a public transaction ID", () => {
 
 test("wallet transaction statuses are normalized conservatively", () => {
   assert.equal(normalizeWalletTransactionStatus("Finalized"), "Finalized");
+  assert.equal(normalizeWalletTransactionStatus({ status: "Accepted" }), "Finalized");
   assert.equal(normalizeWalletTransactionStatus("Rejected"), "Failed");
   assert.equal(normalizeWalletTransactionStatus("Aborted"), "Failed");
   assert.equal(normalizeWalletTransactionStatus("Pending"), "Processing");
@@ -37,14 +38,14 @@ test("wallet transaction statuses are normalized conservatively", () => {
 
 test("transaction diagnostics cover wrong network, locked wallet, and rejected signature", () => {
   assert.equal(
-    diagnoseLeoWalletTransactionError(new Error("network testnet mismatch")).issue,
+    diagnoseShieldWalletTransactionError(new Error("network testnet mismatch")).issue,
     "NetworkMismatch",
   );
   assert.equal(
-    diagnoseLeoWalletTransactionError(new Error("wallet locked")).issue,
+    diagnoseShieldWalletTransactionError(new Error("wallet locked")).issue,
     "WalletLocked",
   );
-  const rejected = diagnoseLeoWalletTransactionError(new Error("user rejected secret payload"));
+  const rejected = diagnoseShieldWalletTransactionError(new Error("user rejected secret payload"));
   assert.equal(rejected.issue, "SignatureRejected");
   assert.equal(rejected.message.includes("secret payload"), false);
 });
@@ -59,10 +60,10 @@ test("wallet provider clears request state on extension disconnect and keeps pub
   );
   assert.match(disconnectHandler, /setSubmission\(null\)/);
   assert.match(disconnectHandler, /setClaimSubmission\(null\)/);
-  assert.match(provider, /WalletAdapterNetwork\.TestnetBeta/);
+  assert.match(provider, /Network\.TESTNET/);
   assert.match(provider, /feeMicrocredits/);
-  assert.match(control, /Leo Wallet/);
-  assert.match(control, /Wallet adapter detected/);
+  assert.match(control, /Shield/);
+  assert.match(control, /Shield detected/);
   assert.match(control, /Expected network/);
   assert.match(control, /<details/);
   assert.match(control, /min-w-0/);

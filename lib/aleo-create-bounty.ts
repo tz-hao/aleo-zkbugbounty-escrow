@@ -2,7 +2,7 @@ import { CANONICAL_ALEO_PROGRAM_ID } from "./aleo-program.ts";
 import type { DemoVaultRuleId } from "./models.ts";
 import { assertNoPrivateFields } from "./privacy-guards.ts";
 
-// Leo Wallet's current transport identifier; public Aleo APIs still call this network "testnet".
+// Legacy preview identifier retained for deployed public API compatibility; Shield receives Network.TESTNET.
 export const ALEO_WALLET_TESTNET_CHAIN_ID = "testnetbeta";
 export const CREATE_BOUNTY_FUNCTION = "create_bounty";
 export const DEFAULT_CREATE_BOUNTY_FEE_MICROCREDITS = 1_000_000;

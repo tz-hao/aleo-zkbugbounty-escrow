@@ -269,7 +269,7 @@ export default function SubmitProofPage() {
       return;
     }
     if (wallet.connectionState !== "Connected" || !wallet.address) {
-      setWalletClaimError(text("请先连接已切换到 Aleo 测试网的 Leo Wallet。", "Connect Leo Wallet on Aleo Testnet first."));
+      setWalletClaimError(text("请先连接已切换到 Aleo 测试网的 Shield。", "Connect Shield on Aleo Testnet first."));
       return;
     }
     if (walletIsBountyOwner) {
@@ -310,7 +310,7 @@ export default function SubmitProofPage() {
         },
       });
       setWalletClaimMessage(
-        text("Leo Wallet 已接收 submit_claim_v2。当前仅表示钱包已提交，尚未达到网络确认状态。确认后请从公开注册表读取收据，再进入链上分诊。", "Leo Wallet received submit_claim_v2. This is Wallet Submitted only, not Network Confirmed. After confirmation, read the Receipt from the public Registry before opening on-chain Triage."),
+        text("Shield 已接收 submit_claim_v2。当前仅表示钱包已提交，尚未达到网络确认状态。确认后请从公开注册表读取收据，再进入链上分诊。", "Shield received submit_claim_v2. This is Wallet Submitted only, not Network Confirmed. After confirmation, read the Receipt from the public Registry before opening on-chain Triage."),
       );
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "";
@@ -519,12 +519,12 @@ export default function SubmitProofPage() {
                   title={
                     wallet.address && wallet.connectionState === "Connected"
                       ? wallet.address
-                      : text("等待连接 Leo Wallet", "Waiting for Leo Wallet connection")
+                      : text("等待连接 Shield", "Waiting for Shield connection")
                   }
                 >
                   {wallet.address && wallet.connectionState === "Connected"
                     ? wallet.address
-                    : text("等待连接 Leo Wallet", "Waiting for Leo Wallet connection")}
+                    : text("等待连接 Shield", "Waiting for Shield connection")}
                 </p>
               </div>
               {walletIsBountyOwner ? (
@@ -693,12 +693,12 @@ export default function SubmitProofPage() {
                       ) : (
                         <WalletCards size={16} aria-hidden="true" />
                       )}
-                      {isRequestingWallet ? text("等待 Leo Wallet 响应", "Waiting for Leo Wallet") : text("请求钱包签名", "Request Wallet signature")}
+                      {isRequestingWallet ? text("等待 Shield 响应", "Waiting for Shield") : text("请求钱包签名", "Request Wallet signature")}
                     </button>
                     <span className="text-xs text-slate-500">
                       {wallet.connectionState === "Connected"
                         ? text("交易预览已就绪", "Transaction preview ready")
-                        : text("需要连接 Leo Wallet", "Leo Wallet connection required")}
+                        : text("需要连接 Shield", "Shield connection required")}
                     </span>
                   </div>
                 </div>

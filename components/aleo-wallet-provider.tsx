@@ -38,10 +38,10 @@ import {
   type TransientSubmitClaimV2Request,
 } from "@/lib/aleo-submit-claim-v2";
 import {
-  diagnoseLeoWalletConnectionError,
-  getInjectedLeoWallet,
-  inspectLeoWalletProvider,
-} from "@/lib/leo-wallet-diagnostics";
+  diagnoseShieldWalletConnectionError,
+  getInjectedShieldWallet,
+  inspectShieldWalletProvider,
+} from "@/lib/shield-wallet-diagnostics";
 import {
   classifyWalletResponseId,
   normalizeWalletTransactionStatus,
@@ -54,7 +54,7 @@ import {
   type PublicTransactionFeedback,
 } from "@/lib/aleo-transaction-status";
 
-type LeoAdapter = import("@demox-labs/aleo-wallet-adapter-leo").LeoWalletAdapter;
+type ShieldAdapter = import("@provablehq/aleo-wallet-adaptor-shield").ShieldWalletAdapter;
 
 export type WalletConnectionState =
   | "Initializing"
@@ -128,13 +128,13 @@ type AleoWalletContextValue = {
 
 const AleoWalletContext = createContext<AleoWalletContextValue | null>(null);
 const ALEO_ADDRESS_PATTERN = /^aleo1[0-9a-z]{58}$/;
-const LEO_WALLET_NOT_DETECTED_MESSAGE =
-  "当前浏览器未检测到 Leo Wallet 扩展。请使用已安装该扩展的 Chrome 或 Edge 打开本站。";
+const SHIELD_WALLET_NOT_DETECTED_MESSAGE =
+  "当前浏览器未检测到 Shield 扩展。请使用已安装该扩展的 Chrome 或 Edge 打开本站。";
 const PUBLIC_PENDING_TRANSACTION_STORAGE_KEY = "zkbugbounty.public-pending-transaction.v1";
 const PUBLIC_TRANSACTION_ID_PATTERN = /^at1[0-9a-z]{50,80}$/;
 
 export function AleoWalletProvider({ children }: { children: ReactNode }) {
-  const adapterRef = useRef<LeoAdapter | null>(null);
+  const adapterRef = useRef<ShieldAdapter | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<WalletConnectionState>("Initializing");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -158,7 +158,7 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    let adapter: LeoAdapter | null = null;
+    let adapter: ShieldAdapter | null = null;
     const handleReadyState = (readyState: string) => {
       if (!active || adapter?.connected) return;
       if (readyState === "Installed") {
@@ -167,7 +167,7 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
         return;
       }
       setConnectionState("NotInstalled");
-      setErrorMessage(LEO_WALLET_NOT_DETECTED_MESSAGE);
+      setErrorMessage(SHIELD_WALLET_NOT_DETECTED_MESSAGE);
     };
     const handleDisconnect = () => {
       if (!active) return;
@@ -181,10 +181,10 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
       setConnectionState(adapter?.readyState === "Installed" ? "Disconnected" : "NotInstalled");
     };
 
-    void import("@demox-labs/aleo-wallet-adapter-leo")
-      .then(({ LeoWalletAdapter }) => {
+    void import("@provablehq/aleo-wallet-adaptor-shield")
+      .then(({ ShieldWalletAdapter }) => {
         if (!active) return;
-        adapter = new LeoWalletAdapter({ appName: "zkBugBounty" });
+        adapter = new ShieldWalletAdapter();
         adapterRef.current = adapter;
         adapter.on("readyStateChange", handleReadyState);
         adapter.on("disconnect", handleDisconnect);
@@ -193,7 +193,7 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
       .catch(() => {
         if (!active) return;
         setConnectionState("Error");
-        setErrorMessage("Leo Wallet Adapter 无法初始化。");
+        setErrorMessage("Shield 钱包适配器无法初始化。");
       });
 
     return () => {
@@ -249,40 +249,39 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
 
   async function connect() {
     const adapter = adapterRef.current;
-    const providerEnvironment = inspectLeoWalletProvider(getInjectedLeoWallet(window));
+    const providerEnvironment = inspectShieldWalletProvider(getInjectedShieldWallet(window));
 
     if (providerEnvironment === "Missing") {
       setConnectionState("NotInstalled");
-      setErrorMessage(LEO_WALLET_NOT_DETECTED_MESSAGE);
+      setErrorMessage(SHIELD_WALLET_NOT_DETECTED_MESSAGE);
       return;
     }
     if (providerEnvironment === "Incompatible") {
       setConnectionState("Error");
-      setErrorMessage("检测到 Leo Wallet，但扩展接口不可用。请更新扩展、解锁钱包并刷新页面。");
+      setErrorMessage("检测到 Shield，但扩展接口不可用。请更新扩展、解锁钱包并刷新页面。");
       return;
     }
     if (!adapter || adapter.readyState !== "Installed") {
       setConnectionState("Error");
-      setErrorMessage("Leo Wallet 已注入，但 Adapter 尚未就绪。请刷新页面后重新连接。");
+      setErrorMessage("Shield 已注入，但适配器尚未就绪。请刷新页面后重新连接。");
       return;
     }
     setConnectionState("Connecting");
     setErrorMessage(null);
     try {
-      const { DecryptPermission, WalletAdapterNetwork } = await import(
-        "@demox-labs/aleo-wallet-adapter-base"
-      );
-      await adapter.connect(DecryptPermission.NoDecrypt, WalletAdapterNetwork.TestnetBeta, [
+      const { Network } = await import("@provablehq/aleo-types");
+      const { WalletDecryptPermission } = await import("@provablehq/aleo-wallet-standard");
+      const account = await adapter.connect(Network.TESTNET, WalletDecryptPermission.NoDecrypt, [
         CANONICAL_ALEO_PROGRAM_ID,
       ]);
-      const publicKey = adapter.publicKey;
+      const publicKey = account.address;
       if (!ALEO_ADDRESS_PATTERN.test(publicKey)) {
         throw new Error("INVALID_ALEO_PUBLIC_ADDRESS");
       }
       setAddress(publicKey);
       setConnectionState("Connected");
     } catch (error) {
-      const diagnostic = diagnoseLeoWalletConnectionError(error);
+      const diagnostic = diagnoseShieldWalletConnectionError(error);
       setAddress(null);
       setConnectionState(diagnostic.issue === "AuthorizationRejected" ? "Disconnected" : "Error");
       setErrorMessage(diagnostic.message);
@@ -309,8 +308,13 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
   }
 
   async function requestWalletTransaction(
-    adapter: LeoAdapter,
-    transaction: Parameters<LeoAdapter["requestTransaction"]>[0],
+    adapter: ShieldAdapter,
+    transaction: {
+      program: string;
+      functionName: string;
+      inputs: readonly string[];
+      feeMicrocredits: number;
+    },
   ) {
     if (transactionRequestActiveRef.current || isTransactionSubmissionBlocked(transactionStatus.state)) {
       throw new Error("A public transaction is already pending. Do not resubmit the same operation.");
@@ -318,7 +322,14 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
     transactionRequestActiveRef.current = true;
     setTransactionStatus(transactionFeedback("awaiting_signature"));
     try {
-      const response = classifyWalletResponseId(await adapter.requestTransaction(transaction));
+      const walletResponse = await adapter.executeTransaction({
+        program: transaction.program,
+        function: transaction.functionName,
+        inputs: [...transaction.inputs],
+        fee: transaction.feeMicrocredits,
+        privateFee: false,
+      });
+      const response = classifyWalletResponseId(walletResponse.transactionId);
       if (!response) throw new Error("INVALID_WALLET_RESPONSE");
       setTransactionStatus(transactionFeedback("pending"));
       if (response.publicTransactionId && PUBLIC_TRANSACTION_ID_PATTERN.test(response.publicTransactionId)) {
@@ -341,7 +352,7 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
   async function submitCreateBounty(preview: CreateBountyTransactionPreview) {
     const adapter = adapterRef.current;
     if (!adapter?.connected || !address) {
-      throw new Error("Connect Leo Wallet before requesting a transaction");
+      throw new Error("Connect Shield before requesting a transaction");
     }
     if (
       preview.network !== "testnet" ||
@@ -351,19 +362,12 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
     ) {
       throw new Error("Transaction preview does not match the canonical Testnet program");
     }
-    const { Transaction, WalletAdapterNetwork } = await import(
-      "@demox-labs/aleo-wallet-adapter-base"
-    );
-    const transaction = Transaction.createTransaction(
-      address,
-      WalletAdapterNetwork.TestnetBeta,
-      preview.programId,
-      preview.functionName,
-      [...preview.inputs],
-      preview.feeMicrocredits,
-      false,
-    );
-    const response = await requestWalletTransaction(adapter, transaction);
+    const response = await requestWalletTransaction(adapter, {
+      program: preview.programId,
+      functionName: preview.functionName,
+      inputs: preview.inputs,
+      feeMicrocredits: preview.feeMicrocredits,
+    });
     const { walletRequestId, publicTransactionId } = response;
     setSubmission({
       walletRequestId,
@@ -380,23 +384,16 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
   async function submitWalletClaim(request: TransientSubmitClaimRequest) {
     const adapter = adapterRef.current;
     if (!adapter?.connected || !address) {
-      throw new Error("Connect Leo Wallet before requesting submit_claim");
+      throw new Error("Connect Shield before requesting submit_claim");
     }
-    const { Transaction, WalletAdapterNetwork } = await import(
-      "@demox-labs/aleo-wallet-adapter-base"
-    );
     const inputs = buildTransientSubmitClaimInputs(request);
     try {
-      const transaction = Transaction.createTransaction(
-        address,
-        WalletAdapterNetwork.TestnetBeta,
-        CANONICAL_ALEO_PROGRAM_ID,
-        SUBMIT_CLAIM_FUNCTION,
+      const response = await requestWalletTransaction(adapter, {
+        program: CANONICAL_ALEO_PROGRAM_ID,
+        functionName: SUBMIT_CLAIM_FUNCTION,
         inputs,
-        request.feeMicrocredits,
-        false,
-      );
-      const response = await requestWalletTransaction(adapter, transaction);
+        feeMicrocredits: request.feeMicrocredits,
+      });
       const { walletRequestId, publicTransactionId } = response;
       setClaimSubmission({
         walletRequestId,
@@ -420,7 +417,7 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
   async function submitWalletClaimV2(request: TransientSubmitClaimV2Request) {
     const adapter = adapterRef.current;
     if (!adapter?.connected || !address) {
-      throw new Error("Connect Leo Wallet before requesting submit_claim_v2");
+      throw new Error("Connect Shield before requesting submit_claim_v2");
     }
 
     const [capabilityResponse, bountyResponse] = await Promise.all([
@@ -452,21 +449,14 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
       throw new Error("submit_claim_v2 requires a protocol-v2 Bounty");
     }
 
-    const { Transaction, WalletAdapterNetwork } = await import(
-      "@demox-labs/aleo-wallet-adapter-base"
-    );
     const inputs = buildTransientSubmitClaimV2Inputs(request);
     try {
-      const transaction = Transaction.createTransaction(
-        address,
-        WalletAdapterNetwork.TestnetBeta,
-        CANONICAL_ALEO_PROGRAM_ID,
-        SUBMIT_CLAIM_V2_FUNCTION,
+      const response = await requestWalletTransaction(adapter, {
+        program: CANONICAL_ALEO_PROGRAM_ID,
+        functionName: SUBMIT_CLAIM_V2_FUNCTION,
         inputs,
-        request.feeMicrocredits,
-        false,
-      );
-      const response = await requestWalletTransaction(adapter, transaction);
+        feeMicrocredits: request.feeMicrocredits,
+      });
       const { walletRequestId, publicTransactionId } = response;
       setClaimSubmission({
         walletRequestId,
@@ -490,7 +480,7 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
   async function submitWalletClaimV3(request: TransientSubmitClaimV3Request) {
     const adapter = adapterRef.current;
     if (!adapter?.connected || !address) {
-      throw new Error("Connect Leo Wallet before requesting submit_claim_v3");
+      throw new Error("Connect Shield before requesting submit_claim_v3");
     }
 
     const [capabilityResponse, bountyResponse] = await Promise.all([
@@ -541,21 +531,14 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
       );
     }
 
-    const { Transaction, WalletAdapterNetwork } = await import(
-      "@demox-labs/aleo-wallet-adapter-base"
-    );
     const inputs = buildTransientSubmitClaimV3Inputs(request);
     try {
-      const transaction = Transaction.createTransaction(
-        address,
-        WalletAdapterNetwork.TestnetBeta,
-        CANONICAL_ALEO_PROGRAM_ID,
-        SUBMIT_CLAIM_V3_FUNCTION,
+      const response = await requestWalletTransaction(adapter, {
+        program: CANONICAL_ALEO_PROGRAM_ID,
+        functionName: SUBMIT_CLAIM_V3_FUNCTION,
         inputs,
-        request.feeMicrocredits,
-        false,
-      );
-      const response = await requestWalletTransaction(adapter, transaction);
+        feeMicrocredits: request.feeMicrocredits,
+      });
       const { walletRequestId, publicTransactionId } = response;
       setClaimSubmission({
         walletRequestId,
@@ -586,27 +569,20 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
   }) {
     const adapter = adapterRef.current;
     if (!adapter?.connected || !address) {
-      throw new Error("Connect Leo Wallet before requesting submit_claim");
+      throw new Error("Connect Shield before requesting submit_claim");
     }
     if (!Number.isSafeInteger(request.feeMicrocredits) || request.feeMicrocredits <= 0) {
       throw new Error("submit_claim fee must be positive microcredits");
     }
     assertSubmitClaimRawInputs(request.inputs);
-    const { Transaction, WalletAdapterNetwork } = await import(
-      "@demox-labs/aleo-wallet-adapter-base"
-    );
     const transientInputs = [...request.inputs];
     try {
-      const transaction = Transaction.createTransaction(
-        address,
-        WalletAdapterNetwork.TestnetBeta,
-        CANONICAL_ALEO_PROGRAM_ID,
-        SUBMIT_CLAIM_FUNCTION,
-        transientInputs,
-        request.feeMicrocredits,
-        false,
-      );
-      const response = await requestWalletTransaction(adapter, transaction);
+      const response = await requestWalletTransaction(adapter, {
+        program: CANONICAL_ALEO_PROGRAM_ID,
+        functionName: SUBMIT_CLAIM_FUNCTION,
+        inputs: transientInputs,
+        feeMicrocredits: request.feeMicrocredits,
+      });
       const { walletRequestId, publicTransactionId } = response;
       setClaimSubmission({
         walletRequestId,
@@ -627,7 +603,7 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
   async function submitProtocolTransaction(preview: RewardEscrowTransactionPreview) {
     const adapter = adapterRef.current;
     if (!adapter?.connected || !address) {
-      throw new Error("Connect Leo Wallet before requesting a protocol transaction");
+      throw new Error("Connect Shield before requesting a protocol transaction");
     }
     const capabilityResponse = await fetch("/api/aleo/escrow", {
       method: "GET",
@@ -677,19 +653,12 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
     ) {
       throw new Error("Protocol transaction preview is not canonical");
     }
-    const { Transaction, WalletAdapterNetwork } = await import(
-      "@demox-labs/aleo-wallet-adapter-base"
-    );
-    const transaction = Transaction.createTransaction(
-      address,
-      WalletAdapterNetwork.TestnetBeta,
-      preview.programId,
-      preview.functionName,
-      [...preview.inputs],
-      preview.feeMicrocredits,
-      false,
-    );
-    const response = await requestWalletTransaction(adapter, transaction);
+    const response = await requestWalletTransaction(adapter, {
+      program: preview.programId,
+      functionName: preview.functionName,
+      inputs: preview.inputs,
+      feeMicrocredits: preview.feeMicrocredits,
+    });
     const { walletRequestId, publicTransactionId } = response;
     setProtocolSubmission({
       walletRequestId,
@@ -711,7 +680,7 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
   ) {
     const adapter = adapterRef.current;
     if (!adapter?.connected || !address) {
-      throw new Error("Connect Leo Wallet before requesting a Protocol-v3 transaction");
+      throw new Error("Connect Shield before requesting a Protocol-v3 transaction");
     }
     const capabilityResponse = await fetch("/api/aleo/v3", {
       method: "GET",
@@ -769,19 +738,12 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
       throw new Error("Protocol-v3 transaction preview is not canonical");
     }
 
-    const { Transaction, WalletAdapterNetwork } = await import(
-      "@demox-labs/aleo-wallet-adapter-base"
-    );
-    const transaction = Transaction.createTransaction(
-      address,
-      WalletAdapterNetwork.TestnetBeta,
-      preview.programId,
-      preview.functionName,
-      [...preview.inputs],
-      preview.feeMicrocredits,
-      false,
-    );
-    const response = await requestWalletTransaction(adapter, transaction);
+    const response = await requestWalletTransaction(adapter, {
+      program: preview.programId,
+      functionName: preview.functionName,
+      inputs: preview.inputs,
+      feeMicrocredits: preview.feeMicrocredits,
+    });
     const { walletRequestId, publicTransactionId } = response;
     setProtocolSubmission({
       walletRequestId,

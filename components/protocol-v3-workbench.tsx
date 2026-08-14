@@ -549,7 +549,7 @@ export function ProtocolV3Workbench() {
                 {wallet.connectionState !== "Connected" ? (
                   <button className="primary-action" type="button" onClick={() => void wallet.connect()}>
                     <WalletCards size={16} aria-hidden="true" />
-                    {text("连接 Leo Wallet", "Connect Leo Wallet")}
+                    {text("连接 Shield", "Connect Shield")}
                   </button>
                 ) : null}
                 {actions.map((action) => (

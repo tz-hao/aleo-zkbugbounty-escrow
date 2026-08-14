@@ -4,14 +4,14 @@ import { getDeviceProofCapability } from "../../../../lib/device-proof-boundary.
 export const runtime = "nodejs";
 
 const DEVICE_ONLY_ERROR =
-  "Server-side private proving is disabled. Use Leo Wallet device-side submit_claim_v2.";
+  "Server-side private proving is disabled. Use Shield device-side submit_claim_v2.";
 
 export function handleAleoProofRequest() {
   return {
     body: {
       error: DEVICE_ONLY_ERROR,
       privateInputsAccepted: false,
-      mode: "leo-wallet-device",
+      mode: "shield-device",
     },
     status: 410,
   } as const;

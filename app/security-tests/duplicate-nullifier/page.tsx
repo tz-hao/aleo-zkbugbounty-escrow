@@ -147,7 +147,7 @@ export default function DuplicateNullifierSecurityTestPage() {
       });
       setFirstWalletRequestId(requestId);
       setLifecycle("FIRST_SUBMITTED");
-      setMessage(text("第一笔 submit_claim 已交给 Leo Wallet。请用公开交易编号完成链上验收。", "The first submit_claim was handed to Leo Wallet. Complete on-chain acceptance with its public Transaction ID."));
+      setMessage(text("第一笔 submit_claim 已交给 Shield。请用公开交易编号完成链上验收。", "The first submit_claim was handed to Shield. Complete on-chain acceptance with its public Transaction ID."));
     } catch (caught) {
       clearDuplicateTestWitness("FAILED");
       setError(caught instanceof Error ? caught.message : text("第一笔钱包请求失败，受控输入已清空。", "The first wallet request failed. Controlled inputs were cleared."));
@@ -187,7 +187,7 @@ export default function DuplicateNullifierSecurityTestPage() {
       });
       setDuplicateWalletRequestId(requestId);
       setLifecycle("DUPLICATE_SUBMITTED");
-      setMessage(text("重复防重复标识交易已交给 Leo Wallet。完成公开链上验收后必须清空本页。", "The duplicate-Nullifier transaction was handed to Leo Wallet. Clear this page after public on-chain acceptance."));
+      setMessage(text("重复防重复标识交易已交给 Shield。完成公开链上验收后必须清空本页。", "The duplicate-Nullifier transaction was handed to Shield. Clear this page after public on-chain acceptance."));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : text("第二笔钱包请求失败，受控输入已清空。", "The duplicate wallet request failed. Controlled inputs were cleared."));
     } finally {
@@ -301,7 +301,7 @@ export default function DuplicateNullifierSecurityTestPage() {
           )}
 
           <div className="mt-5 rounded-lg border border-red-300/20 bg-red-500/10 p-4 text-sm leading-6 text-red-100">
-            {text("第二笔交易预计会被测试网拒绝，但仍可能消耗测试网交易费。只有你本人可以在 Leo Wallet 中确认或取消。", "The second transaction is expected to be rejected by Testnet and may still consume a Testnet Fee. Only you can confirm or cancel it in Leo Wallet.")}
+            {text("第二笔交易预计会被测试网拒绝，但仍可能消耗测试网交易费。只有你本人可以在 Shield 中确认或取消。", "The second transaction is expected to be rejected by Testnet and may still consume a Testnet Fee. Only you can confirm or cancel it in Shield.")}
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">

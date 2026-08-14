@@ -26,6 +26,6 @@ export function getProofEngineCapability(
     mode,
     label: "Aleo Leo Proof",
     supported: true,
-    message: `Development-only local Leo execution for ${ruleId}. Real Mode uses Leo Wallet with ${CANONICAL_ALEO_PROGRAM_ID}.`,
+    message: `Development-only local Leo execution for ${ruleId}. Real Mode uses Shield with ${CANONICAL_ALEO_PROGRAM_ID}.`,
   };
 }

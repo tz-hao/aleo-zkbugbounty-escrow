@@ -39,7 +39,7 @@ Record only public transaction identifiers, accepted/rejected status, and Mappin
 
 - Production URL is `https://aleo-gilt.vercel.app` and the public deployment panel reports Program ID `zkbugbounty_7f3c92.aleo`.
 - Public endpoints report edition `1`, Escrow v2 `Live`, and `ProgramUpgradeRequired` is false.
-- Leo Wallet is connected by the user only and the selected network is Aleo Testnet (`testnetbeta`).
+- Shield is connected by the user only and the selected network is Aleo Testnet.
 - Confirm the available public Testnet Credits balance before every step and use the smallest approved test amount.
 - Run `npm run smoke:identifiers` without `--offline`; retain the generated public markers for this single session.
 - Generate a fresh public Transaction Preview for each action. The user alone approves every Wallet prompt.

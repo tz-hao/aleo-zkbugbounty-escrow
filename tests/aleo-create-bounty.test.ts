@@ -285,11 +285,11 @@ test("Real Mode wallet flow uses minimum permissions and restores only public pe
   const transactionBuilder = readFileSync("lib/aleo-create-bounty.ts", "utf8");
   const combined = `${provider}\n${form}\n${result}\n${publicView}`;
 
-  assert.match(provider, /DecryptPermission\.NoDecrypt/);
-  assert.match(provider, /WalletAdapterNetwork\.TestnetBeta/);
-  assert.match(provider, /requestTransaction/);
+  assert.match(provider, /WalletDecryptPermission\.NoDecrypt/);
+  assert.match(provider, /Network\.TESTNET/);
+  assert.match(provider, /executeTransaction/);
   assert.match(provider, /classifyWalletResponseId/);
-  assert.match(provider, /preview\.feeMicrocredits,\s*false/);
+  assert.match(provider, /privateFee:\s*false/);
   assert.match(transactionBuilder, /ownerSource: "std::ctx::signer\(\)"/);
   assert.match(result, /Submitted[\s\S]*Confirmed[\s\S]*Mapping Verified/);
   assert.match(publicView, /Data Source: Aleo Testnet/);

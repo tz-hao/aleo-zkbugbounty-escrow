@@ -61,7 +61,7 @@ Project Owner creates bounty
         -> Anyone verifies the public protocol state
 ```
 
-The DApp has an explicit Demo Mode for product walkthroughs and a Real Mode that uses Leo Wallet for user-approved Testnet transactions. Real Mode never silently falls back to Mock data or browser persistence.
+The DApp has an explicit Demo Mode for product walkthroughs and a Real Mode that uses Shield for user-approved Testnet transactions. Real Mode never silently falls back to Mock data or browser persistence.
 
 ## Technical Architecture
 
@@ -69,7 +69,7 @@ The DApp has an explicit Demo Mode for product walkthroughs and a Real Mode that
 ┌──────────────────────────────────────────────────────────────┐
 │                    Next.js 16 Browser DApp                   │
 │  Public registry reads ────────> Provable public API          │
-│  Leo Wallet ── user approves ──> Aleo Testnet transaction     │
+│  Shield ── user approves ──> Aleo Testnet transaction         │
 └───────────────┬───────────────────────────────┬──────────────┘
                 │                               │
      device-only private boundary          public protocol state
@@ -88,7 +88,7 @@ Private data is never sent to `/api/aleo/prove`; that endpoint intentionally ret
 | --- | --- |
 | Smart contract | Leo 4.4, Aleo Testnet, `zkbugbounty_7f3c92.aleo` |
 | Frontend | Next.js 16 App Router, React 19, TypeScript, Tailwind CSS |
-| Wallet | Leo Wallet Adapter with Aleo Testnet minimum permissions |
+| Wallet | Shield adapter with Aleo Testnet minimum permissions |
 | Public verification | Provable public API, typed mapping parsers, bounded transaction polling |
 | Proof demo | Device-side MockVault invariant evaluator with four DemoVault rules |
 | Deployment | Vercel Production |
@@ -140,7 +140,7 @@ Legacy economic entrypoints are intentionally fail-closed. Edition 1 actions use
 - Node.js 20+
 - npm
 - Leo 4.4 for Program compilation (optional for frontend-only work)
-- Leo Wallet browser extension for manual Real Mode transactions
+- Shield browser extension for manual Real Mode transactions
 
 ### Run the DApp
 
@@ -185,7 +185,7 @@ npm run verify:testnet-mapping -- --mapping bounties --key <bounty_id_field>
 ## Demo Flow
 
 1. Open **Create Bounty** and select one of the four DemoVault safety rules.
-2. In **Submit Proof**, use Demo Mode for a safe walkthrough or Real Mode for a manually approved Leo Wallet flow.
+2. In **Submit Proof**, use Demo Mode for a safe walkthrough or Real Mode for a manually approved Shield flow.
 3. Read verified receipts in **Public Claims**; they show public metadata only.
 4. Use **Triage** to inspect the responsible-disclosure sequence and public operation markers.
 5. Follow the [Edition 1 smoke test plan](docs/testnet-edition-1-smoke-test-plan.md) for any manual Testnet acceptance run.

@@ -171,7 +171,7 @@ export function AleoSubmitClaimV3Panel() {
       return;
     }
     if (wallet.connectionState !== "Connected") {
-      setMessage(text("请先连接 Leo Wallet。", "Connect Leo Wallet first."));
+      setMessage(text("请先连接 Shield。", "Connect Shield first."));
       return;
     }
     if (wallet.address === bundle.bounty.owner) {
@@ -225,8 +225,8 @@ export function AleoSubmitClaimV3Panel() {
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">
             {text(
-              "目标系统和代码版本来自链上赏金；白帽补充目标状态、执行和报告承诺。私有 witness 直接交给 Leo Wallet，不发送到本站 API。",
-              "The target system and code version come from the on-chain Bounty. The Whitehat adds target-state, execution, and report commitments. The private witness goes directly to Leo Wallet and is never sent to this site's API.",
+              "目标系统和代码版本来自链上赏金；白帽补充目标状态、执行和报告承诺。私有 witness 直接交给 Shield，不发送到本站 API。",
+              "The target system and code version come from the on-chain Bounty. The Whitehat adds target-state, execution, and report commitments. The private witness goes directly to Shield and is never sent to this site's API.",
             )}
           </p>
         </div>
@@ -300,7 +300,7 @@ export function AleoSubmitClaimV3Panel() {
             {wallet.connectionState !== "Connected" ? (
               <button className="primary-action" type="button" onClick={() => void wallet.connect()}>
                 <WalletCards size={16} aria-hidden="true" />
-                {text("连接 Leo Wallet", "Connect Leo Wallet")}
+                {text("连接 Shield", "Connect Shield")}
               </button>
             ) : null}
             <button

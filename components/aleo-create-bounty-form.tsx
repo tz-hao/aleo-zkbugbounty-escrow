@@ -64,7 +64,7 @@ async function fetchNetworkState(): Promise<NetworkState> {
   }
 }
 
-export function AleoCreateBountyForm() {
+export function AleoCreateBountyForm({ legacy = false }: { legacy?: boolean }) {
   const router = useRouter();
   const wallet = useAleoWallet();
   const [network, setNetwork] = useState<NetworkState>({ kind: "loading" });
@@ -188,15 +188,25 @@ export function AleoCreateBountyForm() {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-md border border-cyan-300/25 bg-cyan-300/10 px-2 py-1 text-xs font-semibold text-cyan-100">
-              Aleo Testnet
+              {legacy ? "Protocol V2 · Compatibility" : "Aleo Testnet"}
             </span>
             <span className="rounded-md border border-cyan-300/20 bg-cyan-300/[0.07] px-2 py-1 text-xs text-cyan-100">
               {text("需要钱包签名", "Wallet signature required")}
             </span>
           </div>
           <h2 id="real-create-bounty-title" className="mt-3 text-xl font-semibold text-white">
-            {text("通过钱包签名创建链上赏金", "Create an on-chain Bounty with a Wallet signature")}
+            {legacy
+              ? text("创建兼容 V2 赏金", "Create a compatible V2 Bounty")
+              : text("通过钱包签名创建链上赏金", "Create an on-chain Bounty with a Wallet signature")}
           </h2>
+          {legacy ? (
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-amber-100/75">
+              {text(
+                "仅当需要继续处理旧 V2 收据或旧流程时使用。新建赏金请返回“V3 当前协议”，以获得仲裁、加密交付和完整结算流程。",
+                "Use this only for existing V2 receipts or workflows. Create new Bounties with the V3 current protocol for arbitration, encrypted delivery, and the full settlement flow.",
+              )}
+            </p>
+          ) : null}
         </div>
         <NetworkBadge network={network} onRefresh={() => void refreshNetwork()} />
       </div>
@@ -304,7 +314,7 @@ export function AleoCreateBountyForm() {
             {!submitting ? <ArrowRight size={16} aria-hidden="true" /> : null}
           </button>
           {wallet.connectionState !== "Connected" ? (
-            <p className="text-xs text-slate-500">{text("请先在顶部连接 Leo Wallet，并确认已切换到 Aleo 测试网。", "Connect Leo Wallet in the header and confirm Aleo Testnet first.")}</p>
+            <p className="text-xs text-slate-500">{text("请先在顶部连接 Shield，并确认已切换到 Aleo 测试网。", "Connect Shield in the header and confirm Aleo Testnet first.")}</p>
           ) : null}
         </TransactionPreview>
       ) : null}

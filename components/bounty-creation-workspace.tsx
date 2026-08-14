@@ -9,7 +9,7 @@ import { BountyForm } from "./bounty-form";
 import { DemoRolePreview } from "./demo-role-preview";
 import { useLocale } from "./locale-provider";
 
-type CreationMode = "real" | "v3" | "demo";
+type CreationMode = "real" | "legacy" | "demo";
 
 export function BountyCreationWorkspace() {
   const [mode, setMode] = useState<CreationMode>("real");
@@ -23,15 +23,15 @@ export function BountyCreationWorkspace() {
           <p className="mt-2 text-sm text-slate-400">{text("链上交易与本地模拟使用独立的数据和权限边界。", "On-chain transactions and local simulation use separate data and permission boundaries.")}</p>
         </div>
         <div className="grid grid-cols-3 rounded-lg border border-white/10 bg-black/20 p-1" aria-label={text("赏金创建模式", "Bounty creation mode")}>
-          <ModeButton active={mode === "real"} onClick={() => setMode("real")}><Database size={15} aria-hidden="true" />{text("Aleo 测试网（当前协议）", "Aleo Testnet (current)")}</ModeButton>
-          <ModeButton active={mode === "v3"} onClick={() => setMode("v3")}><ShieldCheck size={15} aria-hidden="true" />V3</ModeButton>
+          <ModeButton active={mode === "real"} onClick={() => setMode("real")}><ShieldCheck size={15} aria-hidden="true" />{text("Aleo 测试网（V3 当前协议）", "Aleo Testnet (V3 current)")}</ModeButton>
+          <ModeButton active={mode === "legacy"} onClick={() => setMode("legacy")}><Database size={15} aria-hidden="true" />{text("V2 兼容（旧数据）", "V2 compatibility")}</ModeButton>
           <ModeButton active={mode === "demo"} onClick={() => setMode("demo")}><FlaskConical size={15} aria-hidden="true" />{text("本地演示", "Demo Local")}</ModeButton>
         </div>
       </div>
       {mode === "real" ? (
-        <AleoCreateBountyForm />
-      ) : mode === "v3" ? (
         <AleoCreateBountyV3Form />
+      ) : mode === "legacy" ? (
+        <AleoCreateBountyForm legacy />
       ) : (
         <><DemoRolePreview /><BountyForm /></>
       )}

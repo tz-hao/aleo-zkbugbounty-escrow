@@ -119,7 +119,7 @@ test("wallet-signed submit_claim keeps only public submission state", () => {
   const publicBounty = readFileSync("components/public-bounty-view.tsx", "utf8");
   const publicState = provider.match(/export type WalletClaimSubmission = \{([\s\S]*?)\n\};/)?.[1] ?? "";
 
-  assert.match(provider, /WalletAdapterNetwork\.TestnetBeta/);
+  assert.match(provider, /Network\.TESTNET/);
   assert.match(provider, /SUBMIT_CLAIM_FUNCTION/);
   assert.match(provider, /inputs\.fill\(""\)/);
   assert.match(provider, /request\.witness\[key\] = ""/);

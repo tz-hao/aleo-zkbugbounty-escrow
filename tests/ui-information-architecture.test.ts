@@ -75,8 +75,8 @@ test("wallet diagnostics are available on demand without tiny always-on copy", (
   const control = readFileSync("components/wallet-connection-control.tsx", "utf8");
 
   assert.match(control, /<details/);
-  assert.match(control, /Wallet extension unavailable/);
-  assert.match(control, /Connection rejected \/ Wallet locked \/ Wrong network/);
+  assert.match(control, /Shield unavailable/);
+  assert.match(control, /Connection rejected \/ Shield locked \/ Wrong network/);
   assert.equal(control.includes("text-[10px]"), false);
   assert.equal(control.includes("text-[11px]"), false);
 });

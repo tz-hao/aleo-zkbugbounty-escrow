@@ -7,24 +7,25 @@ export type WalletCompatibility = {
   name: string;
   verification: WalletVerificationStatus;
   network: "Aleo Testnet";
-  walletChainId: "testnetbeta";
+  walletChainId: "testnet";
   environments: readonly string[];
   verifiedCapabilities: readonly string[];
 };
 
 export const WALLET_COMPATIBILITY: readonly WalletCompatibility[] = [
   {
-    id: "leo-wallet",
-    name: "Leo Wallet",
+    id: "shield-wallet",
+    name: "Shield Wallet",
     verification: "Verified",
     network: "Aleo Testnet",
-    walletChainId: "testnetbeta",
+    walletChainId: "testnet",
     environments: ["Desktop browser extension"],
     verifiedCapabilities: [
       "Connect",
       "Disconnect",
-      "Public fee transaction request",
+      "Public fee transaction execution",
       "create_bounty",
+      "V2/V3 public protocol transactions",
       "Wallet Request ID classification",
     ],
   },
@@ -33,7 +34,7 @@ export const WALLET_COMPATIBILITY: readonly WalletCompatibility[] = [
     name: "Other Aleo wallets",
     verification: "NotVerified",
     network: "Aleo Testnet",
-    walletChainId: "testnetbeta",
+    walletChainId: "testnet",
     environments: [],
     verifiedCapabilities: [],
   },
@@ -57,9 +58,18 @@ export type NormalizedWalletTransactionStatus = "Finalized" | "Failed" | "Proces
 export function normalizeWalletTransactionStatus(
   walletStatus: unknown,
 ): NormalizedWalletTransactionStatus {
-  if (typeof walletStatus !== "string") return "Processing";
-  const normalized = walletStatus.toLowerCase();
-  if (normalized === "finalized") return "Finalized";
+  const rawStatus =
+    typeof walletStatus === "string"
+      ? walletStatus
+      : typeof walletStatus === "object" && walletStatus !== null &&
+          typeof (walletStatus as { status?: unknown }).status === "string"
+        ? (walletStatus as { status: string }).status
+        : null;
+  if (!rawStatus) return "Processing";
+  const normalized = rawStatus.toLowerCase();
+  if (normalized === "finalized" || normalized === "confirmed" || normalized === "accepted") {
+    return "Finalized";
+  }
   if (
     normalized.includes("fail") ||
     normalized.includes("reject") ||

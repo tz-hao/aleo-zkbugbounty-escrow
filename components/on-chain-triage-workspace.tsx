@@ -631,7 +631,7 @@ export function OnChainTriageWorkspace() {
                 onClick={() => void connect()}
               >
                 <WalletCards size={16} />
-                {text("连接 Leo Wallet", "Connect Leo Wallet")}
+                {text("连接 Shield", "Connect Shield")}
               </button>
             ) : null}
           </div>
@@ -727,7 +727,7 @@ export function OnChainTriageWorkspace() {
                 {connectionState !== "Connected" ? (
                   <button className="primary-action" type="button" onClick={() => void connect()}>
                     <WalletCards size={16} />
-                    {text("连接 Leo Wallet", "Connect Leo Wallet")}
+                    {text("连接 Shield", "Connect Shield")}
                   </button>
                 ) : null}
                 {availableActions.map((action) => (

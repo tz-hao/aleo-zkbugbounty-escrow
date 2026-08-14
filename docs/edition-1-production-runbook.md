@@ -14,7 +14,7 @@ Compare a normal request with a no-cache request. Inspect `cache-control`, `age`
 
 ## 3. Wallet Cannot Connect
 
-Confirm that Leo Wallet is installed, unlocked, and its Connected sites entry permits the production URL. Use a supported Chrome or Edge profile. The app must remain disconnected when the extension is unavailable; do not enter credentials into the page.
+Confirm that Shield is installed, unlocked, and permits the production URL. Use a supported Chrome or Edge profile. The app must remain disconnected when the extension is unavailable; do not enter credentials into the page.
 
 ## 4. Wrong Network
 
