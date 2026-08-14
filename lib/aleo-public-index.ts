@@ -12,6 +12,10 @@ import {
 import { fetchOnChainClaimReceipt } from "./aleo-claim-receipt-registry.ts";
 import { fetchOnChainNullifierState } from "./aleo-nullifier-registry.ts";
 import {
+  fetchOnChainBountyV3Config,
+  type OnChainBountyV3Config,
+} from "./aleo-v3-registry.ts";
+import {
   CANONICAL_ALEO_PROGRAM_ID,
 } from "./aleo-program.ts";
 import type {
@@ -38,8 +42,10 @@ export type IndexedBounty = {
   transactionId: string;
   transactionStatus: "Accepted";
   mappingStatus: MappingVerificationStatus;
+  protocolVersion: 1 | 3;
   bountyId: string;
   bounty?: OnChainBountyState;
+  v3Config?: OnChainBountyV3Config;
 };
 
 export type IndexedClaim = {
@@ -76,6 +82,21 @@ export type AleoPublicIndexPage =
 type BountyDiscovery = {
   transactionId: string;
   publicInputs: ReturnType<typeof parseCreateBountyTransitionInputs>;
+  protocolVersion: 1 | 3;
+  v3Policy?: BountyV3PolicyDiscovery;
+};
+
+type BountyV3PolicyDiscovery = {
+  disclosureKeyCommitment: string;
+  targetSystemCommitment: string;
+  targetCodeHash: string;
+  panelId: string;
+  arbiters: readonly [string, string, string];
+  quorum: 2 | 3;
+  reviewWindowBlocks: number;
+  decisionWindowBlocks: number;
+  arbitrationFeeMicrocredits: string;
+  paymentCondition: "OnReproduction" | "OnPatchAcceptance";
 };
 
 type ClaimDiscovery = {
@@ -103,8 +124,14 @@ const severityByLiteral: Record<string, OnChainClaimReceipt["severity"]> = {
   "3u8": "Critical",
 };
 
+type BountyProgramFunctionName = "create_bounty" | "create_bounty_v3";
 type ClaimProgramFunctionName = "submit_claim" | "submit_claim_v2";
-type IndexedProgramFunctionName = "create_bounty" | ClaimProgramFunctionName;
+type IndexedProgramFunctionName = BountyProgramFunctionName | ClaimProgramFunctionName;
+
+const BOUNTY_PROGRAM_FUNCTIONS: readonly BountyProgramFunctionName[] = [
+  "create_bounty_v3",
+  "create_bounty",
+];
 
 const CLAIM_PROGRAM_FUNCTIONS: readonly ClaimProgramFunctionName[] = [
   "submit_claim",
@@ -182,11 +209,107 @@ function parseFlatStruct(raw: string, expectedFields: readonly string[]) {
   return fields;
 }
 
-export function parseIndexedBountyTransaction(entry: unknown): BountyDiscovery {
-  const { transactionId, transition } = canonicalTransition(entry, "create_bounty");
-  const result = {
+const ALEO_ADDRESS_PATTERN = /^aleo1[0-9a-z]{58}$/;
+const MAX_U8 = (1n << 8n) - 1n;
+const MAX_U32 = (1n << 32n) - 1n;
+const MAX_U64 = (1n << 64n) - 1n;
+const BOUNTY_V3_POLICY_FIELDS = [
+  "disclosure_key_commitment",
+  "target_system_commitment",
+  "target_code_hash",
+  "panel_id",
+  "arbiter_one",
+  "arbiter_two",
+  "arbiter_three",
+  "quorum",
+  "review_window_blocks",
+  "decision_window_blocks",
+  "arbitration_fee_microcredits",
+  "payment_condition",
+] as const;
+
+function parseUnsignedPublicLiteral(value: string, suffix: "u8" | "u32" | "u64", label: string) {
+  const match = value.match(new RegExp(`^([0-9]+)${suffix}$`));
+  if (!match) throw new Error(`Aleo ${label} is invalid`);
+  const parsed = BigInt(match[1]);
+  const maximum = suffix === "u8" ? MAX_U8 : suffix === "u32" ? MAX_U32 : MAX_U64;
+  if (parsed > maximum) throw new Error(`Aleo ${label} is out of range`);
+  return parsed;
+}
+
+function parseBountyV3Policy(raw: string): BountyV3PolicyDiscovery {
+  const fields = parseFlatStruct(raw, BOUNTY_V3_POLICY_FIELDS);
+  const fieldLiteral = (name: (typeof BOUNTY_V3_POLICY_FIELDS)[number]) => {
+    const value = fields.get(name)!;
+    if (!isAleoFieldLiteral(value)) throw new Error(`Aleo Bounty V3 ${name} is invalid`);
+    return value;
+  };
+  const arbiters = [
+    fields.get("arbiter_one")!,
+    fields.get("arbiter_two")!,
+    fields.get("arbiter_three")!,
+  ] as const;
+  if (arbiters.some((arbiter) => !ALEO_ADDRESS_PATTERN.test(arbiter)) || new Set(arbiters).size !== 3) {
+    throw new Error("Aleo Bounty V3 arbiters are invalid");
+  }
+  const quorum = Number(parseUnsignedPublicLiteral(fields.get("quorum")!, "u8", "Bounty V3 quorum"));
+  const reviewWindowBlocks = Number(
+    parseUnsignedPublicLiteral(fields.get("review_window_blocks")!, "u32", "Bounty V3 review window"),
+  );
+  const decisionWindowBlocks = Number(
+    parseUnsignedPublicLiteral(fields.get("decision_window_blocks")!, "u32", "Bounty V3 decision window"),
+  );
+  const arbitrationFeeMicrocredits = parseUnsignedPublicLiteral(
+    fields.get("arbitration_fee_microcredits")!,
+    "u64",
+    "Bounty V3 arbitration fee",
+  );
+  const paymentCondition = Number(
+    parseUnsignedPublicLiteral(fields.get("payment_condition")!, "u8", "Bounty V3 payment condition"),
+  );
+  if (
+    (quorum !== 2 && quorum !== 3) ||
+    !Number.isSafeInteger(reviewWindowBlocks) ||
+    !Number.isSafeInteger(decisionWindowBlocks) ||
+    (paymentCondition !== 1 && paymentCondition !== 2)
+  ) {
+    throw new Error("Aleo Bounty V3 policy is unsupported");
+  }
+  return {
+    disclosureKeyCommitment: fieldLiteral("disclosure_key_commitment"),
+    targetSystemCommitment: fieldLiteral("target_system_commitment"),
+    targetCodeHash: fieldLiteral("target_code_hash"),
+    panelId: fieldLiteral("panel_id"),
+    arbiters,
+    quorum: quorum as 2 | 3,
+    reviewWindowBlocks,
+    decisionWindowBlocks,
+    arbitrationFeeMicrocredits: arbitrationFeeMicrocredits.toString(),
+    paymentCondition: paymentCondition === 1 ? "OnReproduction" : "OnPatchAcceptance",
+  };
+}
+
+export function parseIndexedBountyTransaction(
+  entry: unknown,
+  functionName: BountyProgramFunctionName = "create_bounty",
+): BountyDiscovery {
+  const { transactionId, transition } = canonicalTransition(entry, functionName);
+  if (functionName === "create_bounty") {
+    const result: BountyDiscovery = {
+      transactionId,
+      publicInputs: parseCreateBountyTransitionInputs(transition),
+      protocolVersion: 1,
+    };
+    assertNoPrivateFields(result);
+    return result;
+  }
+  const inputs = asArray(transition.inputs, "create_bounty_v3 inputs");
+  if (inputs.length !== 9) throw new Error("Aleo create_bounty_v3 input count mismatch");
+  const result: BountyDiscovery = {
     transactionId,
-    publicInputs: parseCreateBountyTransitionInputs(transition),
+    publicInputs: parseCreateBountyTransitionInputs({ ...transition, inputs: inputs.slice(0, 8) }),
+    protocolVersion: 3,
+    v3Policy: parseBountyV3Policy(publicValue(inputs[8], "create_bounty_v3 policy")),
   };
   assertNoPrivateFields(result);
   return result;
@@ -457,6 +580,29 @@ function bountyMatchesDiscovery(bounty: OnChainBountyState, discovery: BountyDis
   );
 }
 
+function bountyV3ConfigMatchesDiscovery(
+  config: OnChainBountyV3Config,
+  discovery: BountyDiscovery,
+) {
+  const policy = discovery.v3Policy;
+  return Boolean(
+    policy &&
+      config.bountyId === discovery.publicInputs.bountyId &&
+      config.disclosureKeyCommitment === policy.disclosureKeyCommitment &&
+      config.targetSystemCommitment === policy.targetSystemCommitment &&
+      config.targetCodeHash === policy.targetCodeHash &&
+      config.panelId === policy.panelId &&
+      config.arbiters[0] === policy.arbiters[0] &&
+      config.arbiters[1] === policy.arbiters[1] &&
+      config.arbiters[2] === policy.arbiters[2] &&
+      config.quorum === policy.quorum &&
+      config.reviewWindowBlocks === policy.reviewWindowBlocks &&
+      config.decisionWindowBlocks === policy.decisionWindowBlocks &&
+      config.arbitrationFeeMicrocredits === policy.arbitrationFeeMicrocredits &&
+      config.paymentCondition === policy.paymentCondition,
+  );
+}
+
 function claimMatchesDiscovery(
   receipt: OnChainClaimReceipt,
   nullifierState: OnChainNullifierState,
@@ -502,29 +648,65 @@ export async function listIndexedBounties(
   config: AleoPublicIndexConfig,
   fetcher: TransactionFetch = fetch,
 ): Promise<AleoPublicIndexPage> {
-  const discovery = await fetchPublicProgramTransactionPage("create_bounty", page, limit, config, fetcher);
-  const entries = discovery.entries;
-  const discoveries = entries.map(parseIndexedBountyTransaction);
+  const settled = await Promise.allSettled(
+    BOUNTY_PROGRAM_FUNCTIONS.map(async (functionName) => ({
+      functionName,
+      discovery: await fetchPublicProgramTransactionsThroughPage(
+        functionName,
+        page,
+        limit,
+        config,
+        fetcher,
+      ),
+    })),
+  );
+  const sources = settled
+    .filter(
+      (result): result is PromiseFulfilledResult<{
+        functionName: BountyProgramFunctionName;
+        discovery: ProgramTransactionDiscovery;
+      }> => result.status === "fulfilled",
+    )
+    .map((result) => result.value);
+  if (sources.length === 0) {
+    throw new Error("Aleo public Bounty index is temporarily unavailable");
+  }
+  const seenTransactionIds = new Set<string>();
+  const discoveries = sources
+    .flatMap(({ functionName, discovery }) =>
+      discovery.entries.map((entry) => parseIndexedBountyTransaction(entry, functionName))
+    )
+    .filter((discovery) => {
+      if (seenTransactionIds.has(discovery.transactionId)) return false;
+      seenTransactionIds.add(discovery.transactionId);
+      return true;
+    });
   const items = await mapWithConcurrency(
     discoveries,
     async (discovery): Promise<IndexedBounty> => {
       try {
-        const bounty = await fetchOnChainBountyState(
-          discovery.publicInputs.bountyId,
-          config.registry,
-          fetcher,
-        );
-        const mappingStatus = !bounty
+        const [bounty, v3Config] = await Promise.all([
+          fetchOnChainBountyState(discovery.publicInputs.bountyId, config.registry, fetcher),
+          discovery.protocolVersion === 3
+            ? fetchOnChainBountyV3Config(discovery.publicInputs.bountyId, config.registry, fetcher)
+            : Promise.resolve(null),
+        ]);
+        const baseMappingVerified = Boolean(bounty && bountyMatchesDiscovery(bounty, discovery));
+        const v3MappingVerified = discovery.protocolVersion !== 3 ||
+          Boolean(v3Config && bountyV3ConfigMatchesDiscovery(v3Config, discovery));
+        const mappingStatus = !bounty || (discovery.protocolVersion === 3 && !v3Config)
           ? "Missing"
-          : bountyMatchesDiscovery(bounty, discovery)
+          : baseMappingVerified && v3MappingVerified
             ? "Verified"
             : "Mismatch";
         const item: IndexedBounty = {
           transactionId: discovery.transactionId,
           transactionStatus: "Accepted",
           mappingStatus,
+          protocolVersion: discovery.protocolVersion,
           bountyId: discovery.publicInputs.bountyId,
           ...(mappingStatus === "Verified" && bounty ? { bounty } : {}),
+          ...(mappingStatus === "Verified" && v3Config ? { v3Config } : {}),
         };
         assertNoPrivateFields(item);
         return item;
@@ -533,6 +715,7 @@ export async function listIndexedBounties(
           transactionId: discovery.transactionId,
           transactionStatus: "Accepted",
           mappingStatus: "Unavailable",
+          protocolVersion: discovery.protocolVersion,
           bountyId: discovery.publicInputs.bountyId,
         };
         assertNoPrivateFields(item);
@@ -544,10 +727,15 @@ export async function listIndexedBounties(
     kind: "bounties",
     page,
     limit,
-    hasMore: discovery.source === "AleoRpcDiscovery" ? entries.length === limit : discovery.hasMore,
-    source: discovery.source,
+    hasMore: sources.some(({ discovery }) =>
+      discovery.hasMore ||
+      (discovery.source === "AleoRpcDiscovery" && discovery.entries.length === (page + 1) * limit),
+    ),
+    source: sources.every(({ discovery }) => discovery.source === "AleoRpcDiscovery")
+      ? "AleoRpcDiscovery"
+      : "ProvableExplorerDiscovery",
     authority: "AleoMappings",
-    items,
+    items: items.slice(page * limit, (page + 1) * limit),
   };
 }
 export async function listIndexedClaims(
