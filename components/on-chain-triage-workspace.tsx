@@ -533,8 +533,11 @@ export function OnChainTriageWorkspace() {
         <div>
           <p className="page-kicker">{text("Aleo 测试网注册表", "Aleo Testnet Registry")}</p>
           <h2 id="chain-triage-title" className="mt-2 text-lg font-semibold text-white">
-            {text("链上分诊", "On-chain Triage")}
+            {text("链上分诊（V2 兼容）", "On-chain Triage (V2 compatibility)")}
           </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+            {text("V3 赏金与声明请使用上方的 V3 当前协议工作区；此区域只保留旧 V2 托管流程的兼容读取和操作。", "Use the V3 Current Protocol workspace above for V3 Bounties and Claims. This area only retains compatibility reads and actions for the legacy V2 Escrow flow.")}
+          </p>
         </div>
         <span className="font-mono text-xs text-slate-500">
           {capabilityChecked ? text(getChineseCapabilityStatus(capability.status), capability.status) : text("核验中", "Checking")}
@@ -679,9 +682,14 @@ export function OnChainTriageWorkspace() {
                 </p>
               ) : null}
 
-              {bundle.receipt.protocolVersion !== 2 ? (
+              {bundle.receipt.protocolVersion === 1 ? (
                 <p className="border-l-2 border-amber-300/40 pl-4 text-sm leading-6 text-slate-400">
                   {text("该收据属于协议 v1，仅支持公开验证，不具备托管支付资格。", "This Receipt belongs to protocol v1. It supports public verification only and is not eligible for Escrow payout.")}
+                </p>
+              ) : null}
+              {bundle.receipt.protocolVersion === 3 ? (
+                <p className="border-l-2 border-violet-300/40 pl-4 text-sm leading-6 text-slate-400">
+                  {text("该收据属于协议 V3，已具备 V3 分诊资格。为避免混用旧规则，此 V2 兼容区不会提供托管操作；请使用上方“V3 当前协议”工作区读取状态并继续受理、锁定奖励和加密披露流程。", "This Receipt belongs to protocol V3 and is eligible for V3 triage. To prevent mixing legacy rules, this V2 compatibility area does not offer Escrow actions. Use the V3 Current Protocol workspace above to read status and continue review, reward lock, and encrypted disclosure.")}
                 </p>
               ) : null}
               {bundle.receipt.protocolVersion === 2 && !bundle.reporterAddress ? (
