@@ -404,6 +404,9 @@ upgrade_args=(
     --endpoint "${ENDPOINT}"
     --network-retries 6
     --broadcast
+    # The wrapper's exact confirmation above is the only human approval gate.
+    # This prevents Leo from waiting on a second invisible prompt inside the PTY.
+    --yes
 )
 printf -v LEO_UPGRADE_COMMAND '%q ' "${LEO_BIN}" "${upgrade_args[@]}"
 LEO_UPGRADE_LOG="${TEMP_DIR}/leo-upgrade.log"

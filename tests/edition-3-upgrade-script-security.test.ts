@@ -35,4 +35,5 @@ test("Edition 3 broadcast writes only redacted Leo CLI output", () => {
   assert.match(script, /PRIVATE_KEY="\$\{PRIVATE_KEY\}" script -qefc "\$\{LEO_UPGRADE_COMMAND\}" \/dev\/null/);
   assert.match(script, /2>&1 \| node "\$\{SCRIPT_DIR\}\/redact-aleo-cli-output\.mjs" >"\$\{LEO_UPGRADE_LOG\}"/);
   assert.doesNotMatch(script, /leo-result\.json|RAW_RESULT/);
+  assert.ok(script.indexOf("Type UPGRADE EDITION 3 to continue") < script.indexOf("    --yes"));
 });

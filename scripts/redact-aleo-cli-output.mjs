@@ -10,15 +10,24 @@ const sensitiveLabel = /(?:private[ _-]?key|view[ _-]?key|signature|signed[ _-]?
 export function redactAleoCliOutput(output) {
   return String(output)
     .split(/\r?\n/)
-    .map((line) => {
-      if (sensitiveLabel.test(line)) return "[REDACTED_SENSITIVE_LEO_OUTPUT]";
-      return line.replace(sensitiveLiteral, "[REDACTED_SENSITIVE_VALUE]");
-    })
+    .map(redactLine)
     .join("\n");
 }
 
+function redactLine(line) {
+  if (sensitiveLabel.test(line)) return "[REDACTED_SENSITIVE_LEO_OUTPUT]";
+  return line.replace(sensitiveLiteral, "[REDACTED_SENSITIVE_VALUE]");
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const chunks = [];
-  process.stdin.on("data", (chunk) => chunks.push(chunk));
-  process.stdin.on("end", () => process.stdout.write(redactAleoCliOutput(Buffer.concat(chunks).toString("utf8"))));
+  let pending = "";
+  process.stdin.on("data", (chunk) => {
+    pending += chunk.toString("utf8");
+    const lines = pending.split(/\r?\n/);
+    pending = lines.pop() ?? "";
+    for (const line of lines) process.stdout.write(`${redactLine(line)}\n`);
+  });
+  process.stdin.on("end", () => {
+    if (pending) process.stdout.write(redactLine(pending));
+  });
 }
