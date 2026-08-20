@@ -16,6 +16,7 @@ import {
 import {
   fetchOnChainBountyV3Config,
   fetchOnChainClaimV3Acknowledgement,
+  fetchOnChainClaimV3ActiveDispute,
   fetchOnChainClaimV3ArbitrationTally,
   fetchOnChainClaimV3DisputeBond,
   fetchOnChainClaimV3Evidence,
@@ -42,7 +43,7 @@ function unavailable(capability: ProtocolV3Capability) {
         ? 500
         : 409,
     body: {
-      error: "Protocol V3 public state is unavailable until Edition 2 and its public upgrade evidence are verified",
+      error: "Protocol V3 public state is unavailable until the Edition 3 hardening upgrade and its public evidence are verified",
       capability: capability.status,
     },
   };
@@ -78,22 +79,18 @@ export async function handleProtocolV3ClaimLookup(
       evidence,
       state,
       payout,
-      tally,
       acknowledgement,
-      disputeBond,
       projectDecision,
-      disputeMetadata,
+      activeDispute,
     ] = await Promise.all([
       fetchOnChainClaimReceipt(claimHash, config, options.fetcher),
       fetchOnChainClaimReporter(claimHash, config, options.fetcher),
       fetchOnChainClaimV3Evidence(claimHash, config, options.fetcher),
       fetchOnChainClaimV3State(claimHash, config, options.fetcher),
       fetchOnChainClaimV3Payout(claimHash, config, options.fetcher),
-      fetchOnChainClaimV3ArbitrationTally(claimHash, config, options.fetcher),
       fetchOnChainClaimV3Acknowledgement(claimHash, config, options.fetcher),
-      fetchOnChainClaimV3DisputeBond(claimHash, config, options.fetcher),
       fetchOnChainClaimV3ProjectDecision(claimHash, config, options.fetcher),
-      fetchOnChainClaimV3DisputeMetadata(claimHash, config, options.fetcher),
+      fetchOnChainClaimV3ActiveDispute(claimHash, config, options.fetcher),
     ]);
     if (
       !receipt ||
@@ -107,6 +104,27 @@ export async function handleProtocolV3ClaimLookup(
         body: { error: "Protocol-v3 Claim was not found on Aleo Testnet" },
       };
     }
+    const disputeId = activeDispute?.disputeId ?? claimHash;
+    const [tally, disputeBond, disputeMetadata] = await Promise.all([
+      fetchOnChainClaimV3ArbitrationTally(
+        disputeId,
+        config,
+        options.fetcher,
+        claimHash,
+      ),
+      fetchOnChainClaimV3DisputeBond(
+        disputeId,
+        config,
+        options.fetcher,
+        claimHash,
+      ),
+      fetchOnChainClaimV3DisputeMetadata(
+        disputeId,
+        config,
+        options.fetcher,
+        claimHash,
+      ),
+    ]);
     const [bounty, policy] = await Promise.all([
       fetchOnChainBountyState(receipt.bountyId, config, options.fetcher),
       fetchOnChainBountyV3Config(receipt.bountyId, config, options.fetcher),
@@ -131,6 +149,7 @@ export async function handleProtocolV3ClaimLookup(
         acknowledgement,
         disputeBond,
         projectDecision,
+        activeDispute,
         disputeMetadata,
       },
     };

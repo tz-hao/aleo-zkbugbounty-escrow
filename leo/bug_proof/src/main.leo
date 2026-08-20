@@ -420,15 +420,31 @@ fn derive_operation_marker(
 
 fn derive_v3_vote_key(
         bounty_id: field,
-        claim_hash: field,
+        dispute_id: field,
         voter: address,
     ) -> field {
         let voter_commitment: field = BHP256::hash_to_field(voter);
         return Poseidon4::hash_to_field([
             302field,
             bounty_id,
-            claim_hash,
+            dispute_id,
             voter_commitment,
+        ]);
+    }
+
+// A dispute is keyed by a monotonically increasing per-claim round. This keeps
+// every past ruling auditable without preventing a later, independent dispute.
+fn derive_v3_dispute_id(
+        bounty_id: field,
+        claim_hash: field,
+        round: u32,
+    ) -> field {
+        assert(round > 0u32);
+        return Poseidon4::hash_to_field([
+            333field,
+            bounty_id,
+            claim_hash,
+            round as field,
         ]);
     }
 
@@ -508,6 +524,10 @@ program zkbugbounty_7f3c92.aleo {
     mapping claim_v3_dispute_bonds: field => ClaimV3DisputeBond;
     mapping claim_v3_project_decisions: field => ClaimV3ProjectDecision;
     mapping claim_v3_dispute_metadata: field => ClaimV3DisputeMetadata;
+    // `rounds` stores the next round number; `active_disputes` resolves the
+    // current (or most recently resolved) dispute record for public readers.
+    mapping claim_v3_dispute_rounds: field => u32;
+    mapping claim_v3_active_disputes: field => field;
 
     fn prove_vault_invariant_break(
         public bounty_id: field,
@@ -2024,11 +2044,16 @@ program zkbugbounty_7f3c92.aleo {
             assert(Mapping::contains(claim_receipts, claim_hash));
             assert(Mapping::contains(claim_v3_states, claim_hash));
             assert(Mapping::contains(claim_reporters, claim_hash));
+            assert(Mapping::contains(claim_v3_project_decisions, claim_hash));
             let bounty: BountyState = Mapping::get(bounties, bounty_id);
             let protocol_version: u8 = Mapping::get(bounty_protocol_versions, bounty_id);
             let receipt: ClaimReceiptState = Mapping::get(claim_receipts, claim_hash);
             let current: ClaimV3State = Mapping::get(claim_v3_states, claim_hash);
             let reporter: address = Mapping::get(claim_reporters, claim_hash);
+            let decision: ClaimV3ProjectDecision = Mapping::get(
+                claim_v3_project_decisions,
+                claim_hash,
+            );
             assert_eq(protocol_version, 3u8);
             assert_eq(bounty.owner_address, signer);
             assert(bounty.status == 1u8 || bounty.status == 2u8 || bounty.status == 3u8);
@@ -2038,7 +2063,21 @@ program zkbugbounty_7f3c92.aleo {
             assert_eq(current.bounty_id, bounty_id);
             assert_eq(current.whitehat_address, reporter);
             assert_eq(current.status, 3u8);
-            let expected_reward: u64 = reward_for_v3_severity(bounty, receipt.severity);
+            assert_eq(decision.claim_hash, claim_hash);
+            assert_eq(decision.bounty_id, bounty_id);
+            let lock_severity: u8 = decision.decision == 5u8
+                ? decision.project_severity
+                : receipt.severity;
+            // A reward can only be reserved after acceptance or an explicit
+            // non-zero project assessment. A lower assessment is appealable
+            // before lock, then its amount becomes the escrow ceiling.
+            assert(
+                decision.decision == 1u8 ||
+                (decision.decision == 5u8 &&
+                 decision.project_severity >= 1u8 &&
+                 decision.project_severity <= receipt.severity)
+            );
+            let expected_reward: u64 = reward_for_v3_severity(bounty, lock_severity);
             assert_eq(reward_amount, expected_reward);
             assert(Mapping::contains(bounty_escrows, bounty_id));
             assert(!Mapping::contains(claim_v3_payouts, claim_hash));
@@ -2118,19 +2157,26 @@ program zkbugbounty_7f3c92.aleo {
             let bounty: BountyState = Mapping::get(bounties, bounty_id);
             let protocol_version: u8 = Mapping::get(bounty_protocol_versions, bounty_id);
             let receipt: ClaimReceiptState = Mapping::get(claim_receipts, claim_hash);
+            let evidence: ClaimV3Evidence = Mapping::get(claim_v3_evidence, claim_hash);
             let current: ClaimV3State = Mapping::get(claim_v3_states, claim_hash);
             let payout: ClaimV3PayoutState = Mapping::get(claim_v3_payouts, claim_hash);
             assert_eq(protocol_version, 3u8);
             assert_eq(current.bounty_id, bounty_id);
             assert_eq(receipt.bounty_id, bounty_id);
             assert_eq(receipt.protocol_version, 3u8);
+            assert_eq(evidence.claim_hash, claim_hash);
+            assert_eq(evidence.bounty_id, bounty_id);
             assert_eq(payout.bounty_id, bounty_id);
             assert_eq(payout.whitehat_address, current.whitehat_address);
             assert_eq(payout.status, 1u8);
             let valid_delivery: bool =
                 action == 1u8 &&
                 signer == current.whitehat_address &&
-                current.status == 4u8;
+                current.status == 4u8 &&
+                // The pre-committed report field is the ciphertext-envelope
+                // hash. The recipient key remains an immutable Bounty policy
+                // commitment and the ciphertext itself stays off-chain.
+                action_commitment == evidence.report_commitment;
             let valid_acknowledgement: bool =
                 action == 2u8 &&
                 signer == bounty.owner_address &&
@@ -2202,9 +2248,14 @@ program zkbugbounty_7f3c92.aleo {
             let protocol_version: u8 = Mapping::get(bounty_protocol_versions, bounty_id);
             let current: ClaimV3State = Mapping::get(claim_v3_states, claim_hash);
             let receipt: ClaimReceiptState = Mapping::get(claim_receipts, claim_hash);
+            let dispute_id: field = Mapping::get_or_use(
+                claim_v3_active_disputes,
+                claim_hash,
+                claim_hash,
+            );
             let has_dispute_metadata: bool = Mapping::contains(
                 claim_v3_dispute_metadata,
-                claim_hash,
+                dispute_id,
             );
             let empty_dispute_metadata: ClaimV3DisputeMetadata = ClaimV3DisputeMetadata {
                 claim_hash: claim_hash,
@@ -2219,12 +2270,12 @@ program zkbugbounty_7f3c92.aleo {
             };
             let metadata: ClaimV3DisputeMetadata = Mapping::get_or_use(
                 claim_v3_dispute_metadata,
-                claim_hash,
+                dispute_id,
                 empty_dispute_metadata,
             );
             let has_tally: bool = Mapping::contains(
                 claim_v3_arbitration_tallies,
-                claim_hash,
+                dispute_id,
             );
             let empty_tally: ClaimV3ArbitrationTally = ClaimV3ArbitrationTally {
                 claim_hash: claim_hash,
@@ -2237,7 +2288,7 @@ program zkbugbounty_7f3c92.aleo {
             };
             let tally: ClaimV3ArbitrationTally = Mapping::get_or_use(
                 claim_v3_arbitration_tallies,
-                claim_hash,
+                dispute_id,
                 empty_tally,
             );
             let unresolved_claims: u64 = Mapping::get(
@@ -2282,7 +2333,7 @@ program zkbugbounty_7f3c92.aleo {
             let valid_unappealed_rejection: bool =
                 action == 5u8 &&
                 (current.status == 8u8 || current.status == 13u8) &&
-                !Mapping::contains(claim_v3_dispute_bonds, claim_hash) &&
+                !(has_dispute_metadata && metadata.status == 1u8) &&
                 std::ctx::block_height() >
                 current.updated_height + config.decision_window_blocks;
             assert(
@@ -2427,9 +2478,9 @@ program zkbugbounty_7f3c92.aleo {
     }
 
     // Typed dispute opening is authorized by the matching adverse project decision.
-    // V3 dispute types: 1 rejection, 2 duplicate, 3 scope, 4 severity,
-    // 5 reproduction, 6 remediation. The type is public routing metadata;
-    // the detailed evidence stays in dispute_commitment.
+    // Type 7 is a bounded SLA escalation: it can be opened only after the
+    // responsible actor's review window expires. Detailed evidence remains a
+    // commitment, never report plaintext.
     fn dispute_claim_v3(
         public bounty_id: field,
         public claim_hash: field,
@@ -2451,7 +2502,8 @@ program zkbugbounty_7f3c92.aleo {
                 dispute_type == 3u8 ||
                 dispute_type == 4u8 ||
                 dispute_type == 5u8 ||
-                dispute_type == 6u8
+                dispute_type == 6u8 ||
+                dispute_type == 7u8
             );
             assert(dispute_commitment != 0field);
             assert(fee_amount > 0u64);
@@ -2460,26 +2512,34 @@ program zkbugbounty_7f3c92.aleo {
             assert(Mapping::contains(bounty_protocol_versions, bounty_id));
             assert(Mapping::contains(claim_receipts, claim_hash));
             assert(Mapping::contains(claim_v3_states, claim_hash));
-            assert(Mapping::contains(claim_v3_project_decisions, claim_hash));
-            assert(!Mapping::contains(claim_v3_arbitration_tallies, claim_hash));
-            assert(!Mapping::contains(claim_v3_dispute_bonds, claim_hash));
-            assert(!Mapping::contains(claim_v3_dispute_metadata, claim_hash));
             let bounty: BountyState = Mapping::get(bounties, bounty_id);
             let config: BountyV3Config = Mapping::get(bounty_v3_configs, bounty_id);
             let protocol_version: u8 = Mapping::get(bounty_protocol_versions, bounty_id);
             let receipt: ClaimReceiptState = Mapping::get(claim_receipts, claim_hash);
             let current: ClaimV3State = Mapping::get(claim_v3_states, claim_hash);
-            let decision: ClaimV3ProjectDecision = Mapping::get(
+            let empty_decision: ClaimV3ProjectDecision = ClaimV3ProjectDecision {
+                claim_hash: claim_hash,
+                bounty_id: bounty_id,
+                decision: 0u8,
+                project_severity: 0u8,
+                decision_commitment: 0field,
+                decided_height: 0u32,
+            };
+            let decision: ClaimV3ProjectDecision = Mapping::get_or_use(
                 claim_v3_project_decisions,
                 claim_hash,
+                empty_decision,
             );
             assert_eq(protocol_version, 3u8);
             assert_eq(receipt.bounty_id, bounty_id);
             assert_eq(receipt.protocol_version, 3u8);
             assert_eq(current.bounty_id, bounty_id);
-            assert_eq(decision.claim_hash, claim_hash);
-            assert_eq(decision.bounty_id, bounty_id);
             assert_eq(fee_amount, config.arbitration_fee_microcredits);
+            if dispute_type != 7u8 {
+                assert(Mapping::contains(claim_v3_project_decisions, claim_hash));
+                assert_eq(decision.claim_hash, claim_hash);
+                assert_eq(decision.bounty_id, bounty_id);
+            }
 
             let rejection_dispute: bool =
                 dispute_type == 1u8 &&
@@ -2516,6 +2576,24 @@ program zkbugbounty_7f3c92.aleo {
                 decision.decision == 7u8 &&
                 std::ctx::block_height() >
                 current.updated_height + config.review_window_blocks;
+            let owner_sla_timeout: bool =
+                dispute_type == 7u8 &&
+                signer == current.whitehat_address &&
+                (current.status == 1u8 ||
+                 current.status == 2u8 ||
+                 current.status == 3u8 ||
+                 current.status == 5u8 ||
+                 current.status == 6u8 ||
+                 current.status == 7u8 ||
+                 current.status == 10u8) &&
+                std::ctx::block_height() >
+                current.updated_height + config.review_window_blocks;
+            let whitehat_sla_timeout: bool =
+                dispute_type == 7u8 &&
+                signer == bounty.owner_address &&
+                current.status == 4u8 &&
+                std::ctx::block_height() >
+                current.updated_height + config.review_window_blocks;
             let valid_requested_severity: bool =
                 dispute_type == 4u8
                     ? requested_severity >= 1u8 &&
@@ -2528,8 +2606,25 @@ program zkbugbounty_7f3c92.aleo {
                 scope_dispute ||
                 severity_dispute ||
                 reproduction_dispute ||
-                remediation_dispute
+                remediation_dispute ||
+                owner_sla_timeout ||
+                whitehat_sla_timeout
             );
+
+            let next_round: u32 = Mapping::get_or_use(
+                claim_v3_dispute_rounds,
+                claim_hash,
+                1u32,
+            );
+            assert(next_round < 4294967295u32);
+            let dispute_id: field = derive_v3_dispute_id(
+                bounty_id,
+                claim_hash,
+                next_round,
+            );
+            assert(!Mapping::contains(claim_v3_arbitration_tallies, dispute_id));
+            assert(!Mapping::contains(claim_v3_dispute_bonds, dispute_id));
+            assert(!Mapping::contains(claim_v3_dispute_metadata, dispute_id));
 
             let operation_marker: field = derive_operation_marker(
                 327field,
@@ -2582,9 +2677,11 @@ program zkbugbounty_7f3c92.aleo {
                 final_severity: 0u8,
             };
             Mapping::set(claim_v3_states, claim_hash, disputed);
-            Mapping::set(claim_v3_arbitration_tallies, claim_hash, tally);
-            Mapping::set(claim_v3_dispute_bonds, claim_hash, bond);
-            Mapping::set(claim_v3_dispute_metadata, claim_hash, metadata);
+            Mapping::set(claim_v3_arbitration_tallies, dispute_id, tally);
+            Mapping::set(claim_v3_dispute_bonds, dispute_id, bond);
+            Mapping::set(claim_v3_dispute_metadata, dispute_id, metadata);
+            Mapping::set(claim_v3_dispute_rounds, claim_hash, next_round + 1u32);
+            Mapping::set(claim_v3_active_disputes, claim_hash, dispute_id);
             Mapping::set(v3_operation_markers, operation_marker, true);
             transfer.run();
         };
@@ -2604,19 +2701,27 @@ program zkbugbounty_7f3c92.aleo {
             assert(Mapping::contains(bounty_protocol_versions, bounty_id));
             assert(Mapping::contains(claim_receipts, claim_hash));
             assert(Mapping::contains(claim_v3_states, claim_hash));
-            assert(Mapping::contains(claim_v3_arbitration_tallies, claim_hash));
-            assert(Mapping::contains(claim_v3_dispute_metadata, claim_hash));
             let config: BountyV3Config = Mapping::get(bounty_v3_configs, bounty_id);
             let protocol_version: u8 = Mapping::get(bounty_protocol_versions, bounty_id);
             let receipt: ClaimReceiptState = Mapping::get(claim_receipts, claim_hash);
             let current: ClaimV3State = Mapping::get(claim_v3_states, claim_hash);
+            // Edition 2 disputes used `claim_hash` as the record key. Retain
+            // that fallback for in-flight historical disputes while all new
+            // rounds use the active round key.
+            let dispute_id: field = Mapping::get_or_use(
+                claim_v3_active_disputes,
+                claim_hash,
+                claim_hash,
+            );
+            assert(Mapping::contains(claim_v3_arbitration_tallies, dispute_id));
+            assert(Mapping::contains(claim_v3_dispute_metadata, dispute_id));
             let tally: ClaimV3ArbitrationTally = Mapping::get(
                 claim_v3_arbitration_tallies,
-                claim_hash,
+                dispute_id,
             );
             let metadata: ClaimV3DisputeMetadata = Mapping::get(
                 claim_v3_dispute_metadata,
-                claim_hash,
+                dispute_id,
             );
             assert_eq(protocol_version, 3u8);
             assert_eq(receipt.bounty_id, bounty_id);
@@ -2631,7 +2736,8 @@ program zkbugbounty_7f3c92.aleo {
                 metadata.dispute_type == 3u8 ||
                 metadata.dispute_type == 4u8 ||
                 metadata.dispute_type == 5u8 ||
-                metadata.dispute_type == 6u8
+                metadata.dispute_type == 6u8 ||
+                metadata.dispute_type == 7u8
             );
             assert_eq(current.status, 11u8);
             assert(current.pre_dispute_status > 0u8);
@@ -2641,7 +2747,8 @@ program zkbugbounty_7f3c92.aleo {
                 metadata.dispute_type == 2u8 ||
                 metadata.dispute_type == 3u8 ||
                 metadata.dispute_type == 5u8 ||
-                metadata.dispute_type == 6u8;
+                metadata.dispute_type == 6u8 ||
+                metadata.dispute_type == 7u8;
             let severity_ruling: bool =
                 metadata.dispute_type == 4u8 &&
                 verdict <= receipt.severity;
@@ -2653,7 +2760,7 @@ program zkbugbounty_7f3c92.aleo {
                 std::ctx::block_height() <=
                 current.updated_height + config.decision_window_blocks
             );
-            let vote_key: field = derive_v3_vote_key(bounty_id, claim_hash, signer);
+            let vote_key: field = derive_v3_vote_key(bounty_id, dispute_id, signer);
             assert(!Mapping::contains(claim_v3_arbitration_votes, vote_key));
             let operation_marker: field = derive_operation_marker(
                 328field,
@@ -2691,7 +2798,7 @@ program zkbugbounty_7f3c92.aleo {
                 updated_height: std::ctx::block_height(),
             };
             Mapping::set(claim_v3_arbitration_votes, vote_key, vote);
-            Mapping::set(claim_v3_arbitration_tallies, claim_hash, updated_tally);
+            Mapping::set(claim_v3_arbitration_tallies, dispute_id, updated_tally);
             Mapping::set(v3_operation_markers, operation_marker, true);
         };
     }
@@ -2732,9 +2839,14 @@ program zkbugbounty_7f3c92.aleo {
             let payout: ClaimV3PayoutState = Mapping::get(claim_v3_payouts, claim_hash);
             let escrow: BountyEscrowState = Mapping::get(bounty_escrows, bounty_id);
             let unresolved_claims: u64 = Mapping::get(bounty_claim_counts, bounty_id);
+            let dispute_id: field = Mapping::get_or_use(
+                claim_v3_active_disputes,
+                claim_hash,
+                claim_hash,
+            );
             let has_metadata: bool = Mapping::contains(
                 claim_v3_dispute_metadata,
-                claim_hash,
+                dispute_id,
             );
             let empty_metadata: ClaimV3DisputeMetadata = ClaimV3DisputeMetadata {
                 claim_hash: claim_hash,
@@ -2749,7 +2861,7 @@ program zkbugbounty_7f3c92.aleo {
             };
             let metadata: ClaimV3DisputeMetadata = Mapping::get_or_use(
                 claim_v3_dispute_metadata,
-                claim_hash,
+                dispute_id,
                 empty_metadata,
             );
             assert_eq(protocol_version, 3u8);
@@ -2774,7 +2886,8 @@ program zkbugbounty_7f3c92.aleo {
                     metadata.dispute_type == 3u8 ||
                     metadata.dispute_type == 4u8 ||
                     metadata.dispute_type == 5u8 ||
-                    metadata.dispute_type == 6u8
+                    metadata.dispute_type == 6u8 ||
+                    metadata.dispute_type == 7u8
                 );
             }
             let valid_payment_state: bool =
@@ -2786,7 +2899,7 @@ program zkbugbounty_7f3c92.aleo {
                  current.status == 10u8);
             let has_tally: bool = Mapping::contains(
                 claim_v3_arbitration_tallies,
-                claim_hash,
+                dispute_id,
             );
             let empty_tally: ClaimV3ArbitrationTally = ClaimV3ArbitrationTally {
                 claim_hash: claim_hash,
@@ -2799,12 +2912,12 @@ program zkbugbounty_7f3c92.aleo {
             };
             let tally: ClaimV3ArbitrationTally = Mapping::get_or_use(
                 claim_v3_arbitration_tallies,
-                claim_hash,
+                dispute_id,
                 empty_tally,
             );
             let has_bond: bool = Mapping::contains(
                 claim_v3_dispute_bonds,
-                claim_hash,
+                dispute_id,
             );
             let empty_bond: ClaimV3DisputeBond = ClaimV3DisputeBond {
                 claim_hash: claim_hash,
@@ -2816,7 +2929,7 @@ program zkbugbounty_7f3c92.aleo {
             };
             let bond: ClaimV3DisputeBond = Mapping::get_or_use(
                 claim_v3_dispute_bonds,
-                claim_hash,
+                dispute_id,
                 empty_bond,
             );
             let quorum_award: bool =
@@ -2828,10 +2941,16 @@ program zkbugbounty_7f3c92.aleo {
                 std::ctx::block_height() >
                 current.updated_height + config.decision_window_blocks;
             let timeout_favors_whitehat: bool =
-                current.pre_dispute_status == 5u8 ||
-                current.pre_dispute_status == 6u8 ||
-                current.pre_dispute_status == 7u8 ||
-                current.pre_dispute_status == 8u8;
+                (metadata.dispute_type == 5u8 &&
+                 (current.pre_dispute_status == 5u8 ||
+                  current.pre_dispute_status == 6u8 ||
+                  current.pre_dispute_status == 7u8 ||
+                  current.pre_dispute_status == 8u8)) ||
+                (metadata.dispute_type == 7u8 &&
+                 (current.pre_dispute_status == 5u8 ||
+                  current.pre_dispute_status == 6u8 ||
+                  current.pre_dispute_status == 7u8 ||
+                  current.pre_dispute_status == 10u8));
             let timeout_award: bool =
                 verdict == receipt.severity &&
                 decision_expired &&
@@ -2845,6 +2964,14 @@ program zkbugbounty_7f3c92.aleo {
                 metadata.dispute_type == 5u8 &&
                 metadata.status == 1u8 &&
                 reproduction_payment_ready &&
+                has_bond &&
+                bond.status == 1u8 &&
+                (quorum_award || timeout_award);
+            let sla_timeout_award: bool =
+                has_metadata &&
+                metadata.dispute_type == 7u8 &&
+                metadata.status == 1u8 &&
+                current.status == 11u8 &&
                 has_bond &&
                 bond.status == 1u8 &&
                 (quorum_award || timeout_award);
@@ -2867,23 +2994,17 @@ program zkbugbounty_7f3c92.aleo {
                 !has_metadata;
             assert(
                 reproduction_award ||
+                sla_timeout_award ||
                 post_arbitration_award ||
                 uncontested_award
             );
 
-            let selected_severity: u8 = verdict == 0u8
-                ? receipt.severity
-                : verdict;
-            let expected_reward: u64 = reward_for_v3_severity(
-                bounty,
-                selected_severity,
-            );
-            assert_eq(reward_amount, expected_reward);
-            assert(payout.reserved_amount >= reward_amount);
-            if post_arbitration_award {
-                assert_eq(payout.reserved_amount, reward_amount);
-            }
-            let expected_bond_amount: u64 = reproduction_award ? bond.amount : 0u64;
+            // The lock is the only economic ceiling after a project severity
+            // assessment. Post-lock rulings decide eligibility, never inflate
+            // the already reserved amount.
+            assert_eq(reward_amount, payout.reserved_amount);
+            let expected_bond_amount: u64 =
+                (reproduction_award || sla_timeout_award) ? bond.amount : 0u64;
             assert_eq(bond_amount, expected_bond_amount);
             let operation_marker: field = derive_operation_marker(
                 329field,
@@ -2896,12 +3017,10 @@ program zkbugbounty_7f3c92.aleo {
             );
             assert(!Mapping::contains(v3_operation_markers, operation_marker));
 
-            let released_difference: u64 =
-                payout.reserved_amount - reward_amount;
             let updated_escrow: BountyEscrowState = BountyEscrowState {
                 owner_address: escrow.owner_address,
                 total_funded: escrow.total_funded,
-                available_balance: escrow.available_balance + released_difference,
+                available_balance: escrow.available_balance,
                 locked_amount: escrow.locked_amount - payout.reserved_amount,
                 paid_amount: escrow.paid_amount + reward_amount,
                 refunded_amount: escrow.refunded_amount,
@@ -2938,7 +3057,7 @@ program zkbugbounty_7f3c92.aleo {
                 bounty_id,
                 unresolved_claims - 1u64,
             );
-            if reproduction_award {
+            if reproduction_award || sla_timeout_award {
                 let settled_bond: ClaimV3DisputeBond = ClaimV3DisputeBond {
                     claim_hash: bond.claim_hash,
                     bounty_id: bond.bounty_id,
@@ -2958,10 +3077,10 @@ program zkbugbounty_7f3c92.aleo {
                     requested_severity: metadata.requested_severity,
                     final_severity: verdict,
                 };
-                Mapping::set(claim_v3_dispute_bonds, claim_hash, settled_bond);
+                Mapping::set(claim_v3_dispute_bonds, dispute_id, settled_bond);
                 Mapping::set(
                     claim_v3_dispute_metadata,
-                    claim_hash,
+                    dispute_id,
                     accepted_metadata,
                 );
             }
@@ -2993,9 +3112,6 @@ program zkbugbounty_7f3c92.aleo {
             assert(Mapping::contains(bounty_protocol_versions, bounty_id));
             assert(Mapping::contains(claim_receipts, claim_hash));
             assert(Mapping::contains(claim_v3_states, claim_hash));
-            assert(Mapping::contains(claim_v3_arbitration_tallies, claim_hash));
-            assert(Mapping::contains(claim_v3_dispute_bonds, claim_hash));
-            assert(Mapping::contains(claim_v3_dispute_metadata, claim_hash));
             assert(Mapping::contains(bounty_escrows, bounty_id));
             assert(!Mapping::contains(claim_v3_payouts, claim_hash));
             let bounty: BountyState = Mapping::get(bounties, bounty_id);
@@ -3003,17 +3119,25 @@ program zkbugbounty_7f3c92.aleo {
             let protocol_version: u8 = Mapping::get(bounty_protocol_versions, bounty_id);
             let receipt: ClaimReceiptState = Mapping::get(claim_receipts, claim_hash);
             let current: ClaimV3State = Mapping::get(claim_v3_states, claim_hash);
+            let dispute_id: field = Mapping::get_or_use(
+                claim_v3_active_disputes,
+                claim_hash,
+                claim_hash,
+            );
+            assert(Mapping::contains(claim_v3_arbitration_tallies, dispute_id));
+            assert(Mapping::contains(claim_v3_dispute_bonds, dispute_id));
+            assert(Mapping::contains(claim_v3_dispute_metadata, dispute_id));
             let tally: ClaimV3ArbitrationTally = Mapping::get(
                 claim_v3_arbitration_tallies,
-                claim_hash,
+                dispute_id,
             );
             let bond: ClaimV3DisputeBond = Mapping::get(
                 claim_v3_dispute_bonds,
-                claim_hash,
+                dispute_id,
             );
             let metadata: ClaimV3DisputeMetadata = Mapping::get(
                 claim_v3_dispute_metadata,
-                claim_hash,
+                dispute_id,
             );
             let escrow: BountyEscrowState = Mapping::get(
                 bounty_escrows,
@@ -3039,13 +3163,15 @@ program zkbugbounty_7f3c92.aleo {
                 metadata.dispute_type == 3u8 ||
                 metadata.dispute_type == 4u8 ||
                 metadata.dispute_type == 5u8 ||
-                metadata.dispute_type == 6u8
+                metadata.dispute_type == 6u8 ||
+                metadata.dispute_type == 7u8
             );
             let valid_prelock_type: bool =
                 metadata.dispute_type == 1u8 ||
                 metadata.dispute_type == 2u8 ||
                 metadata.dispute_type == 3u8 ||
-                metadata.dispute_type == 4u8;
+                metadata.dispute_type == 4u8 ||
+                metadata.dispute_type == 7u8;
             assert(valid_prelock_type);
             let valid_prelock_verdict: bool =
                 metadata.dispute_type == 4u8
@@ -3140,8 +3266,8 @@ program zkbugbounty_7f3c92.aleo {
             Mapping::set(bounty_escrows, bounty_id, updated_escrow);
             Mapping::set(claim_v3_payouts, claim_hash, payout);
             Mapping::set(claim_v3_states, claim_hash, locked_state);
-            Mapping::set(claim_v3_dispute_bonds, claim_hash, settled_bond);
-            Mapping::set(claim_v3_dispute_metadata, claim_hash, accepted_metadata);
+            Mapping::set(claim_v3_dispute_bonds, dispute_id, settled_bond);
+            Mapping::set(claim_v3_dispute_metadata, dispute_id, accepted_metadata);
             Mapping::set(v3_operation_markers, operation_marker, true);
             transfer.run();
         };
@@ -3170,18 +3296,23 @@ program zkbugbounty_7f3c92.aleo {
             assert(Mapping::contains(bounty_protocol_versions, bounty_id));
             assert(Mapping::contains(claim_receipts, claim_hash));
             assert(Mapping::contains(claim_v3_states, claim_hash));
-            assert(Mapping::contains(claim_v3_arbitration_tallies, claim_hash));
-            assert(Mapping::contains(claim_v3_dispute_bonds, claim_hash));
-            assert(Mapping::contains(claim_v3_dispute_metadata, claim_hash));
             assert(Mapping::contains(bounty_claim_counts, bounty_id));
             let bounty: BountyState = Mapping::get(bounties, bounty_id);
             let config: BountyV3Config = Mapping::get(bounty_v3_configs, bounty_id);
             let protocol_version: u8 = Mapping::get(bounty_protocol_versions, bounty_id);
             let receipt: ClaimReceiptState = Mapping::get(claim_receipts, claim_hash);
             let current: ClaimV3State = Mapping::get(claim_v3_states, claim_hash);
+            let dispute_id: field = Mapping::get_or_use(
+                claim_v3_active_disputes,
+                claim_hash,
+                claim_hash,
+            );
+            assert(Mapping::contains(claim_v3_arbitration_tallies, dispute_id));
+            assert(Mapping::contains(claim_v3_dispute_bonds, dispute_id));
+            assert(Mapping::contains(claim_v3_dispute_metadata, dispute_id));
             let metadata: ClaimV3DisputeMetadata = Mapping::get(
                 claim_v3_dispute_metadata,
-                claim_hash,
+                dispute_id,
             );
             let unresolved_claims: u64 = Mapping::get(
                 bounty_claim_counts,
@@ -3189,11 +3320,11 @@ program zkbugbounty_7f3c92.aleo {
             );
             let tally: ClaimV3ArbitrationTally = Mapping::get(
                 claim_v3_arbitration_tallies,
-                claim_hash,
+                dispute_id,
             );
             let bond: ClaimV3DisputeBond = Mapping::get(
                 claim_v3_dispute_bonds,
-                claim_hash,
+                dispute_id,
             );
             assert_eq(protocol_version, 3u8);
             assert_eq(receipt.bounty_id, bounty_id);
@@ -3209,7 +3340,8 @@ program zkbugbounty_7f3c92.aleo {
                 metadata.dispute_type == 3u8 ||
                 metadata.dispute_type == 4u8 ||
                 metadata.dispute_type == 5u8 ||
-                metadata.dispute_type == 6u8
+                metadata.dispute_type == 6u8 ||
+                metadata.dispute_type == 7u8
             );
             assert_eq(bond.bounty_id, bounty_id);
             assert_eq(bond.claim_hash, claim_hash);
@@ -3218,10 +3350,16 @@ program zkbugbounty_7f3c92.aleo {
             assert(unresolved_claims > 0u64);
 
             let remediation_dispute: bool = metadata.dispute_type == 6u8;
+            let whitehat_sla_timeout: bool =
+                metadata.dispute_type == 7u8 &&
+                current.pre_dispute_status == 4u8 &&
+                std::ctx::block_height() >
+                current.updated_height + config.decision_window_blocks;
             let standard_rejection: bool =
                 !remediation_dispute &&
                 verdict == 0u8 &&
-                v3_verdict_has_quorum(tally, 0u8, config.quorum);
+                (v3_verdict_has_quorum(tally, 0u8, config.quorum) ||
+                 whitehat_sla_timeout);
             let remediation_ruling: bool =
                 remediation_dispute &&
                 (verdict == 0u8 || verdict == receipt.severity) &&
@@ -3277,7 +3415,7 @@ program zkbugbounty_7f3c92.aleo {
                 Mapping::set(claim_v3_states, claim_hash, remediated_state);
                 Mapping::set(
                     claim_v3_dispute_metadata,
-                    claim_hash,
+                    dispute_id,
                     resolved_metadata,
                 );
             }
@@ -3368,11 +3506,11 @@ program zkbugbounty_7f3c92.aleo {
                 );
                 Mapping::set(
                     claim_v3_dispute_metadata,
-                    claim_hash,
+                    dispute_id,
                     rejected_metadata,
                 );
             }
-            Mapping::set(claim_v3_dispute_bonds, claim_hash, settled_bond);
+            Mapping::set(claim_v3_dispute_bonds, dispute_id, settled_bond);
             Mapping::set(v3_operation_markers, operation_marker, true);
             transfer.run();
         };

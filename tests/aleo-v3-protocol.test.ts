@@ -41,7 +41,7 @@ test("V3 Bounty config fixes one immutable panel and never rewrites it", () => {
   assert.doesNotMatch(source, /Mapping::remove\(bounty_v3_configs/);
 });
 
-test("V3 persists all six typed disputes against explicit adverse project decisions", () => {
+test("V3 persists typed disputes plus bounded SLA escalation in independent rounds", () => {
   const review = entry("review_claim_v3");
   const resolution = entry("resolution_action_v3");
   const dispute = entry("dispute_claim_v3");
@@ -63,13 +63,19 @@ test("V3 persists all six typed disputes against explicit adverse project decisi
   assert.match(dispute, /dispute_type == 4u8/);
   assert.match(dispute, /dispute_type == 5u8/);
   assert.match(dispute, /dispute_type == 6u8/);
+  assert.match(dispute, /dispute_type == 7u8/);
   assert.match(dispute, /decision\.decision == 2u8/);
   assert.match(dispute, /decision\.decision == 3u8/);
   assert.match(dispute, /decision\.decision == 4u8/);
   assert.match(dispute, /decision\.decision == 5u8/);
   assert.match(dispute, /decision\.decision == 6u8/);
   assert.match(dispute, /decision\.decision == 7u8/);
-  assert.match(dispute, /Mapping::set\(claim_v3_dispute_metadata, claim_hash, metadata\)/);
+  assert.match(source, /mapping claim_v3_dispute_rounds/);
+  assert.match(source, /mapping claim_v3_active_disputes/);
+  assert.match(dispute, /derive_v3_dispute_id/);
+  assert.match(dispute, /Mapping::set\(claim_v3_dispute_metadata, dispute_id, metadata\)/);
+  assert.match(dispute, /owner_sla_timeout/);
+  assert.match(dispute, /whitehat_sla_timeout/);
 });
 
 test("V3 constrains rulings and settlement routes by dispute type", () => {
@@ -79,21 +85,44 @@ test("V3 constrains rulings and settlement routes by dispute type", () => {
   const reject = entry("finalize_rejection_v3");
 
   assert.match(vote, /is_v3_panel_member\(config, signer\)/);
-  assert.match(vote, /derive_v3_vote_key\(bounty_id, claim_hash, signer\)/);
+  assert.match(vote, /derive_v3_vote_key\(bounty_id, dispute_id, signer\)/);
   assert.match(vote, /binary_ruling/);
   assert.match(vote, /severity_ruling/);
   assert.match(vote, /!Mapping::contains\(claim_v3_arbitration_votes, vote_key\)/);
 
   assert.match(prelock, /valid_prelock_type/);
   assert.match(prelock, /metadata\.dispute_type == 4u8/);
-  assert.match(prelock, /Mapping::set\(claim_v3_dispute_metadata, claim_hash, accepted_metadata\)/);
+  assert.match(prelock, /Mapping::set\(claim_v3_dispute_metadata, dispute_id, accepted_metadata\)/);
 
   assert.match(settle, /metadata\.dispute_type == 5u8/);
+  assert.match(settle, /metadata\.dispute_type == 7u8/);
   assert.match(settle, /reproduction_award/);
+  assert.match(settle, /sla_timeout_award/);
   assert.match(settle, /post_arbitration_award/);
   assert.match(reject, /remediation_dispute/);
   assert.match(reject, /remediation_ruling/);
   assert.match(reject, /next_status: u8 = remediation_accepted \? 10u8 : 7u8/);
+});
+
+test("V3 locks a reviewed severity and binds encrypted delivery to the initial report commitment", () => {
+  const lock = entry("lock_reward_v3");
+  const delivery = entry("disclosure_action_v3");
+  const settle = entry("settle_reward_v3");
+  assert.match(lock, /decision\.project_severity/);
+  assert.match(lock, /let lock_severity: u8/);
+  assert.match(delivery, /action_commitment == evidence\.report_commitment/);
+  assert.match(settle, /assert_eq\(reward_amount, payout\.reserved_amount\)/);
+});
+
+test("V3 browser entry points require verified Program source evidence", () => {
+  for (const path of [
+    "components/aleo-create-bounty-v3-form.tsx",
+    "components/aleo-submit-claim-v3-panel.tsx",
+    "components/protocol-v3-workbench.tsx",
+    "components/aleo-wallet-provider.tsx",
+  ]) {
+    assert.match(readFileSync(path, "utf8"), /programHashVerified/);
+  }
 });
 
 test("V3 writes state and replay guards before every Credits Final", () => {

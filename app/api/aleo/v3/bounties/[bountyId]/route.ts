@@ -35,7 +35,7 @@ function unavailable(capability: ProtocolV3Capability) {
         ? 500
         : 409,
     body: {
-      error: "Protocol V3 public state is unavailable until Edition 2 and its public upgrade evidence are verified",
+      error: "Protocol V3 public state is unavailable until the Edition 3 hardening upgrade and its public evidence are verified",
       capability: capability.status,
     },
   };

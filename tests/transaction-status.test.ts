@@ -14,7 +14,10 @@ test("wallet transaction states keep disconnected, wrong network, and signature 
   assert.equal(transactionFeedback("wrong_network").code, "WRONG_NETWORK");
   assert.equal(classifyWalletTransactionFailure(new Error("user rejected request")).state, "signature_rejected");
   assert.equal(classifyWalletTransactionFailure(new Error("testnet chain mismatch")).state, "wrong_network");
-  assert.equal(classifyWalletTransactionFailure(new Error("rpc 500")).state, "failed");
+  const unknown = classifyWalletTransactionFailure(new Error("rpc 500"));
+  assert.equal(unknown.state, "failed");
+  assert.equal(unknown.code, "WALLET_REQUEST_FAILED");
+  assert.match(unknown.advice, /Public Credits/);
 });
 
 test("transaction lookup does not turn indexing 404 or endpoint errors into rejected", () => {

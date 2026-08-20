@@ -125,7 +125,8 @@ export function AleoSubmitClaimV3Panel() {
 
   const enabled = capability.status === "Available" &&
     capability.walletRequestEnabled &&
-    capability.upgradeEvidenceVerified;
+    capability.upgradeEvidenceVerified &&
+    capability.programHashVerified;
 
   async function lookupBounty() {
     const normalized = bountyId.trim();
@@ -239,8 +240,8 @@ export function AleoSubmitClaimV3Panel() {
         <p className="mt-4 flex items-start gap-2 rounded-md border border-amber-300/20 bg-amber-300/[0.05] p-3 text-sm leading-6 text-amber-100/75">
           <CircleAlert className="mt-1 shrink-0" size={16} aria-hidden="true" />
           {text(
-            "当前测试网尚未通过 Edition 2 与升级证据核验，V3 Claim 钱包按钮保持关闭。",
-            "Testnet has not passed Edition 2 and upgrade-evidence verification. The V3 Claim wallet button remains disabled.",
+            "当前测试网尚未同时通过 Edition 3、升级证据与完整 Program 哈希核验，V3 Claim 钱包按钮保持关闭。",
+            "Testnet has not passed Edition 3, upgrade-evidence, and complete Program-hash verification. The V3 Claim wallet button remains disabled.",
           )}
         </p>
       ) : null}

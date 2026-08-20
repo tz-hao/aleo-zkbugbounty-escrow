@@ -6,7 +6,7 @@ V3 将“白帽证明、公开收据、托管资金”升级为可审计的责�
 
 ## 当前状态
 
-V3 Leo 源码已完成编译并通过 V1/V2 ABI 兼容检查；Testnet 已升级并公开验证为 Program Edition 2。前端仍会逐次读取 Edition、V3 ABI 与已记录的升级交易证据；其中任一校验失败即禁用 V3 钱包操作，Vercel 前端部署不会替代合约升级。
+Testnet 的 Edition 2 是历史 V3 部署证据，不再被本前端视为可写入的安全版本。当前源码已完成 Edition 3 加固：通用 SLA、可重复开启的争议轮次、项目方等级锁款、披露包承诺一致性与完整 Program SHA-256 校验均进入合约或能力门。管理员完成 Edition 3 升级、录入升级交易/费用交易/Program SHA-256 前，前端会失败关闭所有 V3 钱包动作；Vercel 前端部署不会替代合约升级。
 
 ## 不可改变的隐私边界
 
@@ -70,7 +70,7 @@ Disputed
 | --- | --- |
 | 项目方 | 开始审核、受理或提出可申诉拒绝、单独锁款、签名确认收到密文、记录复现结论、提交修复承诺。 |
 | 白帽 | 提交证明、交付密文、确认修复、对拒绝或项目方超时发起争议。 |
-| 仲裁面板成员 | 只在 `Disputed` 时投票；每个成员对同一 Claim 只能投一次。 |
+| 仲裁面板成员 | 只在 `Disputed` 时投票；每个成员对同一争议轮次只能投一次。 |
 | 任何人 | 在已满足付款条件、仲裁门槛或 SLA 默认规则后触发锁款、付款或驳回结算。 |
 
 仲裁结论只允许 `Reject`、维持建议等级或下调到赏金既有档位；不允许任意金额，也不允许高于电路输出的等级。
@@ -109,6 +109,10 @@ claim_v3_arbitration_votes
 v3_operation_markers
 claim_v3_acknowledgements
 claim_v3_dispute_bonds
+claim_v3_project_decisions
+claim_v3_dispute_metadata
+claim_v3_dispute_rounds
+claim_v3_active_disputes
 ```
 
 V2 入口和历史映射保持只读兼容；不能把 V2 Claim 伪装为 V3 Claim。前端必须根据已部署 Program Edition 与 ABI 启用 V3 钱包操作，不可回退到浏览器状态。
@@ -121,9 +125,9 @@ V3 Claim 已绑定 Bounty 的目标系统承诺和目标代码哈希，并额外
 
 1. 在本地 Devnode 完成 V3 的所有正常与恶意路径测试。
 2. 审核 Leo ABI 和 Credits 结算边界。
-3. 由 Program Admin 使用 Testnet 钱包签名 Program Edition 2 升级并支付手续费（已完成）。
-4. 记录并独立验证升级交易 ID、Edition 和 ABI 指纹（已完成）。
-5. 只有当前公开状态同时满足 Edition 2、V3 ABI 和升级证据时，前端才启用真实 V3 钱包操作（已接通）。
+3. 由 Program Admin 使用 Testnet 钱包签名 Program Edition 3 加固升级并支付手续费。
+4. 记录并独立验证升级交易 ID、Edition、费用交易和完整 Program SHA-256。
+5. 只有当前公开状态同时满足 Edition 3、13 个 V3 函数、13 个 V3 Mapping、升级证据和 Program 哈希时，前端才启用真实 V3 钱包操作。
 6. 部署 Vercel Preview 并完成钱包人工验收后，才可提升到 Production。
 
 仅部署 Vercel 不会更新 Aleo Program；前端必须继续以链上探测结果为准，不可回退到浏览器状态。
@@ -140,6 +144,6 @@ claim_v3_project_decisions
 claim_v3_dispute_metadata
 ```
 
-因此 V3 的公开映射总数为 11。项目方的 adverse decision、公开 dispute type、开立人、状态、请求等级与最终等级均成为可验证链上状态；`dispute_commitment` 保留为私有证据的承诺，不公开报告内容。
+因此 Edition 3 的 V3 专用公开映射总数为 13。项目方的 adverse decision、公开 dispute type、开立人、状态、请求等级与最终等级均成为可验证链上状态；每个 Claim 的 active dispute ID 与下一个轮次也可验证。`dispute_commitment` 保留为私有证据的承诺，不公开报告内容。
 
 对于 `payment_condition = OnPatchAcceptance`，REPRODUCTION 仲裁的正向结果只恢复到 `ReproductionConfirmed` 并继续修复流程；不会在修复确认前支付奖励。

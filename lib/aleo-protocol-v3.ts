@@ -45,6 +45,8 @@ export const PROTOCOL_V3_MAPPINGS = [
   "claim_v3_dispute_bonds",
   "claim_v3_project_decisions",
   "claim_v3_dispute_metadata",
+  "claim_v3_dispute_rounds",
+  "claim_v3_active_disputes",
 ] as const;
 
 export type ProtocolV3FunctionName = (typeof PROTOCOL_V3_FUNCTIONS)[number];
@@ -72,6 +74,7 @@ export type ProtocolV3Capability = {
   walletRequestEnabled: boolean;
   upgradeEvidenceRecorded: boolean;
   upgradeEvidenceVerified: boolean;
+  programHashVerified: boolean;
   demoFallbackAllowed: false;
   presentFunctions: string[];
   missingFunctions: string[];
@@ -92,6 +95,7 @@ export const PROTOCOL_V3_CAPABILITY: ProtocolV3Capability = {
   walletRequestEnabled: false,
   upgradeEvidenceRecorded: false,
   upgradeEvidenceVerified: false,
+  programHashVerified: false,
   demoFallbackAllowed: false,
   presentFunctions: [],
   missingFunctions: [...PROTOCOL_V3_FUNCTIONS],
@@ -142,6 +146,8 @@ const SOURCE_MAPPING_VALUES: Record<ProtocolV3MappingName, string> = {
   claim_v3_dispute_bonds: "ClaimV3DisputeBond",
   claim_v3_project_decisions: "ClaimV3ProjectDecision",
   claim_v3_dispute_metadata: "ClaimV3DisputeMetadata",
+  claim_v3_dispute_rounds: "u32",
+  claim_v3_active_disputes: "field",
 };
 
 function sourceFunctionMatches(source: string, name: ProtocolV3FunctionName) {
@@ -228,6 +234,19 @@ async function readProgramSource(response: Response) {
   }
 }
 
+async function sha256Hex(value: string) {
+  if (!globalThis.crypto?.subtle) {
+    throw new Error("Web Crypto SHA-256 is unavailable");
+  }
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0")
+  ).join("");
+}
+
 function disabledCapability(
   status: ProtocolV3CapabilityStatus,
   currentEdition: number | null,
@@ -239,7 +258,8 @@ function disabledCapability(
     currentEdition,
     upgradeEvidenceRecorded:
       Boolean(ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId) &&
-      Boolean(ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId),
+      Boolean(ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId) &&
+      Boolean(ALEO_TESTNET_V3_UPGRADE_EVIDENCE.compiledProgramSha256),
     presentFunctions: inspection?.presentFunctions ?? [],
     missingFunctions: inspection?.missingFunctions ?? [...PROTOCOL_V3_FUNCTIONS],
     presentMappings: inspection?.presentMappings ?? [],
@@ -297,8 +317,14 @@ export async function fetchProtocolV3Capability(
 
     const transactionId = ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId;
     const feeTransactionId = ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId;
-    if (!transactionId || !feeTransactionId) {
+    const compiledProgramSha256 =
+      ALEO_TESTNET_V3_UPGRADE_EVIDENCE.compiledProgramSha256;
+    if (!transactionId || !feeTransactionId || !compiledProgramSha256) {
       return disabledCapability("DeploymentEvidencePending", currentEdition, inspection);
+    }
+    const actualProgramSha256 = await sha256Hex(source);
+    if (actualProgramSha256 !== compiledProgramSha256) {
+      return disabledCapability("ConfigurationError", currentEdition, inspection);
     }
 
     const verification = await verifyTestnetEditionOne(
@@ -322,6 +348,7 @@ export async function fetchProtocolV3Capability(
       walletRequestEnabled: true,
       upgradeEvidenceRecorded: true,
       upgradeEvidenceVerified: true,
+      programHashVerified: true,
     };
   } catch {
     return disabledCapability("EndpointUnavailable", null);
@@ -719,6 +746,7 @@ export const PROTOCOL_V3_DISPUTE_TYPES = {
   Severity: 4,
   Reproduction: 5,
   Remediation: 6,
+  SlaTimeout: 7,
 } as const;
 
 export type ProtocolV3DisputeType =
@@ -734,7 +762,7 @@ export function buildDisputeClaimV3Transaction(input: {
   disputeMarker: string;
   feeMicrocredits: number;
 }) {
-  if (!Number.isSafeInteger(input.disputeType) || input.disputeType < 1 || input.disputeType > 6) {
+  if (!Number.isSafeInteger(input.disputeType) || input.disputeType < 1 || input.disputeType > 7) {
     throw new Error("Dispute type is outside the supported range");
   }
   const bountyId = requireField(input.bountyId, "Bounty ID");

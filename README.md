@@ -11,7 +11,7 @@ zkBugBounty 是一个运行在 **Aleo Testnet** 上的隐私优先、责任披�
 | 在线 DApp | [aleo-gilt.vercel.app](https://aleo-gilt.vercel.app) |
 | Aleo Program | [`zkbugbounty_7f3c92.aleo`](https://testnet.explorer.provable.com/program/zkbugbounty_7f3c92.aleo) |
 | 网络 | Aleo Testnet |
-| 已部署版本 | Edition `2` / Protocol V3 |
+| 链上状态 | Edition `2` 为历史 V3；Edition `3` 加固版待管理员部署 |
 | 合约语言 | Leo 4.4 |
 | 前端 | Next.js 16, React 19, TypeScript, Tailwind CSS |
 
@@ -33,7 +33,7 @@ zkBugBounty 将“**证明影响存在**”与“**交付利用细节**”分开
 
 ## Protocol V3：责任披露、仲裁与结算
 
-当前 Testnet Program 为 **Edition 2 / Protocol V3**。V3 把赏金配置、仲裁面板和付款条件固定在 Bounty 创建时，避免项目方在收到 Claim 后更换规则或仲裁员。
+Testnet 上现存的是 **Edition 2 / Protocol V3 历史版本**。本仓库已经将真实 V3 钱包动作失败关闭，直到管理员部署并记录 **Edition 3 加固版**的交易、费用交易和完整 Program SHA-256。这样不会把旧版的状态机缺口暴露给真实资金。
 
 ```text
 Submitted
@@ -157,6 +157,7 @@ npm run leo:build
 ```bash
 npm run verify:testnet-edition-1
 npm run verify:testnet-edition-2
+npm run verify:testnet-edition-3 # 仅在录入 Edition 3 公开证据后可通过
 npm run verify:testnet-mapping -- --mapping bounties --key <bounty_id_field>
 ```
 
@@ -170,7 +171,8 @@ npm run verify:testnet-mapping -- --mapping bounties --key <bounty_id_field>
 
 ## 当前限制与下一步
 
-- V3 合约与 Edition 2 已部署并公开验证；每次真实操作仍依赖 Leo Wallet 的人工签名和链上 Mapping 验证。
+- Edition 2 是可公开验证的历史版本，但不再获准处理真实 V3 钱包操作。Edition 3 部署和公开证据录入完成前，页面会保持失败关闭。
+- Edition 3 修复了通用 SLA 超时、同一 Claim 多轮争议、项目方下调等级后的锁款、披露包承诺一致性和完整 Program 哈希校验；部署步骤见 [Edition 3 加固操作手册](docs/testnet-edition-3-hardening-runbook.zh.md)。
 - Credits 结算、重放保护和失败原子性已经在 Local Devnode 完整 E2E 中验证；需要以全新 Testnet 数据完成持续的人工端到端验收。
 - 加密披露的收件人绑定与链上承诺已实现；生产级交付仍需配套密钥分发、持久化与外部安全审计。
 - 需要正式协议审计，以及超出 DemoVault 的可验证不变量库。

@@ -122,7 +122,8 @@ export function AleoCreateBountyV3Form() {
 
   const enabled = capability.status === "Available" &&
     capability.walletRequestEnabled &&
-    capability.upgradeEvidenceVerified;
+    capability.upgradeEvidenceVerified &&
+    capability.programHashVerified;
 
   async function generateIdentifiers() {
     setMessage(null);
@@ -215,7 +216,7 @@ export function AleoCreateBountyV3Form() {
         <div className="max-w-3xl">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-md border border-violet-300/25 bg-violet-300/10 px-2 py-1 text-xs font-semibold text-violet-100">
-              Protocol V3 · Program Edition 2
+              Protocol V3 · Program Edition 3 required
             </span>
             <span className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-xs text-slate-400">
               {capability.status} · Edition {capability.currentEdition ?? "—"}
@@ -234,7 +235,7 @@ export function AleoCreateBountyV3Form() {
         <span className={enabled ? "text-sm text-emerald-200" : "text-sm text-amber-200"}>
           {enabled
             ? text("钱包操作已启用", "Wallet actions enabled")
-            : text("等待 Edition 2 与公开升级证据", "Waiting for Edition 2 and public upgrade evidence")}
+            : text("等待 Edition 3、公开升级证据与 Program 哈希", "Waiting for Edition 3, public upgrade evidence, and Program hash")}
         </span>
       </div>
 
@@ -362,6 +363,14 @@ export function AleoCreateBountyV3Form() {
             {text("请求创建签名", "Request creation signature")}
           </button>
         </div>
+        {enabled && !preview ? (
+          <p className="text-xs leading-5 text-slate-500">
+            {text(
+              "请先填完 V3 固定策略并点击“生成交易预览”；只有预览中的 9 个公开输入确认无误后，才会向钱包请求签名。",
+              "Complete the immutable V3 policy and build the transaction preview first. The wallet signature is requested only after the nine public inputs have been reviewed.",
+            )}
+          </p>
+        ) : null}
       </form>
 
       {!enabled ? (

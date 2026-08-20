@@ -15,8 +15,8 @@ umask 077
 
 EXPECTED_PROGRAM_ID="zkbugbounty_7f3c92.aleo"
 EXPECTED_ADMIN_ADDRESS="aleo19cavyq6przvp7d5yjtpm60z5nh58rqd0vc3zr8q409fdqdtn7ypq8vfqx6"
-EXPECTED_CURRENT_EDITION="1"
-EXPECTED_TARGET_EDITION="2"
+EXPECTED_CURRENT_EDITION="2"
+EXPECTED_TARGET_EDITION="3"
 NETWORK="testnet"
 ENDPOINT="https://api.explorer.provable.com/v1"
 
@@ -208,8 +208,8 @@ evidence = {
     "recorded_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     "network": "testnet",
     "program_id": "zkbugbounty_7f3c92.aleo",
-    "previous_edition": 1,
-    "target_edition": 2,
+    "previous_edition": 2,
+    "target_edition": 3,
     "mode": mode,
     "status": status,
     "upgrade_transaction_id": upgrade_transaction_id or None,
@@ -317,6 +317,8 @@ required_mappings=(
     claim_v3_dispute_bonds
     claim_v3_project_decisions
     claim_v3_dispute_metadata
+    claim_v3_dispute_rounds
+    claim_v3_active_disputes
 )
 for function_name in "${required_functions[@]}"; do
     grep -F -q "function ${function_name}:" "${COMPILED_PROGRAM}" ||
@@ -326,7 +328,7 @@ for mapping_name in "${required_mappings[@]}"; do
     grep -F -q "mapping ${mapping_name}:" "${COMPILED_PROGRAM}" ||
         fail "Compiled Program is missing V3 mapping: ${mapping_name}"
 done
-printf 'V3 ABI surface: 13 functions and 11 mappings present\n'
+printf 'V3 Edition 3 hardening surface: 13 functions and 13 mappings present\n'
 
 SOURCE_SHA="$(sha256sum "${LEO_PROJECT_DIR}/src/main.leo" | awk '{print $1}')"
 COMPILED_SHA="$(sha256sum "${COMPILED_PROGRAM}" | awk '{print $1}')"
@@ -336,7 +338,7 @@ GIT_COMMIT="$(git -C "${PROJECT_ROOT}" rev-parse HEAD 2>/dev/null || true)"
 mkdir -p -- "${RESULT_DIR}"
 RAW_RESULT="${TEMP_DIR}/leo-result.json"
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-PUBLIC_EVIDENCE="${RESULT_DIR}/edition-2-${MODE}-${TIMESTAMP}.json"
+PUBLIC_EVIDENCE="${RESULT_DIR}/edition-3-${MODE}-${TIMESTAMP}.json"
 
 printf 'Source SHA256: %s\n' "${SOURCE_SHA}"
 printf 'Compiled Program SHA256: %s\n' "${COMPILED_SHA}"
@@ -355,9 +357,9 @@ KEY_PREFIX="A""PrivateKey1"
 [[ ${#PRIVATE_KEY} -ge 40 ]] || fail "The entered value is too short."
 
 if [[ "${MODE}" == "broadcast" ]]; then
-    printf 'WARNING: this will request an irreversible Aleo Testnet Edition 2 upgrade.\n'
-    read -rp 'Type UPGRADE EDITION 2 to continue: ' CONFIRMATION
-    [[ "${CONFIRMATION}" == "UPGRADE EDITION 2" ]] ||
+    printf 'WARNING: this will request an irreversible Aleo Testnet Edition 3 hardening upgrade.\n'
+    read -rp 'Type UPGRADE EDITION 3 to continue: ' CONFIRMATION
+    [[ "${CONFIRMATION}" == "UPGRADE EDITION 3" ]] ||
         fail "Broadcast confirmation did not match. Nothing was broadcast."
 fi
 
