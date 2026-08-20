@@ -824,6 +824,7 @@ program zkbugbounty_7f3c92.aleo {
             amount,
         );
         return final {
+            transfer.run();
             assert(amount > 0u64);
             assert(funding_marker != 0field);
             assert(Mapping::contains(bounties, bounty_id));
@@ -862,7 +863,6 @@ program zkbugbounty_7f3c92.aleo {
                 last_refund_marker: current.last_refund_marker,
             };
             Mapping::set(bounty_escrows, bounty_id, updated);
-            transfer.run();
         };
     }
 
