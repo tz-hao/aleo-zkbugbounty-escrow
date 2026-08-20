@@ -250,6 +250,7 @@ require_command sha256sum
 require_command git
 require_command mktemp
 require_command node
+require_command script
 
 LEO_VERSION="$("${LEO_BIN}" --version)"
 [[ "${LEO_VERSION}" == "leo 4.4.0"* ]] ||
@@ -404,11 +405,12 @@ upgrade_args=(
     --network-retries 6
     --broadcast
 )
+printf -v LEO_UPGRADE_COMMAND '%q ' "${LEO_BIN}" "${upgrade_args[@]}"
 LEO_UPGRADE_LOG="${TEMP_DIR}/leo-upgrade.log"
 set +e
 (
     cd "${LEO_PROJECT_DIR}"
-    PRIVATE_KEY="${PRIVATE_KEY}" "${LEO_BIN}" "${upgrade_args[@]}"
+    PRIVATE_KEY="${PRIVATE_KEY}" script -qefc "${LEO_UPGRADE_COMMAND}" /dev/null
 ) 2>&1 | node "${SCRIPT_DIR}/redact-aleo-cli-output.mjs" >"${LEO_UPGRADE_LOG}"
 PIPE_RESULTS=("${PIPESTATUS[@]}")
 LEO_EXIT="${PIPE_RESULTS[0]}"
