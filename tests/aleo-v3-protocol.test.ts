@@ -139,6 +139,19 @@ test("V3 writes state and replay guards before every Credits Final", () => {
   }
 });
 
+test("frozen legacy fund_bounty fails before Final and leaves its CEI warning unreachable", () => {
+  const legacyFund = entry("fund_bounty");
+  const firstGuard = legacyFund.indexOf("assert_eq(amount, 0u64);");
+  const contradictoryGuard = legacyFund.indexOf("assert_neq(amount, 0u64);");
+  const creditsFinal = legacyFund.indexOf("let transfer: Final");
+  const finalizer = legacyFund.indexOf("return final {");
+
+  assert.ok(firstGuard >= 0 && contradictoryGuard > firstGuard);
+  assert.ok(creditsFinal > contradictoryGuard);
+  assert.ok(finalizer > creditsFinal);
+  assert.match(legacyFund, /transfer\.run\(\)/);
+});
+
 test("V3 uses the full Leo entry budget without changing the preserved V1/V2 surface", () => {
   const programSource = source.slice(source.indexOf("program zkbugbounty_7f3c92.aleo"));
   const entries = [...programSource.matchAll(/\n    fn ([a-z_][a-z0-9_]*)\(/g)]

@@ -27,7 +27,6 @@ COMPILED_PROGRAM="${LEO_PROJECT_DIR}/build/zkbugbounty_7f3c92/zkbugbounty_7f3c92
 ABI_PATH="${LEO_PROJECT_DIR}/build/zkbugbounty_7f3c92/abi.json"
 RESULT_DIR="${PROJECT_ROOT}/local-upgrade-results"
 TEMP_DIR=""
-PRIVATE_KEY=""
 LEO_UPGRADE_LOG=""
 
 fail() {
@@ -36,9 +35,7 @@ fail() {
 }
 
 cleanup() {
-    unset -v PRIVATE_KEY 2>/dev/null || true
     if [[ -n "${TEMP_DIR}" && -d "${TEMP_DIR}" ]]; then
-        rm -f -- "${TEMP_DIR}/leo-result.json"
         rm -f -- "${TEMP_DIR}/testnet-interface.aleo"
         rm -f -- "${TEMP_DIR}/leo-upgrade.log"
         rmdir -- "${TEMP_DIR}" 2>/dev/null || true
@@ -123,44 +120,44 @@ read_public_edition() {
         tr -d '[:space:]"'
 }
 
+read_public_credits_balance() {
+    curl \
+        --silent \
+        --show-error \
+        --location \
+        --retry 3 \
+        --retry-delay 2 \
+        --retry-all-errors \
+        --connect-timeout 10 \
+        --max-time 30 \
+        "${ENDPOINT}/${NETWORK}/program/credits.aleo/mapping/account/${EXPECTED_ADMIN_ADDRESS}"
+}
+
+read_public_program_owner() {
+    grep -Eo 'assert\.eq program_owner aleo1[0-9a-z]+' "$1" |
+        awk '{print $3}' |
+        head -n 1
+}
+
 extract_transaction_ids() {
     python3 - "$1" <<'PY'
-import json
 import re
 import sys
 
-with open(sys.argv[1], encoding="utf-8") as source:
-    payload = json.load(source)
+text = open(sys.argv[1], encoding="utf-8").read()
+transaction_pattern = re.compile(r"\bat1[0-9a-z]{50,80}\b")
+fee_pattern = re.compile(r"(?im)^.*\bfee\b.*?(at1[0-9a-z]{50,80})\b")
+upgrade_pattern = re.compile(r"(?im)^.*\b(?:upgrade|deployment|transaction)\b.*?(at1[0-9a-z]{50,80})\b")
 
-transaction_pattern = re.compile(r"^at1[0-9a-z]{50,80}$")
-candidates = []
-
-def walk(value, path=()):
-    if isinstance(value, dict):
-        for key, child in value.items():
-            walk(child, path + (str(key),))
-    elif isinstance(value, list):
-        for index, child in enumerate(value):
-            walk(child, path + (str(index),))
-    elif isinstance(value, str) and transaction_pattern.fullmatch(value):
-        candidates.append((path, value))
-
-walk(payload)
-upgrade = None
-fee = None
-for path, value in candidates:
-    label = ".".join(path).lower()
-    if fee is None and "fee" in label:
-        fee = value
-    elif upgrade is None and ("transaction" in label or "deployment" in label or "upgrade" in label):
-        upgrade = value
-
+fee_match = fee_pattern.search(text)
+fee = fee_match.group(1) if fee_match else None
+upgrade_match = upgrade_pattern.search(text)
+upgrade = upgrade_match.group(1) if upgrade_match else None
+candidates = transaction_pattern.findall(text)
 if upgrade is None and candidates:
-    upgrade = candidates[0][1]
+    upgrade = next((value for value in candidates if value != fee), candidates[0])
 if fee is None:
-    remaining = [value for _, value in candidates if value != upgrade]
-    if remaining:
-        fee = remaining[0]
+    fee = next((value for value in candidates if value != upgrade), None)
 
 print(upgrade or "")
 print(fee or "")
@@ -176,6 +173,9 @@ write_public_evidence() {
     local compiled_sha="$6"
     local abi_sha="$7"
     local git_commit="$8"
+    local public_admin_address="$9"
+    local public_balance_microcredits="${10}"
+    local fee_estimate_microcredits="${11}"
 
     python3 - \
         "${output_path}" \
@@ -186,7 +186,10 @@ write_public_evidence() {
         "${source_sha}" \
         "${compiled_sha}" \
         "${abi_sha}" \
-        "${git_commit}" <<'PY'
+        "${git_commit}" \
+        "${public_admin_address}" \
+        "${public_balance_microcredits}" \
+        "${fee_estimate_microcredits}" <<'PY'
 import datetime
 import json
 import sys
@@ -201,6 +204,9 @@ import sys
     compiled_sha,
     abi_sha,
     git_commit,
+    public_admin_address,
+    public_balance_microcredits,
+    fee_estimate_microcredits,
 ) = sys.argv[1:]
 
 evidence = {
@@ -218,6 +224,9 @@ evidence = {
     "compiled_program_sha256": compiled_sha,
     "abi_sha256": abi_sha,
     "git_commit": git_commit or None,
+    "public_administrator_address": public_admin_address,
+    "public_balance_microcredits": None if public_balance_microcredits == "UNAVAILABLE" else public_balance_microcredits,
+    "fee_estimate_microcredits": None if fee_estimate_microcredits == "UNAVAILABLE" else fee_estimate_microcredits,
     "contains_signed_payload": False,
     "contains_private_key": False,
 }
@@ -279,6 +288,13 @@ if ! "${LEO_BIN}" query program "${EXPECTED_PROGRAM_ID}" \
     fail "Unable to read the current Testnet Program interface."
 fi
 
+PUBLIC_ADMIN_ADDRESS="$(read_public_program_owner "${TESTNET_INTERFACE_BASELINE}")"
+[[ -n "${PUBLIC_ADMIN_ADDRESS}" ]] ||
+    fail "Unable to read the public Program administrator address."
+[[ "${PUBLIC_ADMIN_ADDRESS}" == "${EXPECTED_ADMIN_ADDRESS}" ]] ||
+    fail "Public Program administrator does not match the expected administrator address."
+printf 'Public administrator address: %s\n' "${PUBLIC_ADMIN_ADDRESS}"
+
 node --experimental-strip-types \
     "${PROJECT_ROOT}/scripts/check-aleo-upgrade-interface.mjs" \
     "${TESTNET_INTERFACE_BASELINE}" \
@@ -336,7 +352,6 @@ ABI_SHA="$(sha256sum "${ABI_PATH}" | awk '{print $1}')"
 GIT_COMMIT="$(git -C "${PROJECT_ROOT}" rev-parse HEAD 2>/dev/null || true)"
 
 mkdir -p -- "${RESULT_DIR}"
-RAW_RESULT="${TEMP_DIR}/leo-result.json"
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 PUBLIC_EVIDENCE="${RESULT_DIR}/edition-3-${MODE}-${TIMESTAMP}.json"
 
@@ -344,6 +359,27 @@ printf 'Source SHA256: %s\n' "${SOURCE_SHA}"
 printf 'Compiled Program SHA256: %s\n' "${COMPILED_SHA}"
 printf 'ABI SHA256: %s\n' "${ABI_SHA}"
 printf 'Mode: %s\n' "${MODE}"
+
+PUBLIC_BALANCE_RAW=""
+PUBLIC_BALANCE_MICROCREDITS="UNAVAILABLE"
+if PUBLIC_BALANCE_RAW="$(read_public_credits_balance 2>/dev/null)"; then
+    if [[ "${PUBLIC_BALANCE_RAW}" =~ ^\"?([0-9]+)u64\"?$ ]]; then
+        PUBLIC_BALANCE_MICROCREDITS="${BASH_REMATCH[1]}"
+    fi
+fi
+printf 'Public administrator balance (microcredits): %s\n' "${PUBLIC_BALANCE_MICROCREDITS}"
+
+# Leo 4.4.0 has no public, unsigned upgrade fee-estimation command. Constructing
+# one would require a private key, so preview reports this boundary explicitly.
+FEE_ESTIMATE_MICROCREDITS="UNAVAILABLE"
+printf 'Public fee estimate (microcredits): %s (no signing performed)\n' "${FEE_ESTIMATE_MICROCREDITS}"
+
+if [[ "${MODE}" == "preview" ]]; then
+    write_public_evidence         "${PUBLIC_EVIDENCE}"         "PREVIEW_ONLY_NOT_BROADCAST"         ""         ""         "${SOURCE_SHA}"         "${COMPILED_SHA}"         "${ABI_SHA}"         "${GIT_COMMIT}"         "${PUBLIC_ADMIN_ADDRESS}"         "${PUBLIC_BALANCE_MICROCREDITS}"         "${FEE_ESTIMATE_MICROCREDITS}"
+    printf 'Preview complete. No private key was requested, no transaction was signed, and no transaction was broadcast.\n'
+    printf 'Public-only evidence: %s\n' "${PUBLIC_EVIDENCE}"
+    exit 0
+fi
 
 [[ -t 0 && -t 1 ]] ||
     fail "An interactive WSL terminal is required for private-key entry."
@@ -356,74 +392,50 @@ KEY_PREFIX="A""PrivateKey1"
     fail "The entered value does not have the expected Aleo private-key format."
 [[ ${#PRIVATE_KEY} -ge 40 ]] || fail "The entered value is too short."
 
-if [[ "${MODE}" == "broadcast" ]]; then
-    printf 'WARNING: this will request an irreversible Aleo Testnet Edition 3 hardening upgrade.\n'
-    read -rp 'Type UPGRADE EDITION 3 to continue: ' CONFIRMATION
-    [[ "${CONFIRMATION}" == "UPGRADE EDITION 3" ]] ||
-        fail "Broadcast confirmation did not match. Nothing was broadcast."
-fi
+printf 'WARNING: this will request an irreversible Aleo Testnet Edition 3 hardening upgrade.\n'
+read -rp 'Type UPGRADE EDITION 3 to continue: ' CONFIRMATION
+[[ "${CONFIRMATION}" == "UPGRADE EDITION 3" ]] ||
+    fail "Broadcast confirmation did not match. Nothing was broadcast."
 
 upgrade_args=(
     upgrade
     --network "${NETWORK}"
     --endpoint "${ENDPOINT}"
     --network-retries 6
-    "--json-output=${RAW_RESULT}"
+    --broadcast
 )
-if [[ "${MODE}" == "broadcast" ]]; then
-    upgrade_args+=(--broadcast)
-else
-    # A preview is never broadcast. Keep its signed transaction out of the
-    # terminal while still producing the machine-readable temporary result.
-    upgrade_args+=(--print --yes)
-fi
-
 LEO_UPGRADE_LOG="${TEMP_DIR}/leo-upgrade.log"
-if [[ "${MODE}" == "preview" ]]; then
-    if ! (
-        cd "${LEO_PROJECT_DIR}"
-        PRIVATE_KEY="${PRIVATE_KEY}" "${LEO_BIN}" "${upgrade_args[@]}"
-    ) >"${LEO_UPGRADE_LOG}" 2>&1; then
-        printf 'Leo preview failed. No transaction was broadcast.\n' >&2
-        grep -E -i 'error|cannot upgrade|invalid upgrade|insufficient' "${LEO_UPGRADE_LOG}" |
-            sed -E 's/A(P|Private)Key1[[:alnum:]_]+/[REDACTED_PRIVATE_KEY]/g; s/sign1[[:alnum:]_]+/[REDACTED_SIGNATURE]/g' |
-            tail -n 12 >&2 || true
-        fail "Leo upgrade preview failed or was declined."
-    fi
-else
-    if ! (
-        cd "${LEO_PROJECT_DIR}"
-        PRIVATE_KEY="${PRIVATE_KEY}" "${LEO_BIN}" "${upgrade_args[@]}"
-    ); then
-        fail "Leo upgrade broadcast failed or was declined."
-    fi
-fi
+set +e
+(
+    cd "${LEO_PROJECT_DIR}"
+    PRIVATE_KEY="${PRIVATE_KEY}" "${LEO_BIN}" "${upgrade_args[@]}"
+) 2>&1 | node "${SCRIPT_DIR}/redact-aleo-cli-output.mjs" >"${LEO_UPGRADE_LOG}"
+PIPE_RESULTS=("${PIPESTATUS[@]}")
+LEO_EXIT="${PIPE_RESULTS[0]}"
+REDACTOR_EXIT="${PIPE_RESULTS[1]}"
+set -e
 unset -v PRIVATE_KEY
-
-[[ -f "${RAW_RESULT}" ]] || fail "Leo did not produce its JSON result."
-if grep -I -E -q -- "A""PrivateKey1[[:alnum:]_]{20,}" "${RAW_RESULT}"; then
-    fail "Sensitive material was detected in the Leo result. It will not be copied or printed."
+[[ "${REDACTOR_EXIT}" == "0" ]] || fail "Leo output redaction failed; no raw Leo output was written or printed."
+if [[ "${LEO_EXIT}" != "0" ]]; then
+    printf 'Leo upgrade broadcast failed or was declined. Sanitized diagnostics follow:\n' >&2
+    tail -n 12 "${LEO_UPGRADE_LOG}" >&2 || true
+    fail "Leo upgrade broadcast failed or was declined."
 fi
 
-mapfile -t TRANSACTION_IDS < <(extract_transaction_ids "${RAW_RESULT}")
+cat "${LEO_UPGRADE_LOG}"
+mapfile -t TRANSACTION_IDS < <(extract_transaction_ids "${LEO_UPGRADE_LOG}")
 UPGRADE_TRANSACTION_ID="${TRANSACTION_IDS[0]:-}"
 FEE_TRANSACTION_ID="${TRANSACTION_IDS[1]:-}"
-
-if [[ "${MODE}" == "preview" ]]; then
-    write_public_evidence         "${PUBLIC_EVIDENCE}"         "PREVIEW_ONLY_NOT_BROADCAST"         ""         ""         "${SOURCE_SHA}"         "${COMPILED_SHA}"         "${ABI_SHA}"         "${GIT_COMMIT}"
-    printf 'Preview complete. No transaction was broadcast.\n'
+[[ -n "${UPGRADE_TRANSACTION_ID}" ]] ||
+    fail "Broadcast may have occurred, but the public upgrade transaction ID could not be parsed. Do not rebroadcast; inspect public chain state."
+write_public_evidence         "${PUBLIC_EVIDENCE}"         "BROADCAST_UNVERIFIED"         "${UPGRADE_TRANSACTION_ID}"         "${FEE_TRANSACTION_ID}"         "${SOURCE_SHA}"         "${COMPILED_SHA}"         "${ABI_SHA}"         "${GIT_COMMIT}"         "${PUBLIC_ADMIN_ADDRESS}"         "${PUBLIC_BALANCE_MICROCREDITS}"         "${FEE_ESTIMATE_MICROCREDITS}"
+printf 'Upgrade Transaction ID: %s\n' "${UPGRADE_TRANSACTION_ID}"
+if [[ -n "${FEE_TRANSACTION_ID}" ]]; then
+    printf 'Fee Transaction ID: %s\n' "${FEE_TRANSACTION_ID}"
 else
-    [[ -n "${UPGRADE_TRANSACTION_ID}" ]] ||
-        fail "Broadcast may have occurred, but the public upgrade transaction ID could not be parsed. Do not rebroadcast; inspect public chain state."
-    write_public_evidence         "${PUBLIC_EVIDENCE}"         "BROADCAST_UNVERIFIED"         "${UPGRADE_TRANSACTION_ID}"         "${FEE_TRANSACTION_ID}"         "${SOURCE_SHA}"         "${COMPILED_SHA}"         "${ABI_SHA}"         "${GIT_COMMIT}"
-    printf 'Upgrade Transaction ID: %s\n' "${UPGRADE_TRANSACTION_ID}"
-    if [[ -n "${FEE_TRANSACTION_ID}" ]]; then
-        printf 'Fee Transaction ID: %s\n' "${FEE_TRANSACTION_ID}"
-    else
-        printf 'Fee Transaction ID: not parsed; do not rebroadcast. Verify the public transaction first.\n'
-    fi
-    printf 'Status: broadcast recorded, not yet claimed as confirmed\n'
+    printf 'Fee Transaction ID: not parsed; do not rebroadcast. Verify the public transaction first.\n'
 fi
+printf 'Status: broadcast recorded, not yet claimed as confirmed\n'
 
 printf 'Public-only evidence: %s\n' "${PUBLIC_EVIDENCE}"
-printf 'Raw Leo result was kept only in a temporary directory and will now be removed.\n'
+printf 'Only sanitized Leo output was written to a temporary log and will now be removed.\n'

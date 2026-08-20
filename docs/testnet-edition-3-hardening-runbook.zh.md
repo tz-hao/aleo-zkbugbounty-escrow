@@ -31,7 +31,7 @@ LEO_BIN=/home/milli/.local/leo-toolchains/4.4.0/bin/leo \
 npm run preview:testnet-edition-3
 ~~~
 
-该预演会检查当前 Edition 2、保留的历史接口、13 个 V3 函数、13 个 V3 Mapping，并输出 Program SHA-256。它不会广播交易。
+该预演只读取公开链上信息：当前 Edition、Program 管理员公开地址与余额、保留的历史接口，并编译检查 13 个 V3 函数、13 个 V3 Mapping 与三项 SHA-256。它不会请求管理员私钥、不会构造签名、不会广播交易；Leo 4.4.0 当前没有无签名的精确升级费用估算接口，因此费用会明确显示为 `UNAVAILABLE`。
 
 ## 3. 管理员人工广播
 
@@ -49,6 +49,8 @@ bash scripts/upgrade-aleo-testnet-v3.sh --broadcast
 ```text
 UPGRADE EDITION 3
 ```
+
+广播路径只会把经过脱敏的 Leo 输出写入临时日志和终端；任何 `Private Key`、View Key、签名或签名载荷形态的输出都会被替换，且不会进入公开 evidence 文件。
 
 广播成功只表示请求已提交；等待索引，不要因未立即显示而重复广播。
 
