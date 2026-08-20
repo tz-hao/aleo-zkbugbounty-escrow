@@ -62,7 +62,8 @@ UPGRADE EDITION 3
 {
   transactionId: "at1...",
   feeTransactionId: "at1...",
-  compiledProgramSha256: "64 位小写十六进制哈希",
+  compiledProgramSha256: "本地 Leo 编译产物的 64 位小写十六进制哈希",
+  onChainProgramSourceSha256: "Testnet 公共 Program 文本的 64 位小写十六进制哈希",
   expectedEdition: ALEO_TESTNET_V3_EXPECTED_EDITION,
 }
 ```
@@ -73,7 +74,7 @@ UPGRADE EDITION 3
 npm run verify:testnet-edition-3
 ~~~
 
-只有 `Observed edition: 3`、`Upgrade status: confirmed`、`Program SHA-256 match: PASS` 和 `Overall verification: PASS` 全部出现，前端才会允许 V3 钱包操作。
+只有 `Observed edition: 3`、`Upgrade status: confirmed`、`On-chain Program source SHA-256 match: PASS` 和 `Overall verification: PASS` 全部出现，前端才会允许 V3 钱包操作。本地 Leo 编译产物与 Testnet 返回的公开 Program 文本属于不同序列化表示，分别保存，不能互相直接比较。
 
 ## 5. 前端验收
 

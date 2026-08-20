@@ -44,6 +44,7 @@ export type EditionOneVerifierConfig = {
   feeTransactionId: string;
   adminAddress: string;
   expectedEdition: number;
+  expectedProgramSha256?: string;
 };
 
 export const DEFAULT_EDITION_ONE_VERIFIER_CONFIG: EditionOneVerifierConfig = {
@@ -66,6 +67,8 @@ export type EditionOneVerification = {
   deploymentEdition: number | null;
   ownerAddressMatch: boolean;
   publicBalanceMicrocredits: string | null;
+  programSourceHashMatch: boolean;
+  upgradeProgramHashMatch: boolean;
   feeIndexStatus: "FOUND" | "INDEX_UNAVAILABLE" | "HTTP_ERROR";
   upgradeStatus: "confirmed" | "unavailable" | "invalid";
   overallVerification: "PASS" | "FAIL";
@@ -91,6 +94,15 @@ function readProgramIdFromSource(source: unknown, programId: string) {
   return typeof source === "string" && source.includes(`program ${programId}`);
 }
 
+function normalizeProgramSource(source: string) {
+  try {
+    const parsed = JSON.parse(source);
+    return typeof parsed === "string" ? parsed : source;
+  } catch {
+    return source;
+  }
+}
+
 function parseMicrocredits(value: string) {
   const match = value.trim().match(/^"?([0-9]+)u64"?$/);
   return match?.[1] ?? null;
@@ -103,6 +115,16 @@ function requestInit(): RequestInit {
     cache: "no-store",
     signal: AbortSignal.timeout(8_000),
   };
+}
+
+async function sha256Hex(value: string) {
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
 }
 
 export async function verifyTestnetEditionOne(
@@ -122,9 +144,14 @@ export async function verifyTestnetEditionOne(
     fetcher(feeUrl, requestInit()),
   ]);
 
-  const programSourceFound = programResult.status === "fulfilled" && programResult.value.ok
-    ? readProgramIdFromSource(await programResult.value.text(), config.programId)
-    : false;
+  const programSource = programResult.status === "fulfilled" && programResult.value.ok
+    ? await programResult.value.text()
+    : null;
+  const canonicalProgramSource = programSource === null ? null : normalizeProgramSource(programSource);
+  const programSourceFound = canonicalProgramSource !== null && readProgramIdFromSource(canonicalProgramSource, config.programId);
+  const programSourceHashMatch = !config.expectedProgramSha256 || (
+    canonicalProgramSource !== null && await sha256Hex(canonicalProgramSource) === config.expectedProgramSha256
+  );
   const rawEdition = editionResult.status === "fulfilled" && editionResult.value.ok
     ? Number(await editionResult.value.text())
     : null;
@@ -135,6 +162,7 @@ export async function verifyTestnetEditionOne(
   let deploymentEdition: number | null = null;
   let ownerAddressMatch = false;
   let upgradeProgramMatches = false;
+  let upgradeProgramHashMatch = !config.expectedProgramSha256;
   if (upgradeResult.status === "fulfilled" && upgradeResult.value.ok) {
     const transaction = asRecord(await upgradeResult.value.json().catch(() => null));
     const deployment = asRecord(transaction?.deployment);
@@ -144,15 +172,18 @@ export async function verifyTestnetEditionOne(
     deploymentEdition = typeof deployment?.edition === "number" ? deployment.edition : null;
     ownerAddressMatch = owner?.address === config.adminAddress && deployment?.program_owner === config.adminAddress;
     upgradeProgramMatches = readProgramIdFromSource(deployment?.program, config.programId);
+    upgradeProgramHashMatch = typeof deployment?.program === "string" && (
+      !config.expectedProgramSha256 || await sha256Hex(deployment.program) === config.expectedProgramSha256
+    );
   }
-  const upgradeConfirmed = upgradeTransactionFound && upgradeTransactionType === "deploy" && deploymentEdition === config.expectedEdition && ownerAddressMatch && upgradeProgramMatches;
+  const upgradeConfirmed = upgradeTransactionFound && upgradeTransactionType === "deploy" && deploymentEdition === config.expectedEdition && ownerAddressMatch && upgradeProgramMatches && upgradeProgramHashMatch;
   const publicBalanceMicrocredits = balanceResult.status === "fulfilled" && balanceResult.value.ok
     ? parseMicrocredits(await balanceResult.value.text())
     : null;
   const feeIndexStatus = feeResult.status === "fulfilled"
     ? feeResult.value.ok ? "FOUND" : feeResult.value.status === 404 ? "INDEX_UNAVAILABLE" : "HTTP_ERROR"
     : "HTTP_ERROR";
-  const overallVerification = programSourceFound && observedEdition === config.expectedEdition && upgradeConfirmed ? "PASS" : "FAIL";
+  const overallVerification = programSourceFound && programSourceHashMatch && observedEdition === config.expectedEdition && upgradeConfirmed ? "PASS" : "FAIL";
 
   return {
     programId: config.programId,
@@ -165,6 +196,8 @@ export async function verifyTestnetEditionOne(
     deploymentEdition,
     ownerAddressMatch,
     publicBalanceMicrocredits,
+    programSourceHashMatch,
+    upgradeProgramHashMatch,
     feeIndexStatus,
     upgradeStatus: upgradeConfirmed ? "confirmed" : upgradeTransactionFound ? "invalid" : "unavailable",
     overallVerification,

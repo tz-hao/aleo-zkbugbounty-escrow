@@ -30,6 +30,7 @@ export function parseEditionThreeVerifierArguments(argv) {
     upgradeTransactionId: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId,
     feeTransactionId: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId,
     compiledProgramSha256: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.compiledProgramSha256,
+    onChainProgramSourceSha256: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.onChainProgramSourceSha256,
     adminAddress: ALEO_TESTNET_PROGRAM_OWNER,
     expectedEdition: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.expectedEdition,
   };
@@ -41,6 +42,7 @@ export function parseEditionThreeVerifierArguments(argv) {
     if (flag === "--upgrade-transaction-id" && value) config.upgradeTransactionId = value;
     if (flag === "--fee-transaction-id" && value) config.feeTransactionId = value;
     if (flag === "--program-sha256" && value) config.compiledProgramSha256 = value;
+    if (flag === "--on-chain-program-sha256" && value) config.onChainProgramSourceSha256 = value;
     if (flag === "--admin-address" && value) config.adminAddress = value;
   }
   return config;
@@ -53,9 +55,9 @@ export function formatEditionThreeVerification(result, programHash) {
     `Expected edition: ${result.expectedEdition}`,
     `Observed edition: ${result.observedEdition ?? "UNAVAILABLE"}`,
     `Upgrade status: ${result.upgradeStatus}`,
-    `Program SHA-256: ${programHash.actual ?? "UNAVAILABLE"}`,
-    `Expected Program SHA-256: ${programHash.expected}`,
-    `Program SHA-256 match: ${programHash.matches ? "PASS" : "FAIL"}`,
+    `On-chain Program source SHA-256: ${programHash.actual ?? "UNAVAILABLE"}`,
+    `Expected on-chain Program source SHA-256: ${programHash.expected}`,
+    `On-chain Program source SHA-256 match: ${programHash.matches ? "PASS" : "FAIL"}`,
     `Overall verification: ${result.overallVerification === "PASS" && programHash.matches ? "PASS" : "FAIL"}`,
   ].join("\n");
 }
@@ -66,10 +68,12 @@ async function main() {
     !config.upgradeTransactionId ||
     !config.feeTransactionId ||
     !config.compiledProgramSha256 ||
-    !SHA256_HEX.test(config.compiledProgramSha256)
+    !SHA256_HEX.test(config.compiledProgramSha256) ||
+    !config.onChainProgramSourceSha256 ||
+    !SHA256_HEX.test(config.onChainProgramSourceSha256)
   ) {
     console.error(
-      "Edition 3 evidence is incomplete. Record public upgrade ID, fee ID, and the 64-character Program SHA-256 before enabling wallets.",
+      "Edition 3 evidence is incomplete. Record public upgrade ID, fee ID, compiled Program SHA-256, and on-chain Program source SHA-256 before enabling wallets.",
     );
     process.exitCode = 2;
     return;
@@ -77,7 +81,10 @@ async function main() {
 
   const programUrl = `${config.endpoint.replace(/\/$/, "")}/testnet/program/${encodeURIComponent(config.programId)}`;
   const [verification, programResponse] = await Promise.all([
-    verifyTestnetEditionOne(config),
+    verifyTestnetEditionOne({
+      ...config,
+      expectedProgramSha256: config.onChainProgramSourceSha256,
+    }),
     fetch(programUrl, {
       method: "GET",
       headers: { accept: "application/json", "cache-control": "no-cache" },
@@ -90,9 +97,9 @@ async function main() {
     : null;
   const actualHash = source ? sha256Hex(source) : null;
   const programHash = {
-    expected: config.compiledProgramSha256,
+    expected: config.onChainProgramSourceSha256,
     actual: actualHash,
-    matches: actualHash === config.compiledProgramSha256,
+    matches: actualHash === config.onChainProgramSourceSha256,
   };
   console.log(formatEditionThreeVerification(verification, programHash));
   if (verification.overallVerification !== "PASS" || !programHash.matches) {

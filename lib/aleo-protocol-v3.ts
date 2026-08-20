@@ -259,7 +259,8 @@ function disabledCapability(
     upgradeEvidenceRecorded:
       Boolean(ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId) &&
       Boolean(ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId) &&
-      Boolean(ALEO_TESTNET_V3_UPGRADE_EVIDENCE.compiledProgramSha256),
+      Boolean(ALEO_TESTNET_V3_UPGRADE_EVIDENCE.compiledProgramSha256) &&
+      Boolean(ALEO_TESTNET_V3_UPGRADE_EVIDENCE.onChainProgramSourceSha256),
     presentFunctions: inspection?.presentFunctions ?? [],
     missingFunctions: inspection?.missingFunctions ?? [...PROTOCOL_V3_FUNCTIONS],
     presentMappings: inspection?.presentMappings ?? [],
@@ -319,11 +320,13 @@ export async function fetchProtocolV3Capability(
     const feeTransactionId = ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId;
     const compiledProgramSha256 =
       ALEO_TESTNET_V3_UPGRADE_EVIDENCE.compiledProgramSha256;
-    if (!transactionId || !feeTransactionId || !compiledProgramSha256) {
+    const onChainProgramSourceSha256 =
+      ALEO_TESTNET_V3_UPGRADE_EVIDENCE.onChainProgramSourceSha256;
+    if (!transactionId || !feeTransactionId || !compiledProgramSha256 || !onChainProgramSourceSha256) {
       return disabledCapability("DeploymentEvidencePending", currentEdition, inspection);
     }
     const actualProgramSha256 = await sha256Hex(source);
-    if (actualProgramSha256 !== compiledProgramSha256) {
+    if (actualProgramSha256 !== onChainProgramSourceSha256) {
       return disabledCapability("ConfigurationError", currentEdition, inspection);
     }
 
@@ -335,6 +338,7 @@ export async function fetchProtocolV3Capability(
         feeTransactionId,
         adminAddress: ALEO_TESTNET_PROGRAM_OWNER,
         expectedEdition: ALEO_TESTNET_V3_EXPECTED_EDITION,
+        expectedProgramSha256: onChainProgramSourceSha256,
       },
       fetcher,
     );

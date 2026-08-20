@@ -47,17 +47,20 @@ export const ALEO_TESTNET_V3_EDITION_TWO_EVIDENCE = {
 } as const;
 
 // Populated only after the administrator broadcasts and confirms the Edition 3
-// hardening upgrade. All three public values are required: the upgrade and fee
-// transaction IDs establish provenance, and the compiled Program SHA-256 pins
-// the exact on-chain source/ABI instead of only checking its entry names.
+// hardening upgrade. All four public values are required: the upgrade and fee
+// transaction IDs establish provenance. `compiledProgramSha256` pins the local
+// Leo artifact; `onChainProgramSourceSha256` pins the canonical public Program
+// text returned by Testnet (the two serializations are intentionally distinct).
 export const ALEO_TESTNET_V3_UPGRADE_EVIDENCE: {
   transactionId: string | null;
   feeTransactionId: string | null;
   compiledProgramSha256: string | null;
+  onChainProgramSourceSha256: string | null;
   expectedEdition: typeof ALEO_TESTNET_V3_EXPECTED_EDITION;
 } = {
-  transactionId: null,
-  feeTransactionId: null,
-  compiledProgramSha256: null,
+  transactionId: "at1f6d674kemsgal7lwp3rfwruasm5qla3c2llkry4xvskls4r9dvrqh06fx3",
+  feeTransactionId: "at1jtj2pmfff3z6dzepq4xlxt4995ehmttjqlhqezsqnxfugwmkes8shf0jt3",
+  compiledProgramSha256: "383a0c61581e7ff5b50221bf53e605b2fb760e27dea822f91a23131b83b994f9",
+  onChainProgramSourceSha256: "bd67027f3d2db2815c12d134bb5cbbfbf4eb09e640079d503321082d7a914620",
   expectedEdition: ALEO_TESTNET_V3_EXPECTED_EDITION,
 };

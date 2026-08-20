@@ -282,11 +282,13 @@ test("V3 capability remains fail-closed until verified Edition 3 source evidence
     transactionId: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId,
     feeTransactionId: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId,
     compiledProgramSha256: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.compiledProgramSha256,
+    onChainProgramSourceSha256: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.onChainProgramSourceSha256,
   };
   try {
     ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId = null;
     ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId = null;
     ALEO_TESTNET_V3_UPGRADE_EVIDENCE.compiledProgramSha256 = null;
+    ALEO_TESTNET_V3_UPGRADE_EVIDENCE.onChainProgramSourceSha256 = null;
     const pendingEvidence = await fetchProtocolV3Capability(async (input) => {
       const url = String(input);
       if (url.endsWith("/latest_edition")) {
@@ -301,11 +303,15 @@ test("V3 capability remains fail-closed until verified Edition 3 source evidence
     ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId = savedEvidence.transactionId;
     ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId = savedEvidence.feeTransactionId;
     ALEO_TESTNET_V3_UPGRADE_EVIDENCE.compiledProgramSha256 = savedEvidence.compiledProgramSha256;
+    ALEO_TESTNET_V3_UPGRADE_EVIDENCE.onChainProgramSourceSha256 = savedEvidence.onChainProgramSourceSha256;
   }
 
   ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId = "at1editionthreeevidence";
   ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId = "at1editionthreefee";
   ALEO_TESTNET_V3_UPGRADE_EVIDENCE.compiledProgramSha256 = createHash("sha256")
+    .update(compiledSource)
+    .digest("hex");
+  ALEO_TESTNET_V3_UPGRADE_EVIDENCE.onChainProgramSourceSha256 = createHash("sha256")
     .update(compiledSource)
     .digest("hex");
 
@@ -336,6 +342,7 @@ test("V3 capability remains fail-closed until verified Edition 3 source evidence
     ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId = savedEvidence.transactionId;
     ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId = savedEvidence.feeTransactionId;
     ALEO_TESTNET_V3_UPGRADE_EVIDENCE.compiledProgramSha256 = savedEvidence.compiledProgramSha256;
+    ALEO_TESTNET_V3_UPGRADE_EVIDENCE.onChainProgramSourceSha256 = savedEvidence.onChainProgramSourceSha256;
   }
 });
 
@@ -410,9 +417,11 @@ test("Edition 3 verification pins source hash in addition to public upgrade evid
     "--upgrade-transaction-id", "at1editionthree",
     "--fee-transaction-id", "at1editionthreefee",
     "--program-sha256", "a".repeat(64),
+    "--on-chain-program-sha256", "b".repeat(64),
   ]);
   assert.equal(parsed.expectedEdition, 3);
   assert.equal(parsed.compiledProgramSha256, "a".repeat(64));
+  assert.equal(parsed.onChainProgramSourceSha256, "b".repeat(64));
   const output = formatEditionThreeVerification(
     {
       programId: "zkbugbounty_7f3c92.aleo",
@@ -424,6 +433,6 @@ test("Edition 3 verification pins source hash in addition to public upgrade evid
     },
     { expected: "a".repeat(64), actual: "a".repeat(64), matches: true },
   );
-  assert.match(output, /Program SHA-256 match: PASS/);
+  assert.match(output, /On-chain Program source SHA-256 match: PASS/);
   assert.match(output, /Overall verification: PASS/);
 });
