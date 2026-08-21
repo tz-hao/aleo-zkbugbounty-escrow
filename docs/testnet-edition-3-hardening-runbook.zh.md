@@ -1,12 +1,12 @@
-# Protocol V3 / Aleo Testnet Edition 3 加固操作手册
+# 历史归档：Protocol V3 / Aleo Testnet Edition 3 加固操作手册
 
-> Edition 3 是对已部署 Edition 2 的安全加固，不是前端发布。它会不可逆地改变 Testnet Program，必须由 Program Admin 在自己的本机交互终端完成。
+> Edition 3 是历史公开版本，当前 Testnet 已公开核验为 Edition 4。本文件仅保留历史升级证据，不能再作为当前发布步骤执行；请阅读 [Edition 4 修复部署记录](protocol-v3-edition-4-remediation-hardening.zh.md)。
 
-## 上线前置条件
+## 历史上线前置条件
 
 - 不要向任何人、聊天、环境文件或命令行参数提供管理员私钥；脚本只在隐藏交互提示中读取它。
 - 确认当前 Testnet `latest_edition` 为 `2`。不是 `2` 时停止，先读取公开 Program 与交易，绝不重播。
-- 合约与前端的真实写入能力在 Edition 3 的公开证据完整前会保持关闭。
+- 本历史记录不决定合约与前端的真实写入能力；当前能力以 Edition 4 的公开证据为准。
 
 ## 1. 本地验证
 

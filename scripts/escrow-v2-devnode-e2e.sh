@@ -1806,11 +1806,39 @@ expect_chain_rejected() {
   record_event "${label}" "rejected:${tx_id}"
 }
 
+resolve_v3_dispute_mapping_key() {
+  local mapping="$1"
+  local key="$2"
+  local active_dispute_id=""
+
+  case "${mapping}" in
+    claim_v3_arbitration_tallies|claim_v3_dispute_bonds|claim_v3_dispute_metadata)
+      ;;
+    *)
+      printf '%s' "${key}"
+      return 0
+      ;;
+  esac
+
+  # New V3 rounds are keyed by their immutable dispute ID, while callers
+  # naturally hold a Claim Hash. Historical Edition 2 records have no active
+  # pointer and therefore retain their original Claim Hash key.
+  active_dispute_id="$(curl --fail --silent --max-time 3 \
+    "${ALEO_E2E_ENDPOINT}/testnet/program/${PROGRAM_ID}/mapping/claim_v3_active_disputes/${key}" 2>/dev/null || true)"
+  active_dispute_id="$(printf '%s' "${active_dispute_id}" | tr -d '[:space:]\"')"
+  if [[ "${active_dispute_id}" =~ ^[0-9]+field$ ]]; then
+    printf '%s' "${active_dispute_id}"
+    return 0
+  fi
+  printf '%s' "${key}"
+}
+
 query_mapping() {
   local mapping="$1"
   local key="$2"
   local value=""
 
+  key="$(resolve_v3_dispute_mapping_key "${mapping}" "${key}")"
   value="$(curl --fail --silent --max-time 3 \
     "${ALEO_E2E_ENDPOINT}/testnet/program/${PROGRAM_ID}/mapping/${mapping}/${key}")" || return 1
   LAST_OUTPUT="${value}"
@@ -1832,6 +1860,7 @@ capture_mapping() {
   local key="$3"
   local mapping_result=""
 
+  key="$(resolve_v3_dispute_mapping_key "${mapping}" "${key}")"
   mapping_result="$(curl --fail --silent --max-time 3 \
     "${ALEO_E2E_ENDPOINT}/testnet/program/${PROGRAM_ID}/mapping/${mapping}/${key}")" \
     || die "could not read ${mapping}[${key}]"
@@ -1845,6 +1874,7 @@ capture_mapping_or_null() {
   local key="$3"
   local mapping_result=""
 
+  key="$(resolve_v3_dispute_mapping_key "${mapping}" "${key}")"
   mapping_result="$(curl --fail --silent --max-time 3 \
     "${ALEO_E2E_ENDPOINT}/testnet/program/${PROGRAM_ID}/mapping/${mapping}/${key}")" \
     || die "could not read ${mapping}[${key}]"
@@ -1892,6 +1922,7 @@ capture_v3_mapping_with_diagnostics() {
   local key="$4"
   local body_file="" header_file="" http_status="" content_type="" mapping_result=""
 
+  key="$(resolve_v3_dispute_mapping_key "${mapping}" "${key}")"
   body_file="$(mktemp "${REPORT_DIR}/v3-mapping-body.XXXXXX")"
   header_file="$(mktemp "${REPORT_DIR}/v3-mapping-header.XXXXXX")"
   if ! http_status="$(curl --silent --show-error --max-time 3 --output "${body_file}" --dump-header "${header_file}" --write-out '%{http_code}' "${ALEO_E2E_ENDPOINT}/testnet/program/${PROGRAM_ID}/mapping/${mapping}/${key}")"; then

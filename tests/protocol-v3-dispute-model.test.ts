@@ -135,3 +135,12 @@ test("post-lock settlement cannot exceed the amount reserved at lock", () => {
   assert.match(settle, /assert_eq\(verdict, metadata\.final_severity\);/);
   assert.match(settle, /assert_eq\(reward_amount, payout\.reserved_amount\)/);
 });
+
+test("remediation disputes default to retryable reproduction only after the panel decision deadline", () => {
+  const reject = entry("finalize_rejection_v3");
+  assert.match(reject, /let remediation_timeout: bool =\s*remediation_dispute &&\s*verdict == 0u8/);
+  assert.match(reject, /std::ctx::block_height\(\) >\s*current\.updated_height \+ config\.decision_window_blocks/);
+  assert.match(reject, /remediation_ruling:[\s\S]*remediation_timeout/);
+  assert.match(reject, /remediation_accepted: bool = verdict == receipt\.severity/);
+  assert.match(reject, /next_status: u8 = remediation_accepted \? 10u8 : 7u8/);
+});

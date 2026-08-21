@@ -4,6 +4,9 @@ import { test } from "node:test";
 import { redactAleoCliOutput } from "../scripts/redact-aleo-cli-output.mjs";
 
 const script = readFileSync("scripts/upgrade-aleo-testnet-v3.sh", "utf8").replace(/\r\n/g, "\n");
+const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
+  scripts: Record<string, string>;
+};
 
 test("Edition 3 preview is public-only and exits before any private-key path", () => {
   const previewStart = script.indexOf('if [[ "${MODE}" == "preview" ]]; then');
@@ -36,4 +39,11 @@ test("Edition 3 broadcast writes only redacted Leo CLI output", () => {
   assert.match(script, /2>&1 \| node "\$\{SCRIPT_DIR\}\/redact-aleo-cli-output\.mjs" >"\$\{LEO_UPGRADE_LOG\}"/);
   assert.doesNotMatch(script, /leo-result\.json|RAW_RESULT/);
   assert.ok(script.indexOf("Type UPGRADE EDITION 3 to continue") < script.indexOf("    --yes"));
+});
+
+test("Edition 4 broadcast command pins the public Edition transition", () => {
+  assert.equal(
+    packageJson.scripts["broadcast:testnet-edition-4"],
+    "EXPECTED_CURRENT_EDITION=3 EXPECTED_TARGET_EDITION=4 bash scripts/upgrade-aleo-testnet-v3.sh --broadcast",
+  );
 });

@@ -1,6 +1,6 @@
-# zkBugBounty 操作手册
+# 历史归档：zkBugBounty Edition 1 操作手册
 
-本手册对应当前 Aleo Testnet Edition 1 前端。它描述公开协议操作与页面填写方式，不要求、收集或保存 Private Key、Seed Phrase、View Key、Private Witness、Exploit、PoC 或触发参数。
+> 此文档仅保留 Edition 1 页面与历史截图对应关系，不适用于当前 Testnet。请使用 [Protocol V3 操作手册（Edition 4 当前版）](operation-manual-v3.zh.md)。它同样不要求、收集或保存 Private Key、Seed Phrase、View Key、Private Witness、Exploit、PoC 或触发参数。
 
 ## 0. 使用前检查
 

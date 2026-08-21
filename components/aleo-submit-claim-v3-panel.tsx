@@ -3,6 +3,7 @@
 import {
   CircleAlert,
   Database,
+  Download,
   EyeOff,
   Search,
   ShieldCheck,
@@ -213,6 +214,27 @@ export function AleoSubmitClaimV3Panel() {
     }
   }
 
+  function downloadPublicBindingManifest() {
+    if (!bundle) return;
+    const manifest = {
+      schema: "zkbb-v3-public-binding-manifest-v1",
+      bountyId: bundle.bounty.bountyId,
+      targetSystemCommitment: bundle.policy.targetSystemCommitment,
+      targetCodeHash: bundle.policy.targetCodeHash,
+      targetStateCommitment: targetStateCommitment.trim(),
+      executionCommitment: executionCommitment.trim(),
+      reportCommitment: reportCommitment.trim(),
+      privacyBoundary: "No witness, reporter secret, exploit, PoC, triggering parameter, or plaintext report is included.",
+    };
+    const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `zkbb-${bundle.bounty.bountyId}-public-binding-manifest.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <section className="surface-card rounded-lg p-5" aria-labelledby="submit-v3-claim-title">
       <div className="flex flex-col gap-4 border-b border-white/10 pb-4 lg:flex-row lg:items-start lg:justify-between">
@@ -226,8 +248,8 @@ export function AleoSubmitClaimV3Panel() {
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">
             {text(
-              "目标系统和代码版本来自链上赏金；白帽补充目标状态、执行和报告承诺。私有 witness 直接交给 Leo Wallet，不发送到本站 API。",
-              "The target system and code version come from the on-chain Bounty. The Whitehat adds target-state, execution, and report commitments. The private witness goes directly to Leo Wallet and is never sent to this site's API.",
+            "目标系统和代码版本来自链上赏金；白帽补充目标状态、执行和报告承诺。它们把后续证据固定到本次 Claim，但 DemoVault 电路不自动验证外部系统事实。私有 witness 只交给 Leo Wallet，不发送到本站 API。",
+            "The target system and code version come from the on-chain Bounty. The Whitehat adds target-state, execution, and report commitments. They freeze later evidence to this Claim, but the DemoVault circuit does not automatically verify external-system facts. The private witness goes only to Leo Wallet and never to this site's API.",
             )}
           </p>
         </div>
@@ -240,8 +262,8 @@ export function AleoSubmitClaimV3Panel() {
         <p className="mt-4 flex items-start gap-2 rounded-md border border-amber-300/20 bg-amber-300/[0.05] p-3 text-sm leading-6 text-amber-100/75">
           <CircleAlert className="mt-1 shrink-0" size={16} aria-hidden="true" />
           {text(
-            "当前测试网尚未同时通过 Edition 3、升级证据与完整 Program 哈希核验，V3 Claim 钱包按钮保持关闭。",
-            "Testnet has not passed Edition 3, upgrade-evidence, and complete Program-hash verification. The V3 Claim wallet button remains disabled.",
+            "当前测试网尚未同时通过所需 Program Edition、升级证据与完整 Program 哈希核验，V3 Claim 钱包按钮保持关闭。",
+            "Testnet has not passed the required Program Edition, upgrade evidence, and complete Program-hash verification. The V3 Claim wallet button remains disabled.",
           )}
         </p>
       ) : null}
@@ -265,6 +287,14 @@ export function AleoSubmitClaimV3Panel() {
             <FieldInput label={text("目标状态承诺", "Target-state commitment")} value={targetStateCommitment} onChange={setTargetStateCommitment} placeholder="...field" />
             <FieldInput label={text("可验证执行承诺", "Execution commitment")} value={executionCommitment} onChange={setExecutionCommitment} placeholder="...field" />
             <FieldInput label={text("加密报告承诺", "Encrypted report commitment")} value={reportCommitment} onChange={setReportCommitment} placeholder="...field" />
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-300/20 bg-amber-300/[0.04] p-3 text-xs leading-5 text-amber-100/80">
+            <span>{text("报告承诺必须与后续密文包中的 protocol commitment 完全相同；请先保存仅含公开承诺的绑定清单，真实系统状态、执行制品和私密报告仍由双方在安全通道中保存与核验。", "The report commitment must exactly equal the protocol commitment in the later ciphertext package. Save the public-only binding manifest first; real system state, execution artifacts, and the private report remain for the parties to retain and verify through a secure channel.")}</span>
+            <button className="secondary-action" type="button" onClick={downloadPublicBindingManifest}>
+              <Download size={15} aria-hidden="true" />
+              {text("下载公开绑定清单", "Download public binding manifest")}
+            </button>
           </div>
 
           <details className="mt-4 rounded-md border border-white/10 bg-black/20 p-4">

@@ -15,7 +15,7 @@ const statusStyles: Record<ExecutionStatusKind, string> = {
 const statusLabels: Record<ExecutionStatusKind, readonly [string, string]> = {
   onchain: ["链上已确认", "On-chain confirmed"],
   local: ["本地模拟", "Local simulation"],
-  unavailable: ["等待程序升级", "Awaiting program upgrade"],
+  unavailable: ["链上能力暂不可用", "On-chain capability unavailable"],
 };
 
 const statusIcons = {

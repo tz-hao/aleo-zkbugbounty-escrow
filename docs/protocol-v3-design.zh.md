@@ -6,7 +6,7 @@ V3 将“白帽证明、公开收据、托管资金”升级为可审计的责�
 
 ## 当前状态
 
-Testnet 的 Edition 2 是历史 V3 部署证据，不再被本前端视为可写入的安全版本。当前源码已完成 Edition 3 加固：通用 SLA、可重复开启的争议轮次、项目方等级锁款、披露包承诺一致性与完整 Program SHA-256 校验均进入合约或能力门。管理员完成 Edition 3 升级、录入升级交易/费用交易/Program SHA-256 前，前端会失败关闭所有 V3 钱包动作；Vercel 前端部署不会替代合约升级。
+Testnet 的 Edition 2 与 Edition 3 是历史 V3 部署证据；当前 Testnet 已公开核验为 Edition 4。Edition 4 包含通用 SLA、可重复开启的争议轮次、项目方等级锁款、披露包承诺一致性、完整 Program SHA-256 校验，以及 REMEDIATION 争议在裁决期无 quorum 时回到 `ReproductionConfirmed` 的活性规则。Vercel 前端部署不替代合约升级，钱包写入仍必须通过公开 Edition、交易和源码哈希核验。
 
 ## 不可改变的隐私边界
 
@@ -31,7 +31,7 @@ Testnet 的 Edition 2 是历史 V3 部署证据，不再被本前端视为可写
 
 | 字段 | 作用 |
 | --- | --- |
-| `disclosure_key_commitment` | 项目方独立披露公钥的承诺，白帽用真实公钥本地加密。 |
+| `disclosure_key_commitment` | 项目方独立披露公钥的承诺：前端从规范化 ECDH 公钥的域分隔 SHA-256 前 31 字节导出非零 field；白帽加密和项目方解密前都会重新核对。 |
 | `target_system_commitment` | 赏金目标系统承诺，Claim 必须与之匹配。 |
 | `target_code_hash` | 被审核代码或版本的哈希边界，Claim 必须与之匹配。 |
 | `panel_id` | 仲裁面板标识。 |
@@ -60,6 +60,7 @@ RewardLocked
 Disputed
   -> 面板接受/白帽胜出超时 -> RewardLocked 或 Paid
   -> 面板驳回/项目方胜出超时 -> Rejected
+  -> REMEDIATION 无 quorum 超时 -> ReproductionConfirmed（奖励继续锁定，项目方可提交新修复）
 ```
 
 所有状态均记录区块高度和操作承诺。`OwnerRejected` 和 `ReproductionRejected` 是可申诉状态，异议期届满才由任何人结算为终态 `Rejected`；`Paid` 与 `Rejected` 均不可再次推进。
@@ -125,9 +126,9 @@ V3 Claim 已绑定 Bounty 的目标系统承诺和目标代码哈希，并额外
 
 1. 在本地 Devnode 完成 V3 的所有正常与恶意路径测试。
 2. 审核 Leo ABI 和 Credits 结算边界。
-3. 由 Program Admin 使用 Testnet 钱包签名 Program Edition 3 加固升级并支付手续费。
-4. 记录并独立验证升级交易 ID、Edition、费用交易和完整 Program SHA-256。
-5. 只有当前公开状态同时满足 Edition 3、13 个 V3 函数、13 个 V3 Mapping、升级证据和 Program 哈希时，前端才启用真实 V3 钱包操作。
+3. 当前公开 Edition 4 已通过升级交易、费用交易和完整 Program SHA-256 核验。
+4. Edition 4 已完成 ABI、Credits、Devnode E2E 和无密钥 preview 后，由 Program Admin 使用 Testnet 钱包签名升级并支付手续费。
+5. 已记录并独立验证 Edition 4 升级交易 ID、费用交易和完整 Program SHA-256；前端以 Edition 4 链上能力为准。
 6. 部署 Vercel Preview 并完成钱包人工验收后，才可提升到 Production。
 
 仅部署 Vercel 不会更新 Aleo Program；前端必须继续以链上探测结果为准，不可回退到浏览器状态。
@@ -144,6 +145,6 @@ claim_v3_project_decisions
 claim_v3_dispute_metadata
 ```
 
-因此 Edition 3 的 V3 专用公开映射总数为 13。项目方的 adverse decision、公开 dispute type、开立人、状态、请求等级与最终等级均成为可验证链上状态；每个 Claim 的 active dispute ID 与下一个轮次也可验证。`dispute_commitment` 保留为私有证据的承诺，不公开报告内容。
+Edition 3 引入且 Edition 4 保持的 V3 专用公开映射总数为 13。项目方的 adverse decision、公开 dispute type、开立人、状态、请求等级与最终等级均成为可验证链上状态；每个 Claim 的 active dispute ID 与下一个轮次也可验证。`dispute_commitment` 保留为私有证据的承诺，不公开报告内容。Edition 4 不新增公共函数或 Mapping，只增加 REMEDIATION 到期无 quorum 的确定性默认结论。
 
 对于 `payment_condition = OnPatchAcceptance`，REPRODUCTION 仲裁的正向结果只恢复到 `ReproductionConfirmed` 并继续修复流程；不会在修复确认前支付奖励。

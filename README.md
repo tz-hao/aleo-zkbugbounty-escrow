@@ -11,7 +11,7 @@ zkBugBounty 是一个运行在 **Aleo Testnet** 上的隐私优先、责任披�
 | 在线 DApp | [aleo-gilt.vercel.app](https://aleo-gilt.vercel.app) |
 | Aleo Program | [`zkbugbounty_7f3c92.aleo`](https://testnet.explorer.provable.com/program/zkbugbounty_7f3c92.aleo) |
 | 网络 | Aleo Testnet |
-| 链上状态 | Edition `2` 为历史 V3；Edition `3` 加固版待管理员部署 |
+| 链上状态 | Edition `3` 已公开核验；Edition `4` 修复候选待独立编译、预览与管理员部署 |
 | 合约语言 | Leo 4.4 |
 | 前端 | Next.js 16, React 19, TypeScript, Tailwind CSS |
 
@@ -33,7 +33,7 @@ zkBugBounty 将“**证明影响存在**”与“**交付利用细节**”分开
 
 ## Protocol V3：责任披露、仲裁与结算
 
-Testnet 上现存的是 **Edition 2 / Protocol V3 历史版本**。本仓库已经将真实 V3 钱包动作失败关闭，直到管理员部署并记录 **Edition 3 加固版**的交易、费用交易和完整 Program SHA-256。这样不会把旧版的状态机缺口暴露给真实资金。
+Testnet 当前是已公开核验的 **Edition 4 / Protocol V3**。前端只在公开 Edition、升级交易、费用交易和完整 Program SHA-256 同时匹配时启用 V3 钱包动作。Edition 4 已修复 REMEDIATION 争议在仲裁面板未达门槛时可能长期停留在 `Disputed` 的活性问题：裁决期到期且无 quorum 时，Claim 回到 `ReproductionConfirmed`，奖励保持锁定。
 
 ```text
 Submitted
@@ -157,7 +157,7 @@ npm run leo:build
 ```bash
 npm run verify:testnet-edition-1
 npm run verify:testnet-edition-2
-npm run verify:testnet-edition-3 # 仅在录入 Edition 3 公开证据后可通过
+npm run verify:testnet-edition-4 # 校验当前 Edition 4 公开证据
 npm run verify:testnet-mapping -- --mapping bounties --key <bounty_id_field>
 ```
 
@@ -167,14 +167,15 @@ npm run verify:testnet-mapping -- --mapping bounties --key <bounty_id_field>
 - [Aleo Program Explorer](https://testnet.explorer.provable.com/program/zkbugbounty_7f3c92.aleo)
 - [Protocol V3 设计](docs/protocol-v3-design.zh.md)
 - [V3 争议授权与结算矩阵](docs/protocol-v3-dispute-matrix.zh.md)
+- [V3 当前操作手册](docs/operation-manual-v3.zh.md)
 - [V3 Local Devnode E2E](docs/protocol-v3-devnode-e2e.zh.md)
 
 ## 当前限制与下一步
 
-- Edition 2 是可公开验证的历史版本，但不再获准处理真实 V3 钱包操作。Edition 3 部署和公开证据录入完成前，页面会保持失败关闭。
-- Edition 3 修复了通用 SLA 超时、同一 Claim 多轮争议、项目方下调等级后的锁款、披露包承诺一致性和完整 Program 哈希校验；部署步骤见 [Edition 3 加固操作手册](docs/testnet-edition-3-hardening-runbook.zh.md)。
+- Edition 4 是当前公开可验证的 V3 版本；Edition 2 与 Edition 3 仅作历史证据，不能用于当前 V3 钱包流程。
+- Edition 4 已修复 REMEDIATION 争议无 quorum 超时的链上活性问题；其公开交易、费用交易和哈希记录见 [Edition 4 修复说明](docs/protocol-v3-edition-4-remediation-hardening.zh.md)。
 - Credits 结算、重放保护和失败原子性已经在 Local Devnode 完整 E2E 中验证；需要以全新 Testnet 数据完成持续的人工端到端验收。
-- 加密披露的收件人绑定与链上承诺已实现；生产级交付仍需配套密钥分发、持久化与外部安全审计。
+- V3 页面可在本地生成专用 ECDH 密钥，并从规范化公钥确定性导出链上披露 field 承诺；同时生成/核验绑定到 Claim 的密文包，并为每位仲裁员生成独立证据包。密钥、密文与明文不经服务器或浏览器持久化；真实目标状态仍需外部安全流程和审计。
 - 需要正式协议审计，以及超出 DemoVault 的可验证不变量库。
 
 ## License

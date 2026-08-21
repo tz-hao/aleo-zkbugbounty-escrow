@@ -1,6 +1,6 @@
 # 历史归档：Protocol V3 / Aleo Testnet Edition 2 升级操作手册
 
-> 此文档仅保留已完成的 Edition 2 历史记录。当前仓库已移除 `preview:testnet-edition-2`，也不允许 Edition 2 启用真实 V3 钱包操作。以下命令不要作为当前上线步骤执行；请使用 [Edition 3 加固操作手册](testnet-edition-3-hardening-runbook.zh.md)。
+> 此文档仅保留已完成的 Edition 2 历史记录。当前仓库已移除 `preview:testnet-edition-2`，也不允许 Edition 2 启用真实 V3 钱包操作。以下命令不要作为当前上线步骤执行；请阅读 [Edition 4 修复部署记录](protocol-v3-edition-4-remediation-hardening.zh.md) 了解当前公开边界。
 
 ## 安全边界
 

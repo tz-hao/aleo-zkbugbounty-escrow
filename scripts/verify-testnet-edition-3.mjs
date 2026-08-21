@@ -73,7 +73,7 @@ async function main() {
     !SHA256_HEX.test(config.onChainProgramSourceSha256)
   ) {
     console.error(
-      "Edition 3 evidence is incomplete. Record public upgrade ID, fee ID, compiled Program SHA-256, and on-chain Program source SHA-256 before enabling wallets.",
+      "Current Protocol V3 evidence is incomplete. Record public upgrade ID, fee ID, compiled Program SHA-256, and on-chain Program source SHA-256 before enabling wallets.",
     );
     process.exitCode = 2;
     return;

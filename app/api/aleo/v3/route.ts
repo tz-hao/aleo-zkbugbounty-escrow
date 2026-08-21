@@ -22,7 +22,7 @@ export async function POST() {
   return NextResponse.json(
     {
       error:
-        "Server-side V3 transaction submission is disabled. Use a connected wallet only after Edition 3 and full source-hash upgrade evidence are verified.",
+        "Server-side V3 transaction submission is disabled. Use a connected wallet only after the required Program Edition and full source-hash upgrade evidence are verified.",
     },
     { status: 405 },
   );

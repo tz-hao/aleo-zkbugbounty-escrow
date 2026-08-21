@@ -2,6 +2,7 @@
 
 import {
   CircleAlert,
+  Download,
   Hash,
   KeyRound,
   ShieldCheck,
@@ -22,6 +23,13 @@ import {
   type ProtocolV3TransactionPreview,
 } from "@/lib/aleo-protocol-v3";
 import { DEMO_VAULT_RULES } from "@/lib/demo-vault";
+import {
+  deriveDisclosureKeyCommitment,
+  exportDisclosureKeyBundle,
+  exportDisclosurePublicKey,
+  generateDisclosureRecipientKeys,
+  type DisclosureRecipientKeyBundle,
+} from "@/lib/encrypted-disclosure";
 import type { DemoVaultRuleId } from "@/lib/models";
 import { useAleoWallet } from "./aleo-wallet-provider";
 import { useLocale } from "./locale-provider";
@@ -46,6 +54,8 @@ export function AleoCreateBountyV3Form() {
   const [mediumReward, setMediumReward] = useState("1000000");
   const [deadlineBlocks, setDeadlineBlocks] = useState("100000");
   const [disclosureKeyCommitment, setDisclosureKeyCommitment] = useState("");
+  const [disclosureKeys, setDisclosureKeys] = useState<DisclosureRecipientKeyBundle | null>(null);
+  const [generatedDisclosureCommitment, setGeneratedDisclosureCommitment] = useState("");
   const [targetSystemCommitment, setTargetSystemCommitment] = useState("");
   const [targetCodeHash, setTargetCodeHash] = useState("");
   const [panelId, setPanelId] = useState("");
@@ -150,6 +160,34 @@ export function AleoCreateBountyV3Form() {
     }
   }
 
+  async function generateDisclosureKeys() {
+    setMessage(null);
+    try {
+      const keys = await generateDisclosureRecipientKeys();
+      const commitment = await deriveDisclosureKeyCommitment(keys);
+      setDisclosureKeys(keys);
+      setGeneratedDisclosureCommitment(commitment);
+      setDisclosureKeyCommitment(commitment);
+      setPreview(null);
+      setMessage(text(
+        "披露密钥和对应的链上 field 承诺已在本地生成。下载私钥包和可公开分发的公钥包；它们不会上传或保存到浏览器。",
+        "Disclosure keys and their matching on-chain field commitment were generated locally. Download the private bundle and shareable public bundle; neither is uploaded or browser-persisted.",
+      ));
+    } catch {
+      setMessage(text("无法在本地生成披露密钥。", "Could not generate local disclosure keys."));
+    }
+  }
+
+  function downloadJson(filename: string, value: string) {
+    const blob = new Blob([value], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   function buildPreview() {
     if (network.kind !== "available" || deadlineHeight === null) {
       throw new Error("Aleo Testnet height must be available before creating a V3 Bounty");
@@ -216,7 +254,7 @@ export function AleoCreateBountyV3Form() {
         <div className="max-w-3xl">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-md border border-violet-300/25 bg-violet-300/10 px-2 py-1 text-xs font-semibold text-violet-100">
-              Protocol V3 · Program Edition 3 required
+              Protocol V3 · verified Program required
             </span>
             <span className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-xs text-slate-400">
               {capability.status} · Edition {capability.currentEdition ?? "—"}
@@ -235,7 +273,7 @@ export function AleoCreateBountyV3Form() {
         <span className={enabled ? "text-sm text-emerald-200" : "text-sm text-amber-200"}>
           {enabled
             ? text("钱包操作已启用", "Wallet actions enabled")
-            : text("等待 Edition 3、公开升级证据与 Program 哈希", "Waiting for Edition 3, public upgrade evidence, and Program hash")}
+            : text("等待公开 Program 能力与哈希核验", "Waiting for public Program capability and hash verification")}
         </span>
       </div>
 
@@ -287,6 +325,41 @@ export function AleoCreateBountyV3Form() {
           <FormInput label={text("目标系统承诺", "Target system commitment")} value={targetSystemCommitment} onChange={setTargetSystemCommitment} placeholder="...field" icon={<ShieldCheck size={15} />} />
           <FormInput label={text("目标代码版本哈希", "Target code hash")} value={targetCodeHash} onChange={setTargetCodeHash} placeholder="...field" icon={<Hash size={15} />} />
         </div>
+
+        <details className="rounded-md border border-cyan-300/20 bg-cyan-300/[0.04] p-4">
+          <summary className="focus-ring cursor-pointer text-sm font-semibold text-cyan-100">
+            {text("先生成并保存项目方披露密钥", "Generate and save the Project disclosure key first")}
+          </summary>
+          <p className="mt-3 text-xs leading-5 text-slate-400">
+            {text(
+              "公钥包会在白帽本地加密报告时使用；私钥包只由项目方保存。生成按钮会从规范化公钥以域分隔 SHA-256 的前 31 字节派生非零 Aleo field，并自动填入链上承诺。链上绝不上传 JWK、公钥或私钥。",
+              "The public key package is used when a Whitehat encrypts locally; only the Project retains the private key bundle. The generator derives a non-zero Aleo field from the first 31 bytes of a domain-separated SHA-256 over the canonical public key and fills the on-chain commitment automatically. JWKs, public keys, and private keys are never uploaded on-chain.",
+            )}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button className="secondary-action" type="button" onClick={() => void generateDisclosureKeys()}>
+              <KeyRound size={15} aria-hidden="true" />
+              {text("本地生成密钥", "Generate local keys")}
+            </button>
+            {disclosureKeys ? (
+              <>
+                <button className="secondary-action" type="button" onClick={() => downloadJson("zkbb-v3-disclosure-public-key.json", JSON.stringify({ ...JSON.parse(exportDisclosurePublicKey(disclosureKeys)), protocolV3DisclosureKeyCommitment: generatedDisclosureCommitment }, null, 2))}>
+                  <Download size={15} aria-hidden="true" />
+                  {text("下载公钥包", "Download public key")}
+                </button>
+                <button className="secondary-action border-amber-300/25 text-amber-100" type="button" onClick={() => downloadJson("zkbb-v3-disclosure-private-key.json", exportDisclosureKeyBundle(disclosureKeys))}>
+                  <Download size={15} aria-hidden="true" />
+                  {text("下载私钥包", "Download private key")}
+                </button>
+              </>
+            ) : null}
+          </div>
+          {generatedDisclosureCommitment ? (
+            <p className="mt-3 break-all font-mono text-xs text-cyan-100">
+              {text("已生成链上披露公钥承诺：", "Generated on-chain disclosure key commitment:")} {generatedDisclosureCommitment}
+            </p>
+          ) : null}
+        </details>
 
         <div className="rounded-md border border-violet-300/20 bg-violet-300/[0.04] p-4">
           <div className="flex items-center gap-2">

@@ -125,7 +125,7 @@ export const zh = {
   triage: {
     kicker: "漏洞分诊",
     title: "漏洞分诊与负责任披露",
-    description: "核验漏洞声明，推进披露与修复；链上支付等待程序升级。",
+    description: "核验公开声明，推进加密披露、复现、修复和可审计结算。",
     roleNotice: "本页角色仅用于本地演示；链上权限以钱包签名者和程序映射为准。",
     noAccessTitle: "公开用户无法访问漏洞分诊操作。",
     noAccessBody: "公开用户在本地流程中为只读；演示预览不代表钱包或链上权限。",

@@ -94,3 +94,18 @@ test("legacy economic entries are fail-closed and v2 entries are independent", (
   assert.match(fundV2, /transfer\.run\(\);/);
   assert.match(fundV2, /Mapping::set\(bounty_escrows/);
 });
+
+test("frozen fund_bounty preserves its Testnet future-first finalizer ABI", () => {
+  const source = readFileSync("leo/bug_proof/src/main.leo", "utf8");
+  const start = source.indexOf("fn fund_bounty(");
+  const end = source.indexOf("\n    fn fund_bounty_v2(", start);
+  const block = source.slice(start, end);
+
+  assert.ok(start >= 0 && end > start, "fund_bounty boundary must exist");
+  assert.match(block, /assert_eq\(amount, 0u64\);/);
+  assert.match(block, /assert_neq\(amount, 0u64\);/);
+  assert.ok(
+    block.indexOf("transfer.run();") < block.indexOf("assert(amount > 0u64);"),
+    "the immutable legacy Credits future must remain first in the finalizer ABI",
+  );
+});

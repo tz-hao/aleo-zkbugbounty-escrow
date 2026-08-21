@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAleoWallet } from "./aleo-wallet-provider";
 import { useLocale } from "./locale-provider";
+import { ProtocolV3SecureDelivery } from "./protocol-v3-secure-delivery";
 import {
   buildCastArbitrationVoteV3Transaction,
   buildDisclosureActionV3Transaction,
@@ -214,9 +215,10 @@ export function ProtocolV3Workbench() {
     [bundle, wallet.address],
   );
 
-  function prepare(action: ActionId) {
+  function prepare(action: ActionId, actionCommitmentOverride?: string) {
     if (!bundle) return;
     try {
+      const actionCommitment = actionCommitmentOverride ?? commitment;
       const feeMicrocredits = Number(fee);
       const common = {
         bountyId: bundle.bounty.bountyId,
@@ -244,7 +246,7 @@ export function ProtocolV3Workbench() {
             ...common,
             action: reviewAction,
             projectSeverity,
-            decisionCommitment: commitment,
+            decisionCommitment: actionCommitment,
             actionMarker: marker,
           });
           break;
@@ -265,7 +267,7 @@ export function ProtocolV3Workbench() {
             // receipt; acknowledgement remains a separate owner commitment.
             actionCommitment: action === "deliver-disclosure"
               ? bundle.evidence.reportCommitment
-              : commitment,
+              : actionCommitment,
             actionMarker: marker,
           });
           break;
@@ -281,7 +283,7 @@ export function ProtocolV3Workbench() {
               action === "reject-reproduction" ? 2 :
               action === "propose-patch" ? 3 :
               action === "accept-patch" ? 4 : 5,
-            actionCommitment: commitment,
+            actionCommitment,
             actionMarker: marker,
           });
           break;
@@ -297,7 +299,7 @@ export function ProtocolV3Workbench() {
               disputeType === PROTOCOL_V3_DISPUTE_TYPES.Severity
                 ? selectedSeverity
                 : 0,
-            disputeCommitment: commitment,
+            disputeCommitment: actionCommitment,
             feeAmount: bundle.policy.arbitrationFeeMicrocredits,
             disputeMarker: marker,
           });
@@ -605,6 +607,22 @@ export function ProtocolV3Workbench() {
             </div>
           </div>
 
+          <ProtocolV3SecureDelivery
+            claimHash={bundle.receipt.claimHash}
+            disclosureKeyCommitment={bundle.policy.disclosureKeyCommitment}
+            reportCommitment={bundle.evidence.reportCommitment}
+            disputeCommitment={bundle.disputeMetadata?.status === "Open"
+              ? bundle.disputeMetadata.disputeCommitment
+              : null}
+            state={bundle.state.status}
+            ownerAddress={bundle.bounty.owner}
+            whitehatAddress={bundle.state.whitehatAddress}
+            arbiters={bundle.policy.arbiters}
+            connectedAddress={wallet.address}
+            onPrepareDelivery={() => prepare("deliver-disclosure")}
+            onPrepareAcknowledgement={() => prepare("acknowledge-disclosure", bundle.evidence.reportCommitment)}
+          />
+
           {bundle.tally ? (
             <div className="mt-4 grid gap-3 rounded-md border border-violet-300/20 bg-violet-300/[0.05] p-4 sm:grid-cols-4">
               <PublicField label={text("驳回票", "Reject")} value={String(bundle.tally.rejectVotes)} />
@@ -693,7 +711,6 @@ function availableActions(bundle: ClaimBundle | null, address: string | null): A
       );
     }
     if (status === "Accepted") result.push("lock-reward", "reject-claim", "mark-duplicate", "mark-scope");
-    if (status === "DisclosureDelivered") result.push("acknowledge-disclosure");
     if (status === "DisclosureAcknowledged") {
       result.push("confirm-reproduction", "reject-reproduction");
     }
@@ -709,7 +726,6 @@ function availableActions(bundle: ClaimBundle | null, address: string | null): A
   }
 
   if (whitehat) {
-    if (status === "RewardLocked") result.push("deliver-disclosure");
     if (status === "PatchProposed") result.push("accept-patch");
     const appealableDecision =
       decision === "Rejection" ||

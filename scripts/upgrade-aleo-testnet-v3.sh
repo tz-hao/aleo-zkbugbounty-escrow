@@ -15,8 +15,11 @@ umask 077
 
 EXPECTED_PROGRAM_ID="zkbugbounty_7f3c92.aleo"
 EXPECTED_ADMIN_ADDRESS="aleo19cavyq6przvp7d5yjtpm60z5nh58rqd0vc3zr8q409fdqdtn7ypq8vfqx6"
-EXPECTED_CURRENT_EDITION="2"
-EXPECTED_TARGET_EDITION="3"
+# Defaults preserve the historical Edition 3 preview. New candidates set these
+# explicit environment variables, for example 3 -> 4, without duplicating the
+# private-key-safe upgrade wrapper.
+EXPECTED_CURRENT_EDITION="${EXPECTED_CURRENT_EDITION:-2}"
+EXPECTED_TARGET_EDITION="${EXPECTED_TARGET_EDITION:-3}"
 NETWORK="testnet"
 ENDPOINT="https://api.explorer.provable.com/v1"
 
@@ -189,7 +192,9 @@ write_public_evidence() {
         "${git_commit}" \
         "${public_admin_address}" \
         "${public_balance_microcredits}" \
-        "${fee_estimate_microcredits}" <<'PY'
+        "${fee_estimate_microcredits}" \
+        "${EXPECTED_CURRENT_EDITION}" \
+        "${EXPECTED_TARGET_EDITION}" <<'PY'
 import datetime
 import json
 import sys
@@ -207,6 +212,8 @@ import sys
     public_admin_address,
     public_balance_microcredits,
     fee_estimate_microcredits,
+    previous_edition,
+    target_edition,
 ) = sys.argv[1:]
 
 evidence = {
@@ -214,8 +221,8 @@ evidence = {
     "recorded_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     "network": "testnet",
     "program_id": "zkbugbounty_7f3c92.aleo",
-    "previous_edition": 2,
-    "target_edition": 3,
+    "previous_edition": int(previous_edition),
+    "target_edition": int(target_edition),
     "mode": mode,
     "status": status,
     "upgrade_transaction_id": upgrade_transaction_id or None,
@@ -345,7 +352,7 @@ for mapping_name in "${required_mappings[@]}"; do
     grep -F -q "mapping ${mapping_name}:" "${COMPILED_PROGRAM}" ||
         fail "Compiled Program is missing V3 mapping: ${mapping_name}"
 done
-printf 'V3 Edition 3 hardening surface: 13 functions and 13 mappings present\n'
+printf 'Protocol V3 Edition %s candidate surface: 13 functions and 13 mappings present\n' "${EXPECTED_TARGET_EDITION}"
 
 SOURCE_SHA="$(sha256sum "${LEO_PROJECT_DIR}/src/main.leo" | awk '{print $1}')"
 COMPILED_SHA="$(sha256sum "${COMPILED_PROGRAM}" | awk '{print $1}')"
@@ -354,7 +361,7 @@ GIT_COMMIT="$(git -C "${PROJECT_ROOT}" rev-parse HEAD 2>/dev/null || true)"
 
 mkdir -p -- "${RESULT_DIR}"
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-PUBLIC_EVIDENCE="${RESULT_DIR}/edition-3-${MODE}-${TIMESTAMP}.json"
+PUBLIC_EVIDENCE="${RESULT_DIR}/edition-${EXPECTED_TARGET_EDITION}-${MODE}-${TIMESTAMP}.json"
 
 printf 'Source SHA256: %s\n' "${SOURCE_SHA}"
 printf 'Compiled Program SHA256: %s\n' "${COMPILED_SHA}"
@@ -393,9 +400,9 @@ KEY_PREFIX="A""PrivateKey1"
     fail "The entered value does not have the expected Aleo private-key format."
 [[ ${#PRIVATE_KEY} -ge 40 ]] || fail "The entered value is too short."
 
-printf 'WARNING: this will request an irreversible Aleo Testnet Edition 3 hardening upgrade.\n'
-read -rp 'Type UPGRADE EDITION 3 to continue: ' CONFIRMATION
-[[ "${CONFIRMATION}" == "UPGRADE EDITION 3" ]] ||
+printf 'WARNING: this will request an irreversible Aleo Testnet Edition %s upgrade.\n' "${EXPECTED_TARGET_EDITION}"
+read -rp "Type UPGRADE EDITION ${EXPECTED_TARGET_EDITION} to continue: " CONFIRMATION
+[[ "${CONFIRMATION}" == "UPGRADE EDITION ${EXPECTED_TARGET_EDITION}" ]] ||
     fail "Broadcast confirmation did not match. Nothing was broadcast."
 
 upgrade_args=(

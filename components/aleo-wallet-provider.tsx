@@ -531,7 +531,7 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
       capabilityPayload.protocolV3.programHashVerified !== true
     ) {
       throw new Error(
-        "submit_claim_v3 requires verified Edition 3 source-hash deployment evidence",
+        "submit_claim_v3 requires verified Program Edition source-hash deployment evidence",
       );
     }
     if (
@@ -739,7 +739,7 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
       capabilityPayload.protocolV3.programHashVerified !== true
     ) {
       throw new Error(
-        "Protocol V3 requires verified Edition 3 source-hash deployment evidence",
+        "Protocol V3 requires verified Program Edition source-hash deployment evidence",
       );
     }
 

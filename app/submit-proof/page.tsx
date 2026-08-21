@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Send,
   ShieldAlert,
+  ShieldCheck,
   WalletCards,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -51,7 +52,7 @@ type OnChainEscrowResponse = {
   error?: string;
 };
 
-type SubmissionMode = "real" | "demo";
+type SubmissionMode = "v3" | "legacy" | "demo";
 
 export default function SubmitProofPage() {
   const router = useRouter();
@@ -90,7 +91,7 @@ export default function SubmitProofPage() {
   const [walletClaimMessage, setWalletClaimMessage] = useState("");
   const [isLoadingBounty, setIsLoadingBounty] = useState(false);
   const [isRequestingWallet, setIsRequestingWallet] = useState(false);
-  const [submissionMode, setSubmissionMode] = useState<SubmissionMode>("real");
+  const [submissionMode, setSubmissionMode] = useState<SubmissionMode>("v3");
   const demoAllowed = canSubmitProof(state.currentActor);
 
   const selectedBounty = useMemo(
@@ -98,14 +99,14 @@ export default function SubmitProofPage() {
     [bountyId, state.bounties],
   );
   const activeRuleId =
-    submissionMode === "real" ? onChainBounty?.ruleId : selectedBounty?.ruleId;
+    submissionMode === "legacy" ? onChainBounty?.ruleId : selectedBounty?.ruleId;
   const walletIsBountyOwner =
     wallet.connectionState === "Connected" &&
     Boolean(wallet.address) &&
     Boolean(onChainBounty) &&
     wallet.address!.toLowerCase() === onChainBounty!.owner.toLowerCase();
   const privateInputsDisabled =
-    submissionMode === "real"
+    submissionMode === "legacy"
       ? !onChainBounty || onChainProtocolVersion !== 2
       : !demoAllowed;
 
@@ -369,24 +370,41 @@ export default function SubmitProofPage() {
             </div>
           <div
             aria-label={text("漏洞声明提交模式", "Claim submission mode")}
-              className="grid shrink-0 grid-cols-2 rounded-lg border border-white/10 bg-black/20 p-1"
+              className="grid shrink-0 grid-cols-3 rounded-lg border border-white/10 bg-black/20 p-1"
           >
             <button
-              aria-pressed={submissionMode === "real"}
+              aria-pressed={submissionMode === "v3"}
               className={`focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold ${
-                submissionMode === "real"
+                submissionMode === "v3"
                   ? "bg-cyan-300/14 text-cyan-100"
                   : "text-slate-400 hover:bg-white/[0.05] hover:text-white"
               }`}
               onClick={() => {
-                setSubmissionMode("real");
+                setSubmissionMode("v3");
+                setProof(null);
+                setError("");
+              }}
+              type="button"
+            >
+              <ShieldCheck size={15} aria-hidden="true" />
+              {text("V3 当前协议", "V3 current")}
+            </button>
+            <button
+              aria-pressed={submissionMode === "legacy"}
+              className={`focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold ${
+                submissionMode === "legacy"
+                  ? "bg-amber-300/14 text-amber-100"
+                  : "text-slate-400 hover:bg-white/[0.05] hover:text-white"
+              }`}
+              onClick={() => {
+                setSubmissionMode("legacy");
                 setProof(null);
                 setError("");
               }}
               type="button"
             >
               <Database size={15} aria-hidden="true" />
-              Aleo Testnet
+              {text("V2 历史兼容", "V2 legacy")}
             </button>
             <button
               aria-pressed={submissionMode === "demo"}
@@ -409,13 +427,14 @@ export default function SubmitProofPage() {
           </div>
         </div>
         {submissionMode === "demo" ? <DemoRolePreview /> : null}
-        {submissionMode === "real" ? <AleoSubmitClaimV3Panel /> : null}
+        {submissionMode === "v3" ? <AleoSubmitClaimV3Panel /> : null}
+        {submissionMode !== "v3" ? (
         <form className="surface-card grid gap-4 rounded-lg p-5" onSubmit={handleGenerate}>
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
             <p className="page-kicker">
-              {submissionMode === "real" ? text("测试网漏洞声明", "Testnet claim") : text("本地验证", "Local verification")}
+              {submissionMode === "legacy" ? text("V2 历史测试网声明", "V2 legacy Testnet claim") : text("本地验证", "Local verification")}
             </p>
-            {submissionMode === "real" ? (
+            {submissionMode === "legacy" ? (
               <span className="text-xs font-semibold text-cyan-100">
                 Mapping → Witness → Wallet
               </span>
@@ -646,7 +665,7 @@ export default function SubmitProofPage() {
               />
             </label>
           ) : null}
-          {submissionMode === "real" ? (
+          {submissionMode === "legacy" ? (
             onChainBounty && latestBlockHeight !== null && onChainProtocolVersion === 2 ? (
               <section className="border-t border-cyan-300/20 pt-4">
                 <div>
@@ -765,6 +784,7 @@ export default function SubmitProofPage() {
             </div>
           )}
         </form>
+        ) : null}
       </section>
       {submissionMode === "demo" ? (
         <ProofPanel error={error} isLoading={isGenerating} proof={proof} />

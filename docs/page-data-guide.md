@@ -193,7 +193,7 @@ Real Mode 的 Bug Type、Rule 与 Scope Hash 由已读取的 Bounty 和 Program 
 
 ## 8. Triage `/triage`
 
-当前 Testnet 已部署版本不支持链上奖励托管、锁定、支付或退款。因此本页不能用于发起真实资金操作。
+当前 Testnet 的 Edition 4 支持经公开能力门核验后的 V3 托管、锁定、支付和退款，以及 REMEDIATION 无 quorum 到期后的确定性恢复。页面只会在公开 Edition、升级证据与 Program 哈希同时通过时请求 Leo Wallet 签名；任何 Endpoint 不可用或证据不匹配都会失败关闭，绝不回退到 Demo。
 
 可执行的安全操作：
 
@@ -391,7 +391,7 @@ Real Mode 的 Bug Type、Rule 与 Scope Hash 由已读取的 Bounty 和 Program 
 
 ### 12.8 Triage `/triage`
 
-当前页面不能发起真实 Escrow、锁定奖励或付款。若出现公开备注输入，仅填写可公开、非技术细节的状态信息。
+当前页面可在 Edition 4 公开能力门通过后，为 V3 Claim 构建真实 Escrow、锁定、披露确认、仲裁和付款交易预览。只有 `Mapping Verified` 才表示链上动作完成；公开备注仍只能填写非技术细节。
 
 可填写示例：
 

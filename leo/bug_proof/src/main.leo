@@ -824,6 +824,14 @@ program zkbugbounty_7f3c92.aleo {
             amount,
         );
         return final {
+            // This frozen Edition 0 finalizer has a Credits future as its
+            // first public input on Testnet. Moving `transfer.run()` below
+            // any check or mapping operation changes that immutable input
+            // ordering and makes every later Edition incompatible. Its
+            // transition is fail-closed (`amount == 0 && amount != 0`), so
+            // no valid execution can ever reach this legacy finalizer.
+            // Keep the historical ordering; active V2/V3 economic entries
+            // remain CEI-ordered and are the only usable funding paths.
             transfer.run();
             assert(amount > 0u64);
             assert(funding_marker != 0field);
@@ -3350,6 +3358,18 @@ program zkbugbounty_7f3c92.aleo {
             assert(unresolved_claims > 0u64);
 
             let remediation_dispute: bool = metadata.dispute_type == 6u8;
+            // The Owner opens a remediation dispute only after the Whitehat has
+            // not accepted a proposed patch during the review window. If the
+            // immutable panel also fails to reach quorum during its decision
+            // window, preserve liveness by returning to ReproductionConfirmed
+            // and returning the Owner-paid arbitration bond to the Whitehat.
+            // This does not unlock or pay the reward: the Owner may propose a
+            // new patch and the Whitehat retains the ordinary acceptance path.
+            let remediation_timeout: bool =
+                remediation_dispute &&
+                verdict == 0u8 &&
+                std::ctx::block_height() >
+                current.updated_height + config.decision_window_blocks;
             let whitehat_sla_timeout: bool =
                 metadata.dispute_type == 7u8 &&
                 current.pre_dispute_status == 4u8 &&
@@ -3363,7 +3383,8 @@ program zkbugbounty_7f3c92.aleo {
             let remediation_ruling: bool =
                 remediation_dispute &&
                 (verdict == 0u8 || verdict == receipt.severity) &&
-                v3_verdict_has_quorum(tally, verdict, config.quorum);
+                (v3_verdict_has_quorum(tally, verdict, config.quorum) ||
+                 remediation_timeout);
             assert(standard_rejection || remediation_ruling);
             let expected_recipient: address =
                 remediation_dispute && verdict == 0u8

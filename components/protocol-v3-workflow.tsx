@@ -29,7 +29,7 @@ export function ProtocolV3Workflow() {
             )}
           </p>
         </div>
-        <span className="w-fit rounded-md border border-violet-300/25 bg-violet-300/10 px-2 py-1 font-mono text-xs text-violet-100">v3 · local build ready · Testnet upgrade pending</span>
+        <span className="w-fit rounded-md border border-emerald-300/25 bg-emerald-300/10 px-2 py-1 font-mono text-xs text-emerald-100">v3 · Testnet Edition 4 verified</span>
       </div>
 
       <ol className="mt-5 grid gap-3 lg:grid-cols-5">
@@ -50,7 +50,7 @@ export function ProtocolV3Workflow() {
 
       <p className="mt-4 flex items-start gap-2 border-l-2 border-amber-300/40 pl-3 text-xs leading-5 text-amber-100/80">
         <ShieldAlert className="mt-0.5 shrink-0" size={15} aria-hidden="true" />
-        {text("V3 合约源码已在本地编译并通过旧 ABI 兼容检查；当前 Testnet 仍为 V2。V3 钱包操作会保持禁用，直到新版 Program Edition 在链上确认。", "The V3 contract source compiles locally and passes the legacy ABI compatibility check; Testnet still runs V2. V3 wallet actions remain disabled until the new Program Edition is confirmed on-chain.")}
+        {text("Testnet Edition 4 已公开核验。修复争议在裁决窗口内未达仲裁门槛时，将确定性地回到“已确认复现”，而非永久卡在争议中；奖励仍保持锁定。", "Testnet Edition 4 is publicly verified. A remediation dispute without quorum by its decision deadline deterministically returns to Reproduction Confirmed instead of remaining stuck; the reward remains locked.")}
       </p>
     </section>
   );

@@ -101,7 +101,25 @@ test("V3 constrains rulings and settlement routes by dispute type", () => {
   assert.match(settle, /post_arbitration_award/);
   assert.match(reject, /remediation_dispute/);
   assert.match(reject, /remediation_ruling/);
+  assert.match(reject, /let remediation_timeout: bool/);
+  assert.match(reject, /remediation_dispute &&\s*verdict == 0u8/);
+  assert.match(reject, /current\.updated_height \+ config\.decision_window_blocks/);
+  assert.match(reject, /v3_verdict_has_quorum\(tally, verdict, config\.quorum\) \|\|\s*remediation_timeout/);
   assert.match(reject, /next_status: u8 = remediation_accepted \? 10u8 : 7u8/);
+});
+
+test("V3 remediation timeout preserves Credits and unblocks a no-quorum dispute", () => {
+  const reject = entry("finalize_rejection_v3");
+  const timeoutStart = reject.indexOf("let remediation_timeout: bool");
+  const rulingStart = reject.indexOf("let remediation_ruling: bool");
+  const transferRun = reject.lastIndexOf("transfer.run()");
+
+  assert.ok(timeoutStart >= 0 && rulingStart > timeoutStart);
+  assert.match(reject, /remediation_timeout:[\s\S]*verdict == 0u8/);
+  assert.match(reject, /remediation_timeout:[\s\S]*current\.updated_height \+ config\.decision_window_blocks/);
+  assert.match(reject, /remediation_dispute && verdict == 0u8\s*\? current\.whitehat_address/);
+  assert.match(reject, /let next_status: u8 = remediation_accepted \? 10u8 : 7u8/);
+  assert.ok(reject.lastIndexOf("Mapping::set") < transferRun, "state must commit before bond transfer");
 });
 
 test("V3 locks a reviewed severity and binds encrypted delivery to the initial report commitment", () => {
@@ -139,17 +157,20 @@ test("V3 writes state and replay guards before every Credits Final", () => {
   }
 });
 
-test("frozen legacy fund_bounty fails before Final and leaves its CEI warning unreachable", () => {
+test("frozen legacy fund_bounty fails before Final and preserves its immutable future order", () => {
   const legacyFund = entry("fund_bounty");
   const firstGuard = legacyFund.indexOf("assert_eq(amount, 0u64);");
   const contradictoryGuard = legacyFund.indexOf("assert_neq(amount, 0u64);");
   const creditsFinal = legacyFund.indexOf("let transfer: Final");
   const finalizer = legacyFund.indexOf("return final {");
+  const finalRun = legacyFund.lastIndexOf("transfer.run();");
+  const finalStateWrite = legacyFund.lastIndexOf("Mapping::set(bounty_escrows, bounty_id, updated);");
 
   assert.ok(firstGuard >= 0 && contradictoryGuard > firstGuard);
   assert.ok(creditsFinal > contradictoryGuard);
   assert.ok(finalizer > creditsFinal);
-  assert.match(legacyFund, /transfer\.run\(\)/);
+  assert.ok(finalRun > finalizer && finalRun < finalStateWrite);
+  assert.match(legacyFund, /no valid execution can ever reach this legacy finalizer/);
 });
 
 test("V3 uses the full Leo entry budget without changing the preserved V1/V2 surface", () => {
