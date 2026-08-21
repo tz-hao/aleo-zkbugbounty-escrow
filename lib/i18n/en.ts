@@ -134,7 +134,7 @@ export const en: UiCopy = {
   triage: {
     kicker: "Triage",
     title: "Triage and responsible disclosure",
-    description: "Verify the claim and advance disclosure and remediation. On-chain payment is available only after the program upgrade path permits it.",
+    description: "Verify the claim and advance encrypted disclosure, reproduction, remediation, and auditable settlement through the verified V3 Program.",
     roleNotice: "Roles on this page apply only to Local Demo. On-chain authority is enforced by Wallet std::ctx::signer() and Program mappings.",
     noAccessTitle: "Public users cannot access triage actions.",
     noAccessBody: "A Public User is read-only in the local flow. Demo Preview does not represent Wallet or on-chain authority.",

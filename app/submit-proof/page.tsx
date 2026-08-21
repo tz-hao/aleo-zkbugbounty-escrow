@@ -370,7 +370,7 @@ export default function SubmitProofPage() {
             </div>
           <div
             aria-label={text("漏洞声明提交模式", "Claim submission mode")}
-              className="grid shrink-0 grid-cols-3 rounded-lg border border-white/10 bg-black/20 p-1"
+              className="grid shrink-0 grid-cols-2 rounded-lg border border-white/10 bg-black/20 p-1"
           >
             <button
               aria-pressed={submissionMode === "v3"}
@@ -388,23 +388,6 @@ export default function SubmitProofPage() {
             >
               <ShieldCheck size={15} aria-hidden="true" />
               {text("V3 当前协议", "V3 current")}
-            </button>
-            <button
-              aria-pressed={submissionMode === "legacy"}
-              className={`focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold ${
-                submissionMode === "legacy"
-                  ? "bg-amber-300/14 text-amber-100"
-                  : "text-slate-400 hover:bg-white/[0.05] hover:text-white"
-              }`}
-              onClick={() => {
-                setSubmissionMode("legacy");
-                setProof(null);
-                setError("");
-              }}
-              type="button"
-            >
-              <Database size={15} aria-hidden="true" />
-              {text("V2 历史兼容", "V2 legacy")}
             </button>
             <button
               aria-pressed={submissionMode === "demo"}
@@ -426,6 +409,28 @@ export default function SubmitProofPage() {
           </div>
           </div>
         </div>
+        <details className="rounded-lg border border-amber-300/20 bg-amber-300/[0.04] p-4" open={submissionMode === "legacy"}>
+          <summary className="focus-ring cursor-pointer list-none text-sm font-semibold text-amber-100">
+            <span className="inline-flex items-center gap-2"><Database size={15} aria-hidden="true" />{text("历史兼容：已有 V2 声明", "Historical compatibility: existing V2 Claims")}</span>
+          </summary>
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="max-w-2xl text-xs leading-5 text-amber-100/75">
+              {text("仅用于继续处理已有的 V2 收据。新声明必须走 V3 当前协议；此入口不会创建新的 V2 赏金或绕过 V3 校验。", "Use this only to continue an existing V2 receipt. New Claims must use the current V3 protocol; this entry cannot create a new V2 Bounty or bypass V3 checks.")}
+            </p>
+            <button
+              className="secondary-action border-amber-300/25 text-amber-100"
+              type="button"
+              aria-pressed={submissionMode === "legacy"}
+              onClick={() => {
+                setSubmissionMode("legacy");
+                setProof(null);
+                setError("");
+              }}
+            >
+              {text("打开 V2 兼容", "Open V2 compatibility")}
+            </button>
+          </div>
+        </details>
         {submissionMode === "demo" ? <DemoRolePreview /> : null}
         {submissionMode === "v3" ? <AleoSubmitClaimV3Panel /> : null}
         {submissionMode !== "v3" ? (

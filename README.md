@@ -11,7 +11,7 @@ zkBugBounty 是一个运行在 **Aleo Testnet** 上的隐私优先、责任披�
 | 在线 DApp | [aleo-gilt.vercel.app](https://aleo-gilt.vercel.app) |
 | Aleo Program | [`zkbugbounty_7f3c92.aleo`](https://testnet.explorer.provable.com/program/zkbugbounty_7f3c92.aleo) |
 | 网络 | Aleo Testnet |
-| 链上状态 | Edition `3` 已公开核验；Edition `4` 修复候选待独立编译、预览与管理员部署 |
+| 链上状态 | Edition `4` 已公开核验；V3 钱包动作仅在 Edition、升级证据和完整 Program SHA-256 同时匹配时启用 |
 | 合约语言 | Leo 4.4 |
 | 前端 | Next.js 16, React 19, TypeScript, Tailwind CSS |
 
