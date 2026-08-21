@@ -33,9 +33,8 @@ test("dashboard keeps the privacy promise and one primary protocol entry", () =>
   const combinedSource = `${source}\n${heroSource}`;
 
   for (const phrase of [
-    "私有见证 · 公开证明",
-    "证明漏洞存在",
-    "利用细节保持私密",
+    "copy.home.kicker",
+    "copy.home.title",
     "copy.home.proofAction",
     "href=\"/submit-proof\"",
     "私有见证数据留在设备端",

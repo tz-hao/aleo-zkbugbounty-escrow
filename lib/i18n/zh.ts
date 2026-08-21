@@ -59,8 +59,8 @@ export const zh = {
     publiclyVerifiable: "证明的验证级别已明确标注",
   },
   home: {
-    kicker: "面向负责任披露的隐私漏洞证明协议",
-    title: "证明漏洞存在，而不泄露利用细节",
+    kicker: "零知识负责任披露协议",
+    title: "证明漏洞，不泄露利用细节。",
     description: "zkBugBounty 运行于 Aleo 测试网。白帽研究员可以使用私有见证数据证明安全不变量被破坏，而无需公开利用路径、触发参数或完整概念验证。",
     createAction: "创建漏洞赏金",
     proofAction: "进入协议",
