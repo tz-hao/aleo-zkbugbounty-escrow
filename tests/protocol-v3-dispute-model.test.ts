@@ -28,7 +28,7 @@ function entry(name: string) {
   return source.slice(start, end);
 }
 
-test("six public dispute discriminators are stable and exhaustive", () => {
+test("seven public dispute discriminators are stable and exhaustive", () => {
   assert.deepEqual(PROTOCOL_V3_DISPUTE_TYPES, {
     Rejection: 1,
     Duplicate: 2,
@@ -36,9 +36,10 @@ test("six public dispute discriminators are stable and exhaustive", () => {
     Severity: 4,
     Reproduction: 5,
     Remediation: 6,
+    SlaTimeout: 7,
   });
   const dispute = entry("dispute_claim_v3");
-  assert.match(dispute, /dispute_type == 1u8[\s\S]*dispute_type == 6u8/);
+  assert.match(dispute, /dispute_type == 1u8[\s\S]*dispute_type == 7u8/);
   assert.doesNotMatch(dispute, /dispute_type == 0u8/);
 });
 
@@ -99,14 +100,14 @@ test("public project decisions and immutable dispute metadata parse strictly", (
   assert.equal(metadata.status, "Open");
   assert.equal(metadata.disputeCommitment, "13field");
 
-  assert.throws(
-    () => parseOnChainClaimV3DisputeMetadata(
-      "{ claim_hash: 10field, bounty_id: 1field, dispute_type: 7u8, dispute_commitment: 13field, opener: " + address("a") + ", opened_height: 14u32, status: 1u8, requested_severity: 0u8, final_severity: 0u8 }",
-      "10field",
-      config,
-    ),
-    /dispute type is unsupported/i,
+  const timeout = parseOnChainClaimV3DisputeMetadata(
+    "{ claim_hash: 10field, bounty_id: 1field, dispute_type: 7u8, dispute_commitment: 13field, opener: " + address("a") + ", opened_height: 14u32, status: 1u8, requested_severity: 0u8, final_severity: 0u8 }",
+    "11field",
+    config,
+    "10field",
   );
+  assert.equal(timeout.disputeType, "SlaTimeout");
+  assert.equal(timeout.disputeId, "11field");
 });
 
 test("each dispute type is tied to an adverse decision and constrained ruling", () => {
@@ -119,6 +120,8 @@ test("each dispute type is tied to an adverse decision and constrained ruling", 
   assert.match(dispute, /decision\.decision == 5u8/);
   assert.match(dispute, /decision\.decision == 6u8/);
   assert.match(dispute, /decision\.decision == 7u8/);
+  assert.match(dispute, /owner_sla_timeout/);
+  assert.match(dispute, /whitehat_sla_timeout/);
   assert.match(vote, /let binary_ruling: bool/);
   assert.match(vote, /metadata\.dispute_type == 4u8/);
   assert.match(vote, /verdict <= receipt\.severity/);
@@ -126,9 +129,18 @@ test("each dispute type is tied to an adverse decision and constrained ruling", 
   assert.match(resolution, /config\.payment_condition == 2u8/);
 });
 
-test("post-arbitration settlement must use the stored final severity", () => {
+test("post-lock settlement cannot exceed the amount reserved at lock", () => {
   const settle = entry("settle_reward_v3");
   assert.match(settle, /metadata\.status == 2u8/);
   assert.match(settle, /assert_eq\(verdict, metadata\.final_severity\);/);
-  assert.match(settle, /reward_for_v3_severity\(\s*bounty,\s*selected_severity,/);
+  assert.match(settle, /assert_eq\(reward_amount, payout\.reserved_amount\)/);
+});
+
+test("remediation disputes default to retryable reproduction only after the panel decision deadline", () => {
+  const reject = entry("finalize_rejection_v3");
+  assert.match(reject, /let remediation_timeout: bool =\s*remediation_dispute &&\s*verdict == 0u8/);
+  assert.match(reject, /std::ctx::block_height\(\) >\s*current\.updated_height \+ config\.decision_window_blocks/);
+  assert.match(reject, /remediation_ruling:[\s\S]*remediation_timeout/);
+  assert.match(reject, /remediation_accepted: bool = verdict == receipt\.severity/);
+  assert.match(reject, /next_status: u8 = remediation_accepted \? 10u8 : 7u8/);
 });

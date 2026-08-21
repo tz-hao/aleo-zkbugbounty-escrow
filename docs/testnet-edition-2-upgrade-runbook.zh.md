@@ -1,12 +1,12 @@
-# Protocol V3 / Aleo Testnet Edition 2 升级操作手册
+# 历史归档：Protocol V3 / Aleo Testnet Edition 2 升级操作手册
 
-> Protocol V3 是应用协议版本；对当前 Testnet Program 来说，下一次链上升级是 Program Edition 2，不是 Edition 3。
+> 此文档仅保留已完成的 Edition 2 历史记录。当前仓库已移除 `preview:testnet-edition-2`，也不允许 Edition 2 启用真实 V3 钱包操作。以下命令不要作为当前上线步骤执行；请阅读 [Edition 4 修复部署记录](protocol-v3-edition-4-remediation-hardening.zh.md) 了解当前公开边界。
 
 ## 安全边界
 
 - 管理员私钥只在本机 WSL 交互终端中输入，不写入环境文件、命令行参数、仓库、日志或聊天。
-- npm run preview:testnet-edition-2 默认调用 leo upgrade --print，只生成升级预演，不广播。
-- 只有显式执行带 --broadcast 的脚本，并再次输入 UPGRADE EDITION 2，脚本才会请求广播。
+- 历史命令 npm run preview:testnet-edition-2 默认调用 leo upgrade --print，只生成升级预演，不广播；该 npm 入口在当前仓库已移除。
+- 只有显式执行带 --broadcast 的历史脚本，并再次输入 UPGRADE EDITION 2，脚本才会请求广播；当前不要再广播 Edition 2。
 - 广播后不得因为索引延迟重复广播。先读取 Program latest_edition 和公开交易。
 - V3 钱包能力采用失败关闭：Edition 2、13 个 V3 函数、11 个 V3 Mapping、升级交易和费用交易证据任一缺失，前端都保持禁用。
 

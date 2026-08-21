@@ -786,6 +786,9 @@ test("Protocol V3 reproduction arbitration rejects a severity-only verdict and a
 
 test("Protocol V3 Devnode harness uses a strict Leo struct reader and prints raw public mapping diagnostics before votes", () => {
   assert.match(harness, /scripts\/leo-struct-reader\.mjs/);
+  assert.match(harness, /resolve_v3_dispute_mapping_key/);
+  assert.match(harness, /claim_v3_active_disputes/);
+  assert.match(harness, /Historical Edition 2 records have no active/);
   assert.match(harness, /capture_v3_mapping_with_diagnostics/);
   assert.match(harness, /HTTP content-type:/);
   assert.match(harness, /raw mapping value:/);
@@ -870,6 +873,8 @@ test("Protocol V3 final dynamic coverage is localhost-only, assertion-gated, and
   }
   assert.match(finalV3Coverage, /v3-public-key-deriver/);
   assert.match(finalV3Coverage, /derive_vote_key/);
+  assert.match(finalV3Coverage, /v3_active_dispute_id/);
+  assert.match(finalV3Coverage, /v3_fixture_run derive_vote_key "\$\{bounty_id\}" "\$\{dispute_id\}"/);
   assert.match(finalV3Coverage, /derive_operation_marker/);
   assert.match(finalV3Coverage, /--offline --disable-update-check/);
   assert.doesNotMatch(finalV3Coverage, /DEVNODE_PRIVATE_KEY|PRIVATE_KEY=/);
@@ -879,6 +884,13 @@ test("Protocol V3 final dynamic coverage is localhost-only, assertion-gated, and
   assert.match(finalV3Coverage, /non-arbiter rejection: PASS/);
   assert.match(finalV3Coverage, /duplicate vote rollback: PASS/);
   assert.match(finalV3Coverage, /V3 failed-finalize atomic rollback: PASS/);
+  assert.match(finalV3Coverage, /v3-final-remediation-timeout-before-deadline/);
+  assert.match(finalV3Coverage, /remediation timeout pre-deadline atomicity: PASS/);
+  assert.match(finalV3Coverage, /advance_blocks 61/);
+  assert.match(finalV3Coverage, /v3-final-remediation-timeout-finalize/);
+  assert.match(finalV3Coverage, /remediation timeout recovery: PASS/);
+  assert.match(finalV3Coverage, /v3-final-remediation-retry-patch/);
+  assert.match(finalV3Coverage, /v3-final-remediation-retry-accept/);
   assert.match(finalV3Coverage, /finalized dispute replay rejection: PASS/);
   assert.match(finalV3Coverage, /V3 refund replay: PASS/);
   assert.match(finalV3Coverage, /confirmed_public_fee_microcredits "\$\{label\}-refund-fee" "\$\{STEP_TX_ID\}" execute/);

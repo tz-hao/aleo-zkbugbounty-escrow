@@ -5,11 +5,13 @@ import test from "node:test";
 
 import {
   decryptDisclosureReport,
+  deriveDisclosureKeyCommitment,
   encryptDisclosureReport,
   exportDisclosureKeyBundle,
   exportDisclosurePublicKey,
   generateDisclosureRecipientKeys,
   verifyDisclosurePackageHash,
+  verifyProtocolDisclosureBinding,
 } from "../lib/encrypted-disclosure.ts";
 import {
   createInitialDemoState,
@@ -28,6 +30,7 @@ test("Whitehat encrypts for the owner and owner decrypts locally", async () => {
       claimId: "claim-test-1",
       plaintext,
       recipient: exportDisclosurePublicKey(ownerKeys),
+      protocolCommitment: "42field",
     },
     {
       subtle,
@@ -42,6 +45,15 @@ test("Whitehat encrypts for the owner and owner decrypts locally", async () => {
   assert.equal(await verifyDisclosurePackageHash(encrypted, { subtle }), true);
   assert.equal(JSON.stringify(encrypted).includes(plaintext), false);
   assert.match(encrypted.packageHash, /^0x[0-9a-f]{64}$/);
+  assert.equal(encrypted.protocolCommitment, "42field");
+  assert.equal(
+    await verifyProtocolDisclosureBinding(
+      encrypted,
+      { claimId: "claim-test-1", protocolCommitment: "42field" },
+      { subtle },
+    ),
+    true,
+  );
   assert.equal(
     await decryptDisclosureReport(
       { package: encrypted, recipientKeys: exportDisclosureKeyBundle(ownerKeys) },
@@ -49,6 +61,49 @@ test("Whitehat encrypts for the owner and owner decrypts locally", async () => {
     ),
     plaintext,
   );
+});
+
+test("Protocol V3 disclosure binding rejects a swapped claim or field commitment", async () => {
+  const ownerKeys = await generateDisclosureRecipientKeys({ subtle });
+  const encrypted = await encryptDisclosureReport(
+    {
+      claimId: "12field",
+      plaintext: "confidential report",
+      recipient: exportDisclosurePublicKey(ownerKeys),
+      protocolCommitment: "34field",
+    },
+    { subtle },
+  );
+
+  assert.equal(
+    await verifyProtocolDisclosureBinding(
+      encrypted,
+      { claimId: "13field", protocolCommitment: "34field" },
+      { subtle },
+    ),
+    false,
+  );
+  assert.equal(
+    await verifyProtocolDisclosureBinding(
+      encrypted,
+      { claimId: "12field", protocolCommitment: "35field" },
+      { subtle },
+    ),
+    false,
+  );
+});
+
+test("a deterministic non-zero Aleo field commits exactly one disclosure public key", async () => {
+  const ownerKeys = await generateDisclosureRecipientKeys({ subtle });
+  const otherKeys = await generateDisclosureRecipientKeys({ subtle });
+  const commitment = await deriveDisclosureKeyCommitment(ownerKeys, { subtle });
+
+  assert.match(commitment, /^[1-9][0-9]*field$/);
+  assert.equal(
+    await deriveDisclosureKeyCommitment(exportDisclosurePublicKey(ownerKeys), { subtle }),
+    commitment,
+  );
+  assert.notEqual(await deriveDisclosureKeyCommitment(otherKeys, { subtle }), commitment);
 });
 
 test("wrong recipient key cannot decrypt a disclosure package", async () => {
@@ -123,4 +178,21 @@ test("encrypted disclosure UI has no server or browser persistence transport", (
   assert.match(component, /URL\.createObjectURL/);
   assert.match(component, /setReport\(""\)/);
   assert.match(component, /setDecryptionKeyInput\(""\)/);
+});
+
+test("Protocol V3 secure delivery keeps private packages local and binds them to public commitments", () => {
+  const component = readFileSync("components/protocol-v3-secure-delivery.tsx", "utf8");
+
+  assert.equal(component.includes("fetch("), false);
+  assert.equal(component.includes("localStorage"), false);
+  assert.equal(component.includes("sessionStorage"), false);
+  assert.equal(component.includes("console.log"), false);
+  assert.match(component, /protocolCommitment: reportCommitment/);
+  assert.match(component, /protocolCommitment: disputeCommitment/);
+  assert.match(component, /deriveDisclosureKeyCommitment/);
+  assert.match(component, /recipientCommitment !== disclosureKeyCommitment/);
+  assert.match(component, /Promise\.all\(arbiters\.map/);
+  assert.match(component, /setReport\(""\)/);
+  assert.match(component, /setArbitrationEvidence\(""\)/);
+  assert.match(component, /URL\.createObjectURL/);
 });

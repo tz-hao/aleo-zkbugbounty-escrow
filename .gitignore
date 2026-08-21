@@ -16,6 +16,10 @@ tmp/
 temp/
 .codex/edge-cdp/
 .codex/*.png
+.codex/config.toml
+dfggsf
+*.pptx
+*.inspect.ndjson
 leo/bug_proof/deployment_result*.json
 leo/bug_proof/build/
 leo/bug_proof/upgrade_result.json

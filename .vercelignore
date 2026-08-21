@@ -12,6 +12,13 @@ iteration18-*.png
 node_modules
 out
 dist
+tmp
+local-audits
+local-devnode
+local-e2e-results
+local-upgrade-results
+*.pptx
+*.inspect.ndjson
 *.tsbuildinfo
 
 tests

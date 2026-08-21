@@ -510,7 +510,11 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
     ]);
     const [capabilityPayload, bountyPayload] = await Promise.all([
       capabilityResponse.json().catch(() => null) as Promise<{
-        protocolV3?: { status?: string; walletRequestEnabled?: boolean };
+      protocolV3?: {
+        status?: string;
+        walletRequestEnabled?: boolean;
+        programHashVerified?: boolean;
+      };
       } | null>,
       bountyResponse.json().catch(() => null) as Promise<{
         protocolVersion?: number;
@@ -523,10 +527,11 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
     if (
       !capabilityResponse.ok ||
       capabilityPayload?.protocolV3?.status !== "Available" ||
-      capabilityPayload.protocolV3.walletRequestEnabled !== true
+      capabilityPayload.protocolV3.walletRequestEnabled !== true ||
+      capabilityPayload.protocolV3.programHashVerified !== true
     ) {
       throw new Error(
-        "submit_claim_v3 requires verified Edition 2 deployment evidence",
+        "submit_claim_v3 requires verified Program Edition source-hash deployment evidence",
       );
     }
     if (
@@ -723,16 +728,18 @@ export function AleoWalletProvider({ children }: { children: ReactNode }) {
         status?: string;
         walletRequestEnabled?: boolean;
         upgradeEvidenceVerified?: boolean;
+        programHashVerified?: boolean;
       };
     } | null;
     if (
       !capabilityResponse.ok ||
       capabilityPayload?.protocolV3?.status !== "Available" ||
       capabilityPayload.protocolV3.walletRequestEnabled !== true ||
-      capabilityPayload.protocolV3.upgradeEvidenceVerified !== true
+      capabilityPayload.protocolV3.upgradeEvidenceVerified !== true ||
+      capabilityPayload.protocolV3.programHashVerified !== true
     ) {
       throw new Error(
-        "Protocol V3 requires verified Edition 2 deployment evidence",
+        "Protocol V3 requires verified Program Edition source-hash deployment evidence",
       );
     }
 

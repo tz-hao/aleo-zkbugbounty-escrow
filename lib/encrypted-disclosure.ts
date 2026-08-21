@@ -31,6 +31,11 @@ export type EncryptedDisclosurePackage = {
   version: typeof DISCLOSURE_PACKAGE_VERSION;
   cipher: typeof DISCLOSURE_CIPHER;
   claimId: string;
+  /**
+   * Optional Aleo field used by Protocol V3 to bind this off-chain ciphertext
+   * to the public report or dispute commitment. Legacy demo packages omit it.
+   */
+  protocolCommitment?: string;
   recipientKeyId: string;
   senderEphemeralPublicKey: DisclosurePublicJwk;
   iv: string;
@@ -95,6 +100,7 @@ function canonicalPackage(value: Omit<EncryptedDisclosurePackage, "packageHash">
     version: value.version,
     cipher: value.cipher,
     claimId: value.claimId,
+    ...(value.protocolCommitment ? { protocolCommitment: value.protocolCommitment } : {}),
     recipientKeyId: value.recipientKeyId,
     senderEphemeralPublicKey: JSON.parse(canonicalPublicKey(value.senderEphemeralPublicKey)),
     iv: value.iv,
@@ -113,6 +119,9 @@ function canonicalAad(
     version: value.version,
     cipher: value.cipher,
     claimId: value.claimId,
+    ...("protocolCommitment" in value && value.protocolCommitment
+      ? { protocolCommitment: value.protocolCommitment }
+      : {}),
     recipientKeyId: value.recipientKeyId,
     senderEphemeralPublicKey: JSON.parse(canonicalPublicKey(value.senderEphemeralPublicKey)),
     createdAt: value.createdAt,
@@ -122,6 +131,29 @@ function canonicalAad(
 async function sha256Hex(value: string, subtle: SubtleCrypto) {
   const digest = new Uint8Array(await subtle.digest("SHA-256", encoder.encode(value)));
   return `0x${Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/**
+ * Derives the public Aleo field stored in `BountyV3Config` from the canonical
+ * ECDH public key. The first 31 SHA-256 bytes are always below the Aleo field
+ * modulus; adding one excludes the forbidden `0field` sentinel. This is a
+ * domain-separated identifier, not a private-key derivation.
+ */
+export async function deriveDisclosureKeyCommitment(
+  value: DisclosureRecipientPublicKey | DisclosureRecipientKeyBundle | string,
+  options?: Pick<DisclosureCryptoOptions, "subtle">,
+) {
+  const subtle = getSubtle(options);
+  const recipient = parseDisclosurePublicKey(value);
+  const expectedKeyId = await sha256Hex(canonicalPublicKey(recipient.publicKey), subtle);
+  if (recipient.keyId !== expectedKeyId) throw new Error("Disclosure recipient key ID mismatch");
+  const digest = new Uint8Array(await subtle.digest(
+    "SHA-256",
+    encoder.encode(`zkBugBounty:ProtocolV3:disclosure-key-commitment:v1:${canonicalPublicKey(recipient.publicKey)}`),
+  ));
+  let commitment = 0n;
+  for (const byte of digest.slice(0, 31)) commitment = (commitment << 8n) + BigInt(byte);
+  return `${commitment + 1n}field`;
 }
 
 async function deriveDisclosureKey(
@@ -221,11 +253,19 @@ export function parseDisclosureKeyBundle(value: string | unknown): DisclosureRec
 }
 
 export async function encryptDisclosureReport(
-  input: { claimId: string; plaintext: string; recipient: DisclosureRecipientPublicKey | string },
+  input: {
+    claimId: string;
+    plaintext: string;
+    recipient: DisclosureRecipientPublicKey | string;
+    protocolCommitment?: string;
+  },
   options?: DisclosureCryptoOptions,
 ): Promise<EncryptedDisclosurePackage> {
   if (!input.claimId.trim()) throw new Error("Claim ID is required");
   if (!input.plaintext.trim()) throw new Error("Disclosure report is required");
+  if (input.protocolCommitment && !/^[1-9][0-9]*field$/.test(input.protocolCommitment)) {
+    throw new Error("Protocol disclosure commitment must be a non-zero Aleo field literal");
+  }
   const subtle = getSubtle(options);
   const recipient = parseDisclosurePublicKey(input.recipient);
   const expectedKeyId = await sha256Hex(canonicalPublicKey(recipient.publicKey), subtle);
@@ -253,6 +293,7 @@ export async function encryptDisclosureReport(
     version: DISCLOSURE_PACKAGE_VERSION,
     cipher: DISCLOSURE_CIPHER,
     claimId: input.claimId,
+    ...(input.protocolCommitment ? { protocolCommitment: input.protocolCommitment } : {}),
     recipientKeyId: recipient.keyId,
     senderEphemeralPublicKey,
     createdAt,
@@ -307,6 +348,11 @@ export function parseEncryptedDisclosurePackage(
     version: DISCLOSURE_PACKAGE_VERSION,
     cipher: DISCLOSURE_CIPHER,
     claimId: record.claimId,
+    protocolCommitment: record.protocolCommitment === undefined
+      ? undefined
+      : typeof record.protocolCommitment === "string" && /^[1-9][0-9]*field$/.test(record.protocolCommitment)
+        ? record.protocolCommitment
+        : (() => { throw new Error("Encrypted disclosure package protocol commitment is invalid"); })(),
     recipientKeyId: record.recipientKeyId,
     senderEphemeralPublicKey: normalizePublicJwk(record.senderEphemeralPublicKey as JsonWebKey),
     iv: record.iv,
@@ -314,6 +360,21 @@ export function parseEncryptedDisclosurePackage(
     createdAt: record.createdAt,
     packageHash: record.packageHash,
   };
+}
+
+/**
+ * Validates the public binding before a recipient decrypts or records delivery.
+ * It deliberately checks only public metadata and never accepts report plaintext.
+ */
+export async function verifyProtocolDisclosureBinding(
+  value: EncryptedDisclosurePackage | string,
+  expected: { claimId: string; protocolCommitment: string },
+  options?: Pick<DisclosureCryptoOptions, "subtle">,
+) {
+  const packageValue = parseEncryptedDisclosurePackage(value);
+  return packageValue.claimId === expected.claimId &&
+    packageValue.protocolCommitment === expected.protocolCommitment &&
+    await verifyDisclosurePackageHash(packageValue, options);
 }
 
 export async function verifyDisclosurePackageHash(

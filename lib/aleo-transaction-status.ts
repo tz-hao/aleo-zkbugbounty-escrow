@@ -1,3 +1,5 @@
+import { diagnoseLeoWalletTransactionError } from "./leo-wallet-diagnostics.ts";
+
 export type AleoTransactionState =
   | "idle"
   | "wallet_disconnected"
@@ -74,17 +76,31 @@ export function transactionFeedback(
     accepted: { code: "ACCEPTED", message: "交易已被节点接受，仍需等待 Confirmed 与 Mapping 核验。", advice: "继续轮询，不要重新提交。" },
     confirmed: { code: "CONFIRMED", message: "交易已 Confirmed。", advice: "继续核验预期 Public Mapping 状态。", indexStatus: "found" },
     rejected: { code: "REJECTED", message: "交易已被 Testnet 明确拒绝。", advice: "检查公开 rejection summary 与 Mapping 前置状态后再创建新 Preview。" },
-    failed: { code: "BROADCAST_FAILED", message: "Transaction could not be completed.", advice: "检查网络后重新生成 Preview；系统不会自动重新签名或广播。" },
+    failed: { code: "WALLET_REQUEST_FAILED", message: "Leo Wallet 未能完成这笔交易。", advice: "确认钱包已解锁、处于 Aleo Testnet 且拥有足够的 Public Credits 支付交易费；刷新后重新生成 Preview。系统不会自动重签或广播。" },
     timeout: { code: "POLL_TIMEOUT", message: "在限定时间内未获得交易确认。", advice: "稍后使用公开 Transaction ID 继续查询；不要立即重新提交。", indexStatus: "not_found_after_timeout" },
   };
   return { state, ...defaults[state], ...overrides };
 }
 
 export function classifyWalletTransactionFailure(error: unknown): PublicTransactionFeedback {
-  const text = error instanceof Error ? error.message.toLowerCase() : "";
-  if (/(reject|denied|declined|cancel)/.test(text)) return transactionFeedback("signature_rejected");
-  if (/(network|testnet|chain)/.test(text)) return transactionFeedback("wrong_network");
-  if (/(disconnect|not connected|wallet.*unavailable)/.test(text)) return transactionFeedback("wallet_disconnected");
+  const diagnostic = diagnoseLeoWalletTransactionError(error);
+  if (diagnostic.issue === "SignatureRejected") return transactionFeedback("signature_rejected");
+  if (diagnostic.issue === "NetworkMismatch") return transactionFeedback("wrong_network");
+  if (diagnostic.issue === "WalletDisconnected") return transactionFeedback("wallet_disconnected");
+  if (diagnostic.issue === "WalletLocked") {
+    return transactionFeedback("failed", {
+      code: "WALLET_LOCKED",
+      message: diagnostic.message,
+      advice: "解锁 Leo Wallet 后重新生成 Preview，并手动发起一次新的签名请求。",
+    });
+  }
+  if (diagnostic.issue === "PopupUnavailable") {
+    return transactionFeedback("failed", {
+      code: "WALLET_POPUP_UNAVAILABLE",
+      message: diagnostic.message,
+      advice: "允许本站打开 Leo Wallet 弹窗，再重新生成 Preview 并请求签名。",
+    });
+  }
   return transactionFeedback("failed");
 }
 

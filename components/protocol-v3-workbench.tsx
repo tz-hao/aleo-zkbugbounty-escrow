@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAleoWallet } from "./aleo-wallet-provider";
 import { useLocale } from "./locale-provider";
+import { ProtocolV3SecureDelivery } from "./protocol-v3-secure-delivery";
 import {
   buildCastArbitrationVoteV3Transaction,
   buildDisclosureActionV3Transaction,
@@ -76,6 +77,7 @@ type ActionId =
   | "accept-patch"
   | "finalize-unappealed"
   | "open-dispute"
+  | "open-sla-timeout"
   | "cast-vote"
   | "settle-reward"
   | "finalize-prelock"
@@ -97,6 +99,7 @@ const actionLabels: Record<ActionId, [string, string]> = {
   "accept-patch": ["确认修复", "Accept patch"],
   "finalize-unappealed": ["终结未申诉拒绝", "Finalize unappealed rejection"],
   "open-dispute": ["发起类型化争议", "Open typed dispute"],
+  "open-sla-timeout": ["发起 SLA 超时争议", "Escalate an SLA timeout"],
   "cast-vote": ["提交仲裁票", "Cast arbitration vote"],
   "settle-reward": ["结算奖励", "Settle reward"],
   "finalize-prelock": ["仲裁后先锁款", "Lock award after arbitration"],
@@ -187,7 +190,7 @@ export function ProtocolV3Workbench() {
         );
       }
       setBundle(payload);
-      setAmount(rewardForReceipt(payload.bounty, payload.receipt));
+      setAmount(rewardForDecision(payload.bounty, payload.receipt, payload.projectDecision));
       setMessage(text("已读取并严格解析 V3 公共状态。", "Strictly parsed Protocol-v3 public state."));
     } catch (error) {
       setBundle(null);
@@ -212,9 +215,10 @@ export function ProtocolV3Workbench() {
     [bundle, wallet.address],
   );
 
-  function prepare(action: ActionId) {
+  function prepare(action: ActionId, actionCommitmentOverride?: string) {
     if (!bundle) return;
     try {
+      const actionCommitment = actionCommitmentOverride ?? commitment;
       const feeMicrocredits = Number(fee);
       const common = {
         bountyId: bundle.bounty.bountyId,
@@ -242,7 +246,7 @@ export function ProtocolV3Workbench() {
             ...common,
             action: reviewAction,
             projectSeverity,
-            decisionCommitment: commitment,
+            decisionCommitment: actionCommitment,
             actionMarker: marker,
           });
           break;
@@ -259,7 +263,11 @@ export function ProtocolV3Workbench() {
           preview = buildDisclosureActionV3Transaction({
             ...common,
             action: action === "deliver-disclosure" ? 1 : 2,
-            actionCommitment: commitment,
+            // Delivery is bound to the report commitment from the submitted
+            // receipt; acknowledgement remains a separate owner commitment.
+            actionCommitment: action === "deliver-disclosure"
+              ? bundle.evidence.reportCommitment
+              : actionCommitment,
             actionMarker: marker,
           });
           break;
@@ -275,19 +283,23 @@ export function ProtocolV3Workbench() {
               action === "reject-reproduction" ? 2 :
               action === "propose-patch" ? 3 :
               action === "accept-patch" ? 4 : 5,
-            actionCommitment: commitment,
+            actionCommitment,
             actionMarker: marker,
           });
           break;
         case "open-dispute":
+        case "open-sla-timeout":
           preview = buildDisputeClaimV3Transaction({
             ...common,
-            disputeType,
+            disputeType: action === "open-sla-timeout"
+              ? PROTOCOL_V3_DISPUTE_TYPES.SlaTimeout
+              : disputeType,
             requestedSeverity:
+              action === "open-dispute" &&
               disputeType === PROTOCOL_V3_DISPUTE_TYPES.Severity
                 ? selectedSeverity
                 : 0,
-            disputeCommitment: commitment,
+            disputeCommitment: actionCommitment,
             feeAmount: bundle.policy.arbitrationFeeMicrocredits,
             disputeMarker: marker,
           });
@@ -305,7 +317,8 @@ export function ProtocolV3Workbench() {
             whitehatAddress: bundle.state.whitehatAddress,
             rewardAmount: amount,
             bondAmount:
-              bundle.disputeMetadata?.disputeType === "Reproduction" &&
+              (bundle.disputeMetadata?.disputeType === "Reproduction" ||
+               bundle.disputeMetadata?.disputeType === "SlaTimeout") &&
               bundle.disputeBond?.status === "Pending"
                 ? bundle.disputeBond.amount
                 : "0",
@@ -382,7 +395,8 @@ export function ProtocolV3Workbench() {
 
   const enabled = capability.status === "Available" &&
     capability.walletRequestEnabled &&
-    capability.upgradeEvidenceVerified;
+    capability.upgradeEvidenceVerified &&
+    capability.programHashVerified;
 
   return (
     <section className="surface-card-strong rounded-lg p-5 sm:p-6" aria-labelledby="v3-workbench-title">
@@ -415,8 +429,8 @@ export function ProtocolV3Workbench() {
         <div className="mt-5 rounded-md border border-amber-300/20 bg-amber-300/[0.06] p-4 text-sm leading-6 text-amber-100/80">
           {capability.status === "DeploymentEvidencePending"
             ? text(
-                "链上已出现 Edition 2，但仓库尚未记录并验证升级交易 ID 与费用交易 ID；V3 钱包操作继续关闭。",
-                "Edition 2 is visible, but the repository has not recorded and verified the upgrade and fee transaction IDs. V3 wallet actions remain disabled.",
+                "链上已出现所需 Edition，但仓库尚未同时记录并验证升级交易、费用交易与完整 Program 哈希；V3 钱包操作继续关闭。",
+                "The required Edition is visible, but the repository has not verified the upgrade transaction, fee transaction, and complete Program hash together. V3 wallet actions remain disabled.",
               )
             : text(
                 "当前 Aleo 测试网仍未满足 V3 启用条件。界面不会用本地状态或 Demo 回退替代链上能力。",
@@ -529,6 +543,7 @@ export function ProtocolV3Workbench() {
                     <option value={PROTOCOL_V3_DISPUTE_TYPES.Severity}>{text("严重程度争议", "Severity dispute")}</option>
                     <option value={PROTOCOL_V3_DISPUTE_TYPES.Reproduction}>{text("复现争议", "Reproduction dispute")}</option>
                     <option value={PROTOCOL_V3_DISPUTE_TYPES.Remediation}>{text("修复争议", "Remediation dispute")}</option>
+                    <option value={PROTOCOL_V3_DISPUTE_TYPES.SlaTimeout}>{text("SLA 超时争议", "SLA timeout")}</option>
                   </select>
                 </label>
                 <label className="grid gap-2 text-xs text-slate-400">
@@ -591,6 +606,22 @@ export function ProtocolV3Workbench() {
               </div>
             </div>
           </div>
+
+          <ProtocolV3SecureDelivery
+            claimHash={bundle.receipt.claimHash}
+            disclosureKeyCommitment={bundle.policy.disclosureKeyCommitment}
+            reportCommitment={bundle.evidence.reportCommitment}
+            disputeCommitment={bundle.disputeMetadata?.status === "Open"
+              ? bundle.disputeMetadata.disputeCommitment
+              : null}
+            state={bundle.state.status}
+            ownerAddress={bundle.bounty.owner}
+            whitehatAddress={bundle.state.whitehatAddress}
+            arbiters={bundle.policy.arbiters}
+            connectedAddress={wallet.address}
+            onPrepareDelivery={() => prepare("deliver-disclosure")}
+            onPrepareAcknowledgement={() => prepare("acknowledge-disclosure", bundle.evidence.reportCommitment)}
+          />
 
           {bundle.tally ? (
             <div className="mt-4 grid gap-3 rounded-md border border-violet-300/20 bg-violet-300/[0.05] p-4 sm:grid-cols-4">
@@ -680,7 +711,6 @@ function availableActions(bundle: ClaimBundle | null, address: string | null): A
       );
     }
     if (status === "Accepted") result.push("lock-reward", "reject-claim", "mark-duplicate", "mark-scope");
-    if (status === "DisclosureDelivered") result.push("acknowledge-disclosure");
     if (status === "DisclosureAcknowledged") {
       result.push("confirm-reproduction", "reject-reproduction");
     }
@@ -692,10 +722,10 @@ function availableActions(bundle: ClaimBundle | null, address: string | null): A
       result.push("open-dispute");
     }
     if (status === "PatchAccepted") result.push("settle-reward");
+    if (status === "RewardLocked") result.push("open-sla-timeout");
   }
 
   if (whitehat) {
-    if (status === "RewardLocked") result.push("deliver-disclosure");
     if (status === "PatchProposed") result.push("accept-patch");
     const appealableDecision =
       decision === "Rejection" ||
@@ -709,6 +739,17 @@ function availableActions(bundle: ClaimBundle | null, address: string | null): A
       status === "OwnerRejected"
     ) {
       result.push("finalize-unappealed");
+    }
+    if (
+      status === "Submitted" ||
+      status === "OwnerReviewing" ||
+      status === "Accepted" ||
+      status === "DisclosureDelivered" ||
+      status === "DisclosureAcknowledged" ||
+      status === "ReproductionConfirmed" ||
+      status === "PatchAccepted"
+    ) {
+      result.push("open-sla-timeout");
     }
   }
 
@@ -739,13 +780,17 @@ function receiptSeverityCode(severity: OnChainClaimReceipt["severity"]): 1 | 2 |
   return severity === "Critical" ? 3 : severity === "High" ? 2 : 1;
 }
 
-function rewardForReceipt(
+function rewardForDecision(
   bounty: OnChainBountyState,
   receipt: OnChainClaimReceipt,
+  decision: OnChainClaimV3ProjectDecision | null,
 ) {
-  return receipt.severity === "Critical"
+  const severity = decision?.decision === "Severity" && decision.projectSeverityCode > 0
+    ? decision.projectSeverityCode
+    : receiptSeverityCode(receipt.severity);
+  return severity === 3
     ? bounty.rewards.critical
-    : receipt.severity === "High"
+    : severity === 2
       ? bounty.rewards.high
       : bounty.rewards.medium;
 }

@@ -91,7 +91,7 @@ export function AleoDeploymentStatus() {
     liveState.kind === "confirmed" || liveState.kind === "partial" || liveState.kind === "problem"
       ? liveState.deployment.currentEdition ?? liveState.deployment.edition
       : null;
-  const escrowV2Live = currentEdition !== null && currentEdition >= 1;
+  const protocolV3Live = currentEdition !== null && currentEdition >= 3;
   const statusLabel =
     liveState.kind === "confirmed" || liveState.kind === "partial" || liveState.kind === "problem"
       ? statusLabels[liveState.deployment.verificationStatus]
@@ -104,10 +104,10 @@ export function AleoDeploymentStatus() {
       : "testnet / public edition unavailable";
   const escrowLabel =
     currentEdition === null
-      ? "Escrow v2: Awaiting public verification"
-      : escrowV2Live
-        ? "Escrow v2: Live"
-        : "Escrow v2: Awaiting upgrade";
+      ? "Protocol V3: Awaiting public verification"
+      : protocolV3Live
+        ? "Protocol V3 / Edition 4+: Live"
+        : "Protocol V3: Historical edition only";
   const editionOne =
     liveState.kind === "confirmed" || liveState.kind === "partial" || liveState.kind === "problem"
       ? liveState.deployment.editionOne
@@ -148,8 +148,8 @@ export function AleoDeploymentStatus() {
             <p className="page-kicker">{text("部署核验", "Deployment verification")}</p>
             <h2 className="mt-1 text-lg font-semibold text-white">
               {confirmed
-                ? escrowV2Live
-                  ? text("托管协议 v2 已上线并完成链上核验", "Escrow v2 is live and verified on-chain")
+                ? protocolV3Live
+                  ? text("Protocol V3 已上线并完成链上核验", "Protocol V3 is live and verified on-chain")
                   : text("程序与部署交易已完成链上核验", "Program and deployment transaction are verified on-chain")
                 : partial
                   ? text("已找到程序，部分接口不可用", "Program found; some endpoints are unavailable")
@@ -186,7 +186,7 @@ export function AleoDeploymentStatus() {
             mono
           />
           <DeploymentField label={text("托管状态", "Escrow status")} value={escrowLabel} />
-          <DeploymentField label={text("版本 1 升级", "Edition 1 upgrade")} value={upgradeLabel} />
+          <DeploymentField label={text("Edition 1 历史升级", "Edition 1 historical upgrade")} value={upgradeLabel} />
           <div className="flex flex-wrap gap-2">
           <a
             className="focus-ring secondary-action"
@@ -211,7 +211,7 @@ export function AleoDeploymentStatus() {
             target="_blank"
             rel="noreferrer"
           >
-            Edition 1 Upgrade
+            Edition 1 History
             <ExternalLink size={15} aria-hidden="true" />
           </a>
         </div>

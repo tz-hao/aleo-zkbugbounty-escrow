@@ -1,8 +1,7 @@
 import {
   ALEO_TESTNET_API_ENDPOINT,
   ALEO_TESTNET_PROGRAM_OWNER,
-  ALEO_TESTNET_V3_EXPECTED_EDITION,
-  ALEO_TESTNET_V3_UPGRADE_EVIDENCE,
+  ALEO_TESTNET_V3_EDITION_TWO_EVIDENCE,
   CANONICAL_ALEO_PROGRAM_ID,
 } from "../lib/aleo-program.ts";
 import { verifyTestnetEditionOne } from "../lib/testnet-edition-one.ts";
@@ -11,10 +10,10 @@ export function parseEditionTwoVerifierArguments(argv) {
   const config = {
     endpoint: ALEO_TESTNET_API_ENDPOINT,
     programId: CANONICAL_ALEO_PROGRAM_ID,
-    upgradeTransactionId: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId ?? "",
-    feeTransactionId: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId ?? "",
+    upgradeTransactionId: ALEO_TESTNET_V3_EDITION_TWO_EVIDENCE.transactionId,
+    feeTransactionId: ALEO_TESTNET_V3_EDITION_TWO_EVIDENCE.feeTransactionId,
     adminAddress: ALEO_TESTNET_PROGRAM_OWNER,
-    expectedEdition: ALEO_TESTNET_V3_EXPECTED_EDITION,
+    expectedEdition: ALEO_TESTNET_V3_EDITION_TWO_EVIDENCE.expectedEdition,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];

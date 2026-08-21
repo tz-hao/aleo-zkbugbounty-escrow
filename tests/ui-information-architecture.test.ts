@@ -34,6 +34,19 @@ test("Demo role selection is isolated in an explicitly local preview control", (
   assert.match(triage, /<DemoRolePreview/);
 });
 
+test("V2 compatibility is visually secondary to the current V3 workflow", () => {
+  const createWorkspace = readFileSync("components/bounty-creation-workspace.tsx", "utf8");
+  const submitPage = readFileSync("app/submit-proof/page.tsx", "utf8");
+
+  for (const source of [createWorkspace, submitPage]) {
+    assert.match(source, /<details className="rounded-lg border border-amber-300\/20/);
+    assert.match(source, /历史兼容：已有 V2/);
+    assert.match(source, /打开 V2 兼容/);
+    assert.match(source, /grid-cols-2/);
+  }
+  assert.doesNotMatch(submitPage, /V2 历史兼容/);
+});
+
 test("homepage is a focused protocol entry without local or registry metrics", () => {
   const dashboard = readFileSync("components/dashboard.tsx", "utf8");
   const navigation = readFileSync("components/navigation.tsx", "utf8");

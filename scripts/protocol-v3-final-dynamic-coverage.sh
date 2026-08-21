@@ -20,8 +20,24 @@ v3_fixture_run() {
   printf '%s\n' "${output}" | grep -Eo '[0-9]+field' | tail -n 1
 }
 
+v3_active_dispute_id() {
+  local claim_hash="$1"
+  local active_dispute_id=""
+
+  capture_mapping active_dispute_id claim_v3_active_disputes "${claim_hash}"
+  active_dispute_id="$(printf '%s' "${active_dispute_id}" | tr -d '[:space:]\"')"
+  [[ "${active_dispute_id}" =~ ^[0-9]+field$ ]] || die "V3 active dispute ID is missing for ${claim_hash}"
+  printf '%s' "${active_dispute_id}"
+}
+
 v3_vote_mapping_key() {
-  v3_fixture_run derive_vote_key "$1" "$2" "$3"
+  local bounty_id="$1"
+  local claim_hash="$2"
+  local voter="$3"
+  local dispute_id=""
+
+  dispute_id="$(v3_active_dispute_id "${claim_hash}")"
+  v3_fixture_run derive_vote_key "${bounty_id}" "${dispute_id}" "${voter}"
 }
 
 v3_operation_mapping_key() {
@@ -223,7 +239,7 @@ run_protocol_v3_final_dynamic_coverage() {
   local v3_two_panel_before="" v3_two_panel_after="" v3_two_program_before="" v3_two_program_after=""
   local claim_rejection="" claim_duplicate="" claim_scope="" claim_severity="" claim_reproduction="" claim_remediation=""
   local rejection_commitment="" duplicate_commitment="" scope_commitment="" severity_commitment="" reproduction_commitment="" remediation_commitment=""
-  local rejection_marker="" duplicate_marker="" scope_marker="" severity_marker="" reproduction_marker="" remediation_marker=""
+  local rejection_marker="" duplicate_marker="" scope_marker="" severity_marker="" reproduction_marker="" remediation_marker="" remediation_timeout_marker="" remediation_timeout_operation="" remediation_retry_patch_commitment=""
   local non_vote_nonce="" non_vote_key="" non_vote_operation="" vote_one_nonce="" vote_one_key="" vote_one_operation="" duplicate_vote_nonce="" duplicate_vote_operation="" prelock_nonce="" prelock_operation="" settlement_nonce="" settlement_operation=""
   local tally_before="" state_before="" dispute_before="" bond_before="" escrow_before="" vote_before="" vote_marker_before="" prelock_before=""
   local program_before="" owner_before="" whitehat_before="" program_after="" owner_after="" whitehat_after=""
@@ -488,9 +504,44 @@ run_protocol_v3_final_dynamic_coverage() {
   remediation_commitment="$(v3_final_field)"; remediation_marker="$(v3_final_field)"
   v3_open_final_dispute "v3-final-remediation-open" "${v3_two_bounty}" "${claim_remediation}" 6 0 "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}" "${remediation_commitment}" "${remediation_marker}"
   assert_v3_dispute_persistence "REMEDIATION" "${v3_two_bounty}" "${claim_remediation}" 6 "${remediation_commitment}" "${OWNER_ADDRESS}" 9 7
-  v3_cast_vote "v3-final-remediation-arbiter-one" "${ARBITER_PRIVATE_KEY}" "Arbiter 1" "${ARBITER_ADDRESS}" "${v3_two_bounty}" "${claim_remediation}" 3 "$(v3_final_field)"
-  v3_cast_vote "v3-final-remediation-arbiter-two" "${arbiter_two_key}" "Arbiter 2" "${arbiter_two_address}" "${v3_two_bounty}" "${claim_remediation}" 3 "$(v3_final_field)"
-  execute_accepted "v3-final-remediation-finalize" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID "${CANDIDATE_DIR}" "${arbiter_three_key}" "Arbiter 3" "${arbiter_three_address}" "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" finalize_rejection_v3 "${v3_two_bounty}" "${claim_remediation}" "${OWNER_ADDRESS}" 1000000u64 3u8 "$(v3_final_field)"
+  # Edition 4 liveness guard: a remediation panel that reaches no quorum must
+  # remain atomically unchanged before its deadline, then return the claim to
+  # reproduction-confirmed after expiry. The reward remains locked throughout.
+  remediation_timeout_marker="$(v3_final_field)"
+  remediation_timeout_operation="$(v3_operation_mapping_key 330field "${v3_two_bounty}" "${claim_remediation}" "${arbiter_three_address}" "${WHITEHAT_ADDRESS}" 1000000u64 "${remediation_timeout_marker}")"
+  capture_mapping tally_before claim_v3_arbitration_tallies "${claim_remediation}"
+  capture_mapping state_before claim_v3_states "${claim_remediation}"
+  capture_mapping dispute_before claim_v3_dispute_metadata "${claim_remediation}"
+  capture_mapping bond_before claim_v3_dispute_bonds "${claim_remediation}"
+  capture_mapping escrow_before bounty_escrows "${v3_two_bounty}"
+  capture_mapping_or_null vote_marker_before v3_operation_markers "${remediation_timeout_operation}"
+  program_before="$(public_credits_balance "${PROGRAM_ID}")"; owner_before="$(public_credits_balance "${OWNER_ADDRESS}")"; whitehat_before="$(public_credits_balance "${WHITEHAT_ADDRESS}")"
+  expect_chain_rejected "v3-final-remediation-timeout-before-deadline" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID \
+    "${CANDIDATE_DIR}" "${arbiter_three_key}" "Arbiter 3" "${arbiter_three_address}" "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" \
+    execute finalize_rejection_v3 "${v3_two_bounty}" "${claim_remediation}" "${WHITEHAT_ADDRESS}" 1000000u64 0u8 "${remediation_timeout_marker}" --skip-execute-proof --broadcast --yes
+  assert_mapping_unchanged "v3-final-remediation-timeout-pre-deadline-tally" claim_v3_arbitration_tallies "${claim_remediation}" "${tally_before}"
+  assert_mapping_unchanged "v3-final-remediation-timeout-pre-deadline-state" claim_v3_states "${claim_remediation}" "${state_before}"
+  assert_mapping_unchanged "v3-final-remediation-timeout-pre-deadline-dispute" claim_v3_dispute_metadata "${claim_remediation}" "${dispute_before}"
+  assert_mapping_unchanged "v3-final-remediation-timeout-pre-deadline-bond" claim_v3_dispute_bonds "${claim_remediation}" "${bond_before}"
+  assert_mapping_unchanged "v3-final-remediation-timeout-pre-deadline-escrow" bounty_escrows "${v3_two_bounty}" "${escrow_before}"
+  assert_mapping_or_null_unchanged "v3-final-remediation-timeout-pre-deadline-marker" v3_operation_markers "${remediation_timeout_operation}" "${vote_marker_before}"
+  assert_balance_delta "v3-final-remediation-timeout-pre-deadline-program" "${program_before}" "$(public_credits_balance "${PROGRAM_ID}")" 0
+  assert_balance_delta "v3-final-remediation-timeout-pre-deadline-owner" "${owner_before}" "$(public_credits_balance "${OWNER_ADDRESS}")" 0
+  assert_balance_delta "v3-final-remediation-timeout-pre-deadline-whitehat" "${whitehat_before}" "$(public_credits_balance "${WHITEHAT_ADDRESS}")" 0
+  printf 'remediation timeout pre-deadline atomicity: PASS\n'; record_event "v3-remediation-timeout-pre-deadline-atomicity" "passed"
+  advance_blocks 61
+  execute_accepted "v3-final-remediation-timeout-finalize" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID \
+    "${CANDIDATE_DIR}" "${arbiter_three_key}" "Arbiter 3" "${arbiter_three_address}" "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" \
+    finalize_rejection_v3 "${v3_two_bounty}" "${claim_remediation}" "${WHITEHAT_ADDRESS}" 1000000u64 0u8 "${remediation_timeout_marker}"
+  assert_mapping_matches "v3-final-remediation-timeout-state" claim_v3_states "${claim_remediation}" "status:7u8"
+  assert_mapping_matches "v3-final-remediation-timeout-bond" claim_v3_dispute_bonds "${claim_remediation}" "status:2u8"
+  assert_mapping_matches "v3-final-remediation-timeout-metadata" claim_v3_dispute_metadata "${claim_remediation}" "dispute_type:6u8" "status:3u8" "final_severity:0u8"
+  assert_mapping_matches "v3-final-remediation-timeout-payout" claim_v3_payouts "${claim_remediation}" "reserved_amount:3000000u64" "paid_amount:0u64" "status:1u8"
+  assert_mapping_matches "v3-final-remediation-timeout-escrow" bounty_escrows "${v3_two_bounty}" "available_balance:14000000u64" "locked_amount:3000000u64" "paid_amount:3000000u64"
+  printf 'remediation timeout recovery: PASS\n'; record_event "v3-remediation-timeout-recovery" "passed"
+  remediation_retry_patch_commitment="$(v3_final_field)"
+  execute_accepted "v3-final-remediation-retry-patch" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID "${CANDIDATE_DIR}" "${OWNER_PRIVATE_KEY}" "Owner" "${OWNER_ADDRESS}" "${MINIMUM_OWNER_MICROCREDITS}" resolution_action_v3 "${v3_two_bounty}" "${claim_remediation}" 3u8 "${remediation_retry_patch_commitment}" "$(v3_final_field)"
+  execute_accepted "v3-final-remediation-retry-accept" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID "${CANDIDATE_DIR}" "${WHITEHAT_PRIVATE_KEY}" "Whitehat" "${WHITEHAT_ADDRESS}" "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" resolution_action_v3 "${v3_two_bounty}" "${claim_remediation}" 4u8 "${remediation_retry_patch_commitment}" "$(v3_final_field)"
   execute_accepted "v3-final-remediation-settle" STEP_TX_ID STEP_FEE_ID STEP_FEE_TX_ID "${CANDIDATE_DIR}" "${arbiter_three_key}" "Arbiter 3" "${arbiter_three_address}" "${MINIMUM_ROLE_TRANSACTION_MICROCREDITS}" settle_reward_v3 "${v3_two_bounty}" "${claim_remediation}" "${WHITEHAT_ADDRESS}" 3000000u64 0u64 3u8 "$(v3_final_field)"
   assert_mapping_matches "v3-final-remediation-paid" claim_v3_states "${claim_remediation}" "status:12u8"
   assert_mapping_matches "v3-final-remediation-payout" claim_v3_payouts "${claim_remediation}" "reserved_amount:3000000u64" "paid_amount:3000000u64" "status:2u8"

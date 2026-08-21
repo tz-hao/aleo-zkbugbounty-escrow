@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
@@ -23,6 +24,8 @@ import {
 } from "../lib/aleo-protocol-v3.ts";
 import {
   ALEO_TESTNET_PROGRAM_OWNER,
+  ALEO_TESTNET_V3_EDITION_TWO_EVIDENCE,
+  ALEO_TESTNET_V3_EXPECTED_EDITION,
   ALEO_TESTNET_V3_UPGRADE_EVIDENCE,
 } from "../lib/aleo-program.ts";
 import {
@@ -35,6 +38,10 @@ import {
 } from "../lib/aleo-v3-registry.ts";
 import { isEditionOneMappingName } from "../lib/testnet-edition-one.ts";
 import { parseEditionTwoVerifierArguments } from "../scripts/verify-testnet-edition-2.mjs";
+import {
+  formatEditionThreeVerification,
+  parseEditionThreeVerifierArguments,
+} from "../scripts/verify-testnet-edition-3.mjs";
 import type { OnChainBountyState } from "../lib/models.ts";
 
 const ROOT = new URL("../", import.meta.url);
@@ -75,7 +82,7 @@ const bounty: OnChainBountyState = {
   mapping: "bounties",
 };
 
-test("Protocol V3 source inspection requires all 13 functions and 11 mappings", () => {
+test("Protocol V3 source inspection requires all 13 functions and 13 mappings", () => {
   for (const source of [compiledSource, leoSource]) {
     const inspection = inspectProtocolV3Source(source);
     assert.equal(inspection.available, true);
@@ -83,7 +90,7 @@ test("Protocol V3 source inspection requires all 13 functions and 11 mappings", 
     assert.deepEqual(inspection.missingMappings, []);
   }
   assert.equal(PROTOCOL_V3_FUNCTIONS.length, 13);
-  assert.equal(PROTOCOL_V3_MAPPINGS.length, 11);
+  assert.equal(PROTOCOL_V3_MAPPINGS.length, 13);
   const incomplete = inspectProtocolV3Source(
     compiledSource.replace("function settle_reward_v3:", "function removed:"),
   );
@@ -91,7 +98,7 @@ test("Protocol V3 source inspection requires all 13 functions and 11 mappings", 
   assert.deepEqual(incomplete.missingFunctions, ["settle_reward_v3"]);
 });
 
-test("all 12 public V3 transaction builders follow the Edition 2 ABI", () => {
+test("all 12 public V3 transaction builders preserve the Edition 4 ABI", () => {
   const common = { bountyId: "1field", claimHash: "3field", feeMicrocredits: 1_000_000 };
   const previews = [
     buildCreateBountyV3Transaction({
@@ -259,7 +266,7 @@ test("submit_claim_v3 serializes bindings and private witness as two ABI structs
   assert.match(inputs[4], /reporter_secret: 30field/);
 });
 
-test("V3 capability remains fail-closed until verified Edition 2 evidence is available", async () => {
+test("V3 capability remains fail-closed until verified Edition 4 source evidence is available", async () => {
   const fetcher = async (input: string | URL | Request) => {
     const url = String(input);
     if (url.endsWith("/latest_edition")) {
@@ -275,14 +282,18 @@ test("V3 capability remains fail-closed until verified Edition 2 evidence is ava
   const savedEvidence = {
     transactionId: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId,
     feeTransactionId: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId,
+    compiledProgramSha256: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.compiledProgramSha256,
+    onChainProgramSourceSha256: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.onChainProgramSourceSha256,
   };
   try {
     ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId = null;
     ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId = null;
+    ALEO_TESTNET_V3_UPGRADE_EVIDENCE.compiledProgramSha256 = null;
+    ALEO_TESTNET_V3_UPGRADE_EVIDENCE.onChainProgramSourceSha256 = null;
     const pendingEvidence = await fetchProtocolV3Capability(async (input) => {
       const url = String(input);
       if (url.endsWith("/latest_edition")) {
-        return new Response("2", { status: 200 });
+        return new Response(String(ALEO_TESTNET_V3_EXPECTED_EDITION), { status: 200 });
       }
       return new Response(JSON.stringify(compiledSource), { status: 200 });
     });
@@ -292,29 +303,48 @@ test("V3 capability remains fail-closed until verified Edition 2 evidence is ava
   } finally {
     ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId = savedEvidence.transactionId;
     ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId = savedEvidence.feeTransactionId;
+    ALEO_TESTNET_V3_UPGRADE_EVIDENCE.compiledProgramSha256 = savedEvidence.compiledProgramSha256;
+    ALEO_TESTNET_V3_UPGRADE_EVIDENCE.onChainProgramSourceSha256 = savedEvidence.onChainProgramSourceSha256;
   }
 
-  const verified = await fetchProtocolV3Capability(async (input) => {
-    const url = String(input);
-    if (url.endsWith("/latest_edition")) return new Response("2", { status: 200 });
-    if (url.endsWith(`/transaction/${ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId}`)) {
-      return Response.json({
-        id: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId,
-        type: "deploy",
-        owner: { address: ALEO_TESTNET_PROGRAM_OWNER },
-        deployment: {
-          edition: 2,
-          program_owner: ALEO_TESTNET_PROGRAM_OWNER,
-          program: compiledSource,
-        },
-      });
-    }
-    if (url.includes("/transaction/")) return Response.json({});
-    return new Response(JSON.stringify(compiledSource), { status: 200 });
-  });
-  assert.equal(verified.status, "Available");
-  assert.equal(verified.walletRequestEnabled, true);
-  assert.equal(verified.upgradeEvidenceVerified, true);
+  ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId = "at1editionfourevidence";
+  ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId = "at1editionfourfee";
+  ALEO_TESTNET_V3_UPGRADE_EVIDENCE.compiledProgramSha256 = createHash("sha256")
+    .update(compiledSource)
+    .digest("hex");
+  ALEO_TESTNET_V3_UPGRADE_EVIDENCE.onChainProgramSourceSha256 = createHash("sha256")
+    .update(compiledSource)
+    .digest("hex");
+
+  try {
+    const verified = await fetchProtocolV3Capability(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/latest_edition")) return new Response(String(ALEO_TESTNET_V3_EXPECTED_EDITION), { status: 200 });
+      if (url.endsWith(`/transaction/${ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId}`)) {
+        return Response.json({
+          id: ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId,
+          type: "deploy",
+          owner: { address: ALEO_TESTNET_PROGRAM_OWNER },
+          deployment: {
+            edition: ALEO_TESTNET_V3_EXPECTED_EDITION,
+            program_owner: ALEO_TESTNET_PROGRAM_OWNER,
+            program: compiledSource,
+          },
+        });
+      }
+      if (url.includes("/transaction/")) return Response.json({});
+      return new Response(JSON.stringify(compiledSource), { status: 200 });
+    });
+    assert.equal(verified.status, "Available");
+    assert.equal(verified.walletRequestEnabled, true);
+    assert.equal(verified.upgradeEvidenceVerified, true);
+    assert.equal(verified.programHashVerified, true);
+  } finally {
+    ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId = savedEvidence.transactionId;
+    ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId = savedEvidence.feeTransactionId;
+    ALEO_TESTNET_V3_UPGRADE_EVIDENCE.compiledProgramSha256 = savedEvidence.compiledProgramSha256;
+    ALEO_TESTNET_V3_UPGRADE_EVIDENCE.onChainProgramSourceSha256 = savedEvidence.onChainProgramSourceSha256;
+  }
 });
 
 test("strict V3 Mapping parsers reject unknown fields and decode every public state family", () => {
@@ -373,12 +403,37 @@ test("strict V3 Mapping parsers reject unknown fields and decode every public st
   );
 });
 
-test("generic public Mapping allowlist includes all V3 mappings and Edition 2 verifier uses recorded evidence", () => {
+test("generic public Mapping allowlist includes all V3 mappings and Edition 2 evidence remains immutable", () => {
   for (const mapping of PROTOCOL_V3_MAPPINGS) {
     assert.equal(isEditionOneMappingName(mapping), true);
   }
   const parsed = parseEditionTwoVerifierArguments([]);
   assert.equal(parsed.expectedEdition, 2);
-  assert.equal(parsed.upgradeTransactionId, ALEO_TESTNET_V3_UPGRADE_EVIDENCE.transactionId);
-  assert.equal(parsed.feeTransactionId, ALEO_TESTNET_V3_UPGRADE_EVIDENCE.feeTransactionId);
+  assert.equal(parsed.upgradeTransactionId, ALEO_TESTNET_V3_EDITION_TWO_EVIDENCE.transactionId);
+  assert.equal(parsed.feeTransactionId, ALEO_TESTNET_V3_EDITION_TWO_EVIDENCE.feeTransactionId);
+});
+
+test("Edition 4 verification pins source hash in addition to public upgrade evidence", () => {
+  const parsed = parseEditionThreeVerifierArguments([
+    "--upgrade-transaction-id", "at1editionfour",
+    "--fee-transaction-id", "at1editionfourfee",
+    "--program-sha256", "a".repeat(64),
+    "--on-chain-program-sha256", "b".repeat(64),
+  ]);
+  assert.equal(parsed.expectedEdition, ALEO_TESTNET_V3_EXPECTED_EDITION);
+  assert.equal(parsed.compiledProgramSha256, "a".repeat(64));
+  assert.equal(parsed.onChainProgramSourceSha256, "b".repeat(64));
+  const output = formatEditionThreeVerification(
+    {
+      programId: "zkbugbounty_7f3c92.aleo",
+      network: "testnet",
+      expectedEdition: ALEO_TESTNET_V3_EXPECTED_EDITION,
+      observedEdition: ALEO_TESTNET_V3_EXPECTED_EDITION,
+      upgradeStatus: "confirmed",
+      overallVerification: "PASS",
+    },
+    { expected: "a".repeat(64), actual: "a".repeat(64), matches: true },
+  );
+  assert.match(output, /On-chain Program source SHA-256 match: PASS/);
+  assert.match(output, /Overall verification: PASS/);
 });

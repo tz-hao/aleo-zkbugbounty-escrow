@@ -10,7 +10,8 @@ import { createInitialDemoState } from "../lib/store.ts";
 test("Chinese UI copy uses Chinese for product labels and security terminology", () => {
   assert.equal(zh.navigation.home, "首页");
   assert.equal(zh.navigation.submitProof, "提交隐私证明");
-  assert.equal(zh.home.title, "证明漏洞存在，而不泄露利用细节");
+  assert.equal(zh.home.title, "证明漏洞，不泄露利用细节。");
+  assert.equal(en.home.title, "PROVE THE BUG. KEEP THE EXPLOIT PRIVATE.");
   assert.equal(zh.submit.title, "提交隐私证明");
   assert.equal(glossary.witnessCommitment, "见证承诺");
   assert.equal(glossary.nullifier, "防重复标识");
