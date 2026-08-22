@@ -567,7 +567,7 @@ test("public index API reports unavailable and never falls back to local demo da
   assert.equal(route.includes("mock-data"), false);
   assert.equal(route.includes("localStorage"), false);
   assert.doesNotMatch(panel, /交易已确认不等于映射已验证/);
-  assert.match(panel, /公开链上索引/);
+  assert.match(panel, /链上公开索引列表/);
   assert.match(panel, /未使用模拟数据或本地存储回退/);
 });
 

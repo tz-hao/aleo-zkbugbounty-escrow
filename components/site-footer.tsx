@@ -10,10 +10,10 @@ import { ALEO_TESTNET_DEPLOYMENT } from "@/lib/aleo-program";
 export function SiteFooter() {
   const { text } = useLocale();
   const workflowLinks = [
-    { href: "/create-bounty", label: text("创建赏金", "Create Bounty") },
-    { href: "/submit-proof", label: text("提交隐私证明", "Submit Private Proof") },
-    { href: "/triage", label: text("负责任披露", "Responsible Disclosure") },
-    { href: "/public-claims", label: text("公开注册表", "Public Registry") },
+    { href: "/create-bounty", label: text("发布赏金", "Create Bounty") },
+    { href: "/submit-proof", label: text("提交 ZK 证明", "Submit ZK Proof") },
+    { href: "/triage", label: text("漏洞评审", "Triage") },
+    { href: "/public-claims", label: text("公开存证榜", "Public Claims") },
   ];
 
   return (

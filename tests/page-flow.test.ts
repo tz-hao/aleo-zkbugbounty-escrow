@@ -186,7 +186,7 @@ test("Public User sees only public rule metadata", () => {
   const receiptPanel = readFileSync("components/aleo-claim-receipt-panel.tsx", "utf8");
   const combinedSource = `${source}\n${bountyPanel}\n${receiptPanel}`;
 
-  for (const phrase of ["AleoPublicIndex", "AleoBountyRegistryPanel", "AleoClaimReceiptPanel", "查询链上赏金状态", "独立核验链上漏洞声明收据"]) {
+  for (const phrase of ["AleoPublicIndex", "AleoBountyRegistryPanel", "AleoClaimReceiptPanel", "链上赏金状态实时检索", "漏洞声明存证收据独立核验"]) {
     assert.equal(combinedSource.includes(phrase), true, `${phrase} should be public metadata`);
   }
   for (const forbidden of ["hiddenDeltaBalance", "hiddenDeltaClaims", "reporterSecret", "privateCallSequence"]) {

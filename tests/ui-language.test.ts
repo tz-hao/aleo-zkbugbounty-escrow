@@ -9,7 +9,10 @@ import { createInitialDemoState } from "../lib/store.ts";
 
 test("Chinese UI copy uses Chinese for product labels and security terminology", () => {
   assert.equal(zh.navigation.home, "首页");
-  assert.equal(zh.navigation.submitProof, "提交隐私证明");
+  assert.equal(zh.navigation.submitProof, "提交 ZK 证明");
+  assert.equal(zh.navigation.createBounty, "发布赏金");
+  assert.equal(zh.navigation.triage, "漏洞评审");
+  assert.equal(zh.navigation.publicClaims, "公开存证榜");
   assert.equal(zh.home.title, "证明漏洞，不泄露利用细节。");
   assert.equal(en.home.title, "PROVE THE BUG. KEEP THE EXPLOIT PRIVATE.");
   assert.equal(zh.submit.title, "提交隐私证明");
@@ -40,7 +43,7 @@ test("primary pages consume the locale provider and keep Chinese as the default 
   assert.equal(zh.common.skipToContent, "跳到主要内容");
   assert.equal(en.common.skipToContent, "Skip to main content");
   assert.equal(en.submit.title, "Submit a Private Proof");
-  assert.equal(en.publicClaims.title, "Public claims");
+  assert.equal(en.publicClaims.title, "Public Claims");
 });
 
 test("language switcher uses a shareable URL and never persists a locale", () => {

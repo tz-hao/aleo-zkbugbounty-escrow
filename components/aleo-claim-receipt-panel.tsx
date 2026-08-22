@@ -26,7 +26,7 @@ export function AleoClaimReceiptPanel() {
   const [receipt, setReceipt] = useState<OnChainClaimReceipt | null>(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const visibleMessage = message || text("尚未查询 Aleo 测试网漏洞声明收据。", "No Aleo Testnet Claim Receipt has been queried yet.");
+  const visibleMessage = message || text("暂无待核验的收据数据。支持输入 Claim Hash 核验链上公开收据与 Mapping 状态。", "No receipt is awaiting verification. Enter a Claim Hash to verify the public on-chain receipt and Mapping state.");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,10 +66,10 @@ export function AleoClaimReceiptPanel() {
         <div className="max-w-2xl">
           <div className="mb-3 flex items-center gap-2 text-violet-200">
             <FileCheck2 size={17} aria-hidden="true" />
-            <p className="page-kicker">{text("Aleo 测试网漏洞声明收据", "Aleo Testnet Claim Receipt")}</p>
+            <p className="page-kicker">{text("Aleo Testnet Receipts", "Aleo Testnet Receipts")}</p>
           </div>
           <h2 id="aleo-claim-receipt-title" className="text-xl font-semibold text-white">
-            {text("独立核验链上漏洞声明收据", "Independently verify an on-chain Claim Receipt")}
+            {text("漏洞声明存证收据独立核验 (Claim Receipt Verifier)", "Claim Receipt Verifier")}
           </h2>
         </div>
         <form className="flex w-full max-w-xl flex-col gap-2 sm:flex-row" onSubmit={handleSubmit}>

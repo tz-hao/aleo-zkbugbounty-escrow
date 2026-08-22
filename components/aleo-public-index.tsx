@@ -139,6 +139,7 @@ export function AleoPublicIndex() {
     })
     : [];
   const visibleItems = registry?.kind === "bounties" ? visibleBounties : items;
+  const totalPages = registry?.hasMore ? null : page + 1;
   const emptyMessage = kind === "bounties"
     ? bountyFilter === "active"
       ? text("当前页没有可参与的进行中赏金；可切换到“全部”查看历史记录。", "This page has no active Bounties; switch to All to view historical records.")
@@ -149,8 +150,8 @@ export function AleoPublicIndex() {
     <section className="surface-card rounded-lg p-5 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="page-kicker">{text("链上注册表", "On-chain Registry")}</p>
-          <h2 className="mt-2 text-xl font-semibold text-white">{text("公开链上索引", "Public on-chain index")}</h2>
+          <p className="page-kicker">{text("链上公开索引", "On-chain Index")}</p>
+          <h2 className="mt-2 text-xl font-semibold text-white">{text("链上公开索引列表", "On-chain Index list")}</h2>
         </div>
         <div className="inline-flex w-fit rounded-md border border-white/10 bg-black/20 p-1" aria-label={text("注册表视图", "Registry view")}>
           {(["bounties", "claims"] as const).map((item) => (
@@ -170,11 +171,11 @@ export function AleoPublicIndex() {
 
       {kind === "bounties" ? (
         <div className="mt-4 flex flex-wrap items-center gap-2" aria-label={text("赏金状态筛选", "Bounty status filter")}>
-          <span className="text-xs text-slate-500">{text("显示", "Show")}</span>
+          <span className="text-xs text-slate-500">{text("状态筛选", "Filter by status")}</span>
           {([
             ["all", text("全部", "All")],
-            ["active", text("仅进行中", "Active only")],
-            ["inactive", text("暂停、关闭与过期", "Paused, closed, and expired")],
+            ["active", text("进行中", "Active")],
+            ["inactive", text("已归档", "Archived")],
           ] as const).map(([filter, label]) => (
             <button
               className={`focus-ring min-h-9 rounded-md border px-3 text-xs font-semibold ${
@@ -194,7 +195,7 @@ export function AleoPublicIndex() {
 
       <div className="mt-5 border-y border-white/10">
         {loading ? (
-          <p className="py-8 text-sm text-slate-400">{text("正在读取 Aleo 测试网公开索引与映射数据…", "Reading the Aleo Testnet public index and mappings...")}</p>
+          <p className="py-8 text-sm text-slate-400">{text("正在同步 Aleo 测试网公开索引与 Mapping 状态数据，请稍候...", "Syncing the Aleo Testnet public index and Mapping state. Please wait...")}</p>
         ) : error ? (
           <div className="flex flex-wrap items-center justify-between gap-3 py-5">
             <p className="text-sm text-amber-100">{error}</p>
@@ -283,7 +284,11 @@ export function AleoPublicIndex() {
           <ArrowLeft size={15} aria-hidden="true" />
           {text("上一页", "Previous")}
         </button>
-        <span className="text-xs text-slate-500">{text(`第 ${page + 1} 页`, `Page ${page + 1}`)}</span>
+        <span className="text-xs text-slate-500">
+          {totalPages === null
+            ? text(`第 ${page + 1} 页 / 还有更多`, `Page ${page + 1} / more available`)
+            : text(`第 ${page + 1} 页 / 共 ${totalPages} 页`, `Page ${page + 1} of ${totalPages}`)}
+        </span>
         <button
           className="focus-ring secondary-action"
           disabled={!registry?.hasMore || loading}

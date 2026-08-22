@@ -27,10 +27,10 @@ export const zh = {
   },
   navigation: {
     home: "首页",
-    createBounty: "创建赏金",
-    submitProof: "提交隐私证明",
-    triage: "漏洞分诊",
-    publicClaims: "公开注册表",
+    createBounty: "发布赏金",
+    submitProof: "提交 ZK 证明",
+    triage: "漏洞评审",
+    publicClaims: "公开存证榜",
   },
   rules: {
     "vault-accounting-safety": {
@@ -185,9 +185,9 @@ export const zh = {
     noTimeline: "暂无公开漏洞分诊记录。",
   },
   publicClaims: {
-    kicker: "公开注册表",
-    title: "公开漏洞声明",
-    description: "公开收据不等于公开利用细节；这里只展示验证状态。",
+    kicker: "公开声明与存证中心",
+    title: "公开漏洞存证记录 (Public Claims)",
+    description: "链上公开存证仅记录零知识验证状态与完成凭证，绝不包含任何漏洞利用细节与敏感数据，全方位保障白帽黑客与项目方的隐私安全。",
     registryNotice: "公开注册表只展示协议收据与披露状态，不提供敏感披露内容或操作入口。",
     viewReceipt: "查看协议收据",
     noClaims: "当前没有可公开展示的已验证漏洞声明。",

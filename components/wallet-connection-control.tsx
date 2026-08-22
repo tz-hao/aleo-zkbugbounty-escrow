@@ -40,8 +40,8 @@ export function WalletConnectionControl() {
           "Connection rejected / wallet locked / wrong network diagnostics shown below",
         )
         : text(
-          "正在检测 Shield 适配器 · 预期网络 Aleo 测试网",
-          "Shield adapter detection pending · Expected network Aleo Testnet",
+          "正在检测 Shield 钱包连接（预期网络：Aleo Testnet）",
+          "Checking Shield wallet connection (expected network: Aleo Testnet)",
         );
 
   return (
@@ -106,7 +106,7 @@ export function WalletConnectionControl() {
           <span className="sr-only">{text("展开钱包状态详情", "Expand wallet status details")}</span>
         </summary>
         <div className="absolute right-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-cyan-300/15 bg-[#070912]/95 p-3 text-xs leading-5 text-slate-300 shadow-2xl backdrop-blur-xl">
-          <p className="font-semibold text-white">{text("Shield 诊断", "Shield diagnostics")}</p>
+          <p className="font-semibold text-white">{text("Shield 钱包运行环境诊断", "Shield wallet environment diagnostics")}</p>
           <p className="mt-1 break-words text-slate-400">{diagnosticText}</p>
           {errorMessage ? (
             <p className="mt-2 border-t border-white/10 pt-2 text-red-200">
@@ -117,7 +117,10 @@ export function WalletConnectionControl() {
             {text("预期网络：Aleo 测试网", "Expected network: Aleo Testnet")}
           </p>
           <p className="mt-2 border-t border-white/10 pt-2 text-slate-500">
-            {text("适配器为 alpha 集成；每笔交易都必须在 Shield 内人工核对并签名。", "The adapter is alpha; verify and sign every transaction manually in Shield.")}
+            {text(
+              "安全提示：当前为 Alpha 测试版本。为保障资产安全，所有链上交互与交易均需在 Shield 钱包内人工核对并签名确认。",
+              "Security notice: this is an Alpha integration. For asset safety, review and manually sign every on-chain interaction and transaction in Shield.",
+            )}
           </p>
           {transactionStatus.state !== "idle" ? (
             <p className="mt-2 border-t border-white/10 pt-2 text-slate-400">

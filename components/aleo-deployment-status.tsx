@@ -38,13 +38,13 @@ type LiveState =
   | { kind: "problem"; deployment: LiveDeployment }
   | { kind: "unavailable" };
 
-const statusLabels: Record<LiveDeployment["verificationStatus"], string> = {
-  verified: "链上已确认",
-  program_found_transaction_unavailable: "已找到程序，交易接口暂不可用",
-  transaction_found_program_unavailable: "交易已找到，Program 接口暂不可用",
-  endpoint_unavailable: "公开节点暂不可用",
-  not_deployed: "未部署",
-  configuration_error: "配置不一致",
+const statusLabels: Record<LiveDeployment["verificationStatus"], { chinese: string; english: string }> = {
+  verified: { chinese: "验证通过", english: "Verified" },
+  program_found_transaction_unavailable: { chinese: "已找到合约，交易接口暂不可用", english: "Program found; transaction endpoint unavailable" },
+  transaction_found_program_unavailable: { chinese: "已找到交易，合约接口暂不可用", english: "Transaction found; Program endpoint unavailable" },
+  endpoint_unavailable: { chinese: "公开节点暂不可用", english: "Public node unavailable" },
+  not_deployed: { chinese: "尚未部署", english: "Not deployed" },
+  configuration_error: { chinese: "配置不一致", english: "Configuration mismatch" },
 };
 
 export function AleoDeploymentStatus() {
@@ -104,20 +104,23 @@ export function AleoDeploymentStatus() {
     protocolV3.programHashVerified;
   const statusLabel =
     liveState.kind === "confirmed" || liveState.kind === "partial" || liveState.kind === "problem"
-      ? statusLabels[liveState.deployment.verificationStatus]
+      ? text(
+        statusLabels[liveState.deployment.verificationStatus].chinese,
+        statusLabels[liveState.deployment.verificationStatus].english,
+      )
       : liveState.kind === "loading"
-        ? "正在核验"
-        : "公开节点暂不可用";
+        ? text("节点同步中", "Syncing")
+        : text("公开节点暂不可用", "Public node unavailable");
   const networkLabel =
     currentEdition !== null
-      ? `testnet / edition ${currentEdition}`
-      : "testnet / public edition unavailable";
+      ? text(`Aleo Testnet / Edition ${currentEdition}`, `Aleo Testnet / Edition ${currentEdition}`)
+      : text("Aleo Testnet（公开版本准备中）", "Aleo Testnet (public edition pending)");
   const escrowLabel =
     currentEdition === null
-      ? "Protocol V3: Awaiting public verification"
+      ? text("Protocol V3（等待公开节点共识验证）", "Protocol V3 (awaiting public-node consensus verification)")
       : protocolV3Live
-        ? "Protocol V3 / Edition 4: Public capability verified"
-        : "Protocol V3: Strict public capability verification pending";
+        ? text("Protocol V3 / Edition 4（公开能力已验证）", "Protocol V3 / Edition 4 (public capability verified)")
+        : text("Protocol V3（等待严格公开能力核验）", "Protocol V3 (strict public capability verification pending)");
   const editionOne =
     liveState.kind === "confirmed" || liveState.kind === "partial" || liveState.kind === "problem"
       ? liveState.deployment.editionOne
@@ -125,21 +128,24 @@ export function AleoDeploymentStatus() {
   const upgradeLabel =
     editionOne?.upgradeStatus === "confirmed"
       ? editionOne.feeIndexStatus === "INDEX_UNAVAILABLE"
-        ? "Upgrade confirmed / Fee transaction index unavailable"
-        : "Upgrade confirmed / Fee transaction indexed"
-      : "Upgrade: public verification pending";
+        ? text("升级已确认 / 费用交易索引暂不可用", "Upgrade confirmed / fee transaction index unavailable")
+        : text("升级已确认 / 费用交易已索引", "Upgrade confirmed / fee transaction indexed")
+      : text("待公开验证确认 (Pending Verification)", "Pending public verification");
   const keyCountLabel =
     liveState.kind === "confirmed" || liveState.kind === "partial" || liveState.kind === "problem"
       ? String(liveState.deployment.verifyingKeyCount ?? "unknown")
       : "unknown";
   const liveSourceLabel =
     liveState.kind === "confirmed" || liveState.kind === "partial" || liveState.kind === "problem"
-      ? `Program ${liveState.deployment.programFound ? "found" : "unavailable"} / Transaction ${
+      ? text(
+        `合约${liveState.deployment.programFound ? "已找到" : "暂不可用"} / 交易${liveState.deployment.transactionFound ? "已找到" : "暂不可用"}`,
+        `Program ${liveState.deployment.programFound ? "found" : "unavailable"} / Transaction ${
           liveState.deployment.transactionFound ? "found" : "unavailable"
-        }`
+        }`,
+      )
       : liveState.kind === "loading"
-        ? "checking"
-        : "unavailable";
+        ? text("验证中（正在读取 Verifying Keys）", "Verifying (reading Verifying Keys)")
+        : text("暂不可用", "Unavailable");
 
   return (
     <section className="surface-card h-full rounded-lg p-5" aria-live="polite">
@@ -155,7 +161,7 @@ export function AleoDeploymentStatus() {
             <ShieldCheck size={19} aria-hidden="true" />
           </div>
           <div>
-            <p className="page-kicker">{text("部署核验", "Deployment verification")}</p>
+            <p className="page-kicker">{text("智能合约部署核验", "Smart contract deployment verification")}</p>
             <h2 className="mt-1 text-lg font-semibold text-white">
               {confirmed
                 ? protocolV3Live
@@ -163,7 +169,7 @@ export function AleoDeploymentStatus() {
                   : text("程序与部署交易已完成链上核验", "Program and deployment transaction are verified on-chain")
                 : partial
                   ? text("已找到程序，部分接口不可用", "Program found; some endpoints are unavailable")
-                  : text("等待公开节点返回部署证据", "Waiting for public-node deployment evidence")}
+                  : text("正在等待公开 RPC 节点同步链上部署证明", "Waiting for public RPC nodes to sync deployment proof")}
             </h2>
           </div>
         </div>
@@ -182,21 +188,21 @@ export function AleoDeploymentStatus() {
       </div>
 
       <div className="mt-4 grid gap-4 border-t border-white/10 pt-4 sm:grid-cols-[0.7fr_1.3fr]">
-        <DeploymentField label={text("网络", "Network")} value={networkLabel} />
-        <DeploymentField label={text("程序编号", "Program ID")} value={ALEO_TESTNET_DEPLOYMENT.programId} mono />
+        <DeploymentField label={text("运行网络", "Runtime network")} value={networkLabel} />
+        <DeploymentField label={text("合约 Program ID", "Contract Program ID")} value={ALEO_TESTNET_DEPLOYMENT.programId} mono />
       </div>
       <details className="group mt-4 border-t border-white/10 pt-3">
         <summary className="focus-ring min-h-11 cursor-pointer list-none py-2 text-xs font-semibold text-slate-400 hover:text-white [&::-webkit-details-marker]:hidden">
-          {text("查看部署证据与区块浏览器链接", "View deployment evidence and Explorer links")}
+          {text("展开查看合约部署详情与链上交易哈希 ▾", "View contract deployment details and on-chain transaction hashes ▾")}
         </summary>
         <div className="grid gap-4 pt-2">
           <DeploymentField
-            label={text("核验状态", "Verification")}
-            value={`${liveSourceLabel} / keys ${keyCountLabel}`}
+            label={text("核验状态", "Verification status")}
+            value={`${liveSourceLabel} / Verifying Keys: ${keyCountLabel}`}
             mono
           />
-          <DeploymentField label={text("托管状态", "Escrow status")} value={escrowLabel} />
-          <DeploymentField label={text("Edition 1 历史升级", "Edition 1 historical upgrade")} value={upgradeLabel} />
+          <DeploymentField label={text("协议状态", "Protocol status")} value={escrowLabel} />
+          <DeploymentField label={text("Edition 1 升级记录", "Edition 1 upgrade record")} value={upgradeLabel} />
           <div className="flex flex-wrap gap-2">
           <a
             className="focus-ring secondary-action"
@@ -204,7 +210,7 @@ export function AleoDeploymentStatus() {
             target="_blank"
             rel="noreferrer"
           >
-            {text("查看程序", "View Program")}
+            {text("在浏览器中查看合约", "View Program in Explorer")}
             <ExternalLink size={15} aria-hidden="true" />
           </a>
           <a
@@ -213,7 +219,7 @@ export function AleoDeploymentStatus() {
             target="_blank"
             rel="noreferrer"
           >
-            {text("部署交易", "Deployment transaction")}
+            {text("部署交易哈希", "Deployment Tx")}
             <ExternalLink size={15} aria-hidden="true" />
           </a>          <a
             className="focus-ring secondary-action"
@@ -221,7 +227,7 @@ export function AleoDeploymentStatus() {
             target="_blank"
             rel="noreferrer"
           >
-            Edition 1 History
+            {text("Edition 1 历史升级记录", "Edition 1 upgrade history")}
             <ExternalLink size={15} aria-hidden="true" />
           </a>
         </div>

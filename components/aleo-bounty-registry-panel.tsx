@@ -20,7 +20,7 @@ export function AleoBountyRegistryPanel() {
   const [bounty, setBounty] = useState<OnChainBountyState | null>(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const visibleMessage = message || text("尚未查询 Aleo 测试网赏金映射。", "No Aleo Testnet Bounty mapping has been queried yet.");
+  const visibleMessage = message || text("暂未同步到赏金映射数据。请输入 Bounty ID 以检索最新链上状态。", "No Bounty mapping has been synced yet. Enter a Bounty ID to retrieve the latest on-chain state.");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,10 +60,10 @@ export function AleoBountyRegistryPanel() {
         <div className="max-w-2xl">
           <div className="mb-3 flex items-center gap-2 text-cyan-200">
             <Database size={17} aria-hidden="true" />
-            <p className="page-kicker">{text("Aleo 测试网注册表", "Aleo Testnet Registry")}</p>
+            <p className="page-kicker">{text("Aleo Testnet Mapping", "Aleo Testnet Mapping")}</p>
           </div>
           <h2 id="aleo-bounty-registry-title" className="text-xl font-semibold text-white">
-            {text("查询链上赏金状态", "Query on-chain Bounty state")}
+            {text("链上赏金状态实时检索 (Bounty State)", "Live on-chain Bounty state lookup")}
           </h2>
         </div>
         <form className="flex w-full max-w-xl flex-col gap-2 sm:flex-row" onSubmit={handleSubmit}>

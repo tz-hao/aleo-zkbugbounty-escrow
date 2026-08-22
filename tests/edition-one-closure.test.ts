@@ -122,6 +122,6 @@ test("wallet and deployment UI expose only public transaction state and Edition 
   assert.match(provider, /Operation marker already exists/);
   assert.match(provider, /sessionStorage/);
   assert.equal(provider.includes("localStorage"), false);
-  assert.match(deployment, /Fee transaction index unavailable/);
+  assert.match(deployment, /fee transaction index unavailable/);
   assert.match(deployment, /ALEO_TESTNET_EDITION_ONE_UPGRADE/);
 });

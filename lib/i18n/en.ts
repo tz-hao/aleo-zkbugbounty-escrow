@@ -36,10 +36,10 @@ export const en: UiCopy = {
   },
   navigation: {
     home: "Home",
-    createBounty: "Create",
-    submitProof: "Private Proof",
+    createBounty: "Create Bounty",
+    submitProof: "Submit ZK Proof",
     triage: "Triage",
-    publicClaims: "Registry",
+    publicClaims: "Public Claims",
   },
   rules: {
     "vault-accounting-safety": {
@@ -194,9 +194,9 @@ export const en: UiCopy = {
     noTimeline: "No public triage records yet.",
   },
   publicClaims: {
-    kicker: "Public registry",
-    title: "Public claims",
-    description: "A public receipt is not a public exploit. This registry shows verification status only.",
+    kicker: "Public Claims & Evidence Center",
+    title: "Public Claims",
+    description: "On-chain public evidence records only zero-knowledge verification status and completion receipts. It never includes exploit details or sensitive data, protecting both whitehats and project owners.",
     registryNotice: "The public registry presents protocol receipts and disclosure state only. It never exposes sensitive disclosure material or action controls.",
     viewReceipt: "View protocol receipt",
     noClaims: "There are no verified claims available for public display.",

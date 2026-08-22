@@ -27,7 +27,7 @@ test("public claims page keeps the public registry focused on its actionable rea
   const combinedSource = `${source}\n${uiCopySource}`;
 
   for (const phrase of [
-    "公开收据不等于公开利用细节",
+    "链上公开存证仅记录零知识验证状态与完成凭证",
     "AleoPublicIndex",
     "AleoBountyRegistryPanel",
     "AleoClaimReceiptPanel",
