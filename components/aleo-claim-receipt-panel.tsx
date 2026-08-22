@@ -66,10 +66,10 @@ export function AleoClaimReceiptPanel() {
         <div className="max-w-2xl">
           <div className="mb-3 flex items-center gap-2 text-violet-200">
             <FileCheck2 size={17} aria-hidden="true" />
-            <p className="page-kicker">{text("Aleo Testnet Receipts", "Aleo Testnet Receipts")}</p>
+            <p className="page-kicker">{text("Aleo 测试网收据", "Aleo Testnet Receipts")}</p>
           </div>
           <h2 id="aleo-claim-receipt-title" className="text-xl font-semibold text-white">
-            {text("漏洞声明存证收据独立核验 (Claim Receipt Verifier)", "Claim Receipt Verifier")}
+            {text("漏洞声明存证收据独立核验", "Claim Receipt Verifier")}
           </h2>
         </div>
         <form className="flex w-full max-w-xl flex-col gap-2 sm:flex-row" onSubmit={handleSubmit}>

@@ -594,7 +594,11 @@ body:has(.home-immersive) .main-shell {
   position: relative;
   z-index: 1;
   width: 8.9rem;
-  padding: 0.18rem;
+  height: 2.3rem;
+  padding: 0;
+  object-fit: cover;
+  object-position: center 44%;
+  border-radius: 0.34rem;
   filter: saturate(1.12) contrast(1.05);
 }
 

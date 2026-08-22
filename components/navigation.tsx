@@ -31,10 +31,10 @@ export function Navigation() {
           <Image
             alt="ALEO GILT"
             className="inner-brand-image"
-            height={67}
+            height={576}
             priority
-            src="/images/aleo-gilt-wordmark.png"
-            width={236}
+            src="/images/aleo-gilt-header-brand.png"
+            width={1024}
           />
         </Link>
 

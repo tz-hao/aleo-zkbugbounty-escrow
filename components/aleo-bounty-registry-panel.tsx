@@ -60,10 +60,10 @@ export function AleoBountyRegistryPanel() {
         <div className="max-w-2xl">
           <div className="mb-3 flex items-center gap-2 text-cyan-200">
             <Database size={17} aria-hidden="true" />
-            <p className="page-kicker">{text("Aleo Testnet Mapping", "Aleo Testnet Mapping")}</p>
+            <p className="page-kicker">{text("Aleo 测试网映射", "Aleo Testnet Mapping")}</p>
           </div>
           <h2 id="aleo-bounty-registry-title" className="text-xl font-semibold text-white">
-            {text("链上赏金状态实时检索 (Bounty State)", "Live on-chain Bounty state lookup")}
+            {text("链上赏金状态实时检索", "Live on-chain Bounty state lookup")}
           </h2>
         </div>
         <form className="flex w-full max-w-xl flex-col gap-2 sm:flex-row" onSubmit={handleSubmit}>

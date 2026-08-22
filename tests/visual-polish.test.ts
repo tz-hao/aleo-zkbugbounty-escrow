@@ -79,7 +79,7 @@ test("navigation stays off the immersive homepage and keeps Demo roles out of th
   for (const phrase of ["site-navigation", "pathname === \"/\"", "return null", "h-[3.75rem]", "mobile-navigation", "WalletConnectionControl", "lg:hidden"]) {
     assert.equal(source.includes(phrase), true, `${phrase} should be present in navigation`);
   }
-  for (const brandPhrase of ["/images/aleo-gilt-wordmark.png", "ALEO GILT", "inner-brand-image", "brand-sticker"]) {
+  for (const brandPhrase of ["/images/aleo-gilt-header-brand.png", "ALEO GILT", "inner-brand-image", "brand-sticker"]) {
     assert.equal(source.includes(brandPhrase), true, `${brandPhrase} should be used by the inner-page navigation`);
   }
   assert.equal(source.includes(">zkBugBounty</span>"), false, "the old text lockup must not remain in inner-page navigation");

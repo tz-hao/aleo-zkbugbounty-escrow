@@ -186,7 +186,7 @@ export const zh = {
   },
   publicClaims: {
     kicker: "公开声明与存证中心",
-    title: "公开漏洞存证记录 (Public Claims)",
+    title: "公开漏洞存证记录",
     description: "链上公开存证仅记录零知识验证状态与完成凭证，绝不包含任何漏洞利用细节与敏感数据，全方位保障白帽黑客与项目方的隐私安全。",
     registryNotice: "公开注册表只展示协议收据与披露状态，不提供敏感披露内容或操作入口。",
     viewReceipt: "查看协议收据",
