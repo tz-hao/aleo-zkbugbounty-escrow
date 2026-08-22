@@ -8,7 +8,8 @@ zkBugBounty 是一个运行在 **Aleo Testnet** 上的隐私优先、责任披�
 
 | 项目 | 当前状态 |
 | --- | --- |
-| 在线 DApp | [aleo-gilt.vercel.app](https://aleo-gilt.vercel.app) |
+| 生产入口 | [aleo-tz-haos-projects.vercel.app](https://aleo-tz-haos-projects.vercel.app) |
+| 当前 Vercel 部署 | [aleo-ngwlacvo6-tz-haos-projects.vercel.app](https://aleo-ngwlacvo6-tz-haos-projects.vercel.app)（Deployment `dpl_G2PG3sgMS6Y8y38vyBVAfikXWJgE`） |
 | Aleo Program | [`zkbugbounty_7f3c92.aleo`](https://testnet.explorer.provable.com/program/zkbugbounty_7f3c92.aleo) |
 | 网络 | Aleo Testnet |
 | 链上状态 | Edition `4` 已公开核验；V3 钱包动作仅在 Edition、升级证据和完整 Program SHA-256 同时匹配时启用 |
@@ -163,7 +164,8 @@ npm run verify:testnet-mapping -- --mapping bounties --key <bounty_id_field>
 
 ## 公开资源
 
-- [在线 DApp](https://aleo-gilt.vercel.app)
+- [生产入口](https://aleo-tz-haos-projects.vercel.app)
+- [当前 Vercel 部署](https://aleo-ngwlacvo6-tz-haos-projects.vercel.app)
 - [Aleo Program Explorer](https://testnet.explorer.provable.com/program/zkbugbounty_7f3c92.aleo)
 - [Protocol V3 设计](docs/protocol-v3-design.zh.md)
 - [V3 争议授权与结算矩阵](docs/protocol-v3-dispute-matrix.zh.md)
