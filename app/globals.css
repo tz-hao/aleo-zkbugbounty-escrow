@@ -379,8 +379,10 @@ body:has(.home-immersive) .main-shell {
 
 .home-brand-image {
   width: clamp(8.75rem, 12vw, 10.5rem);
-  height: auto;
-  object-fit: contain;
+  height: clamp(2.25rem, 3.1vw, 2.72rem);
+  object-fit: cover;
+  object-position: center 44%;
+  border-radius: 0.34rem;
 }
 
 .home-nav-actions {
@@ -485,6 +487,7 @@ body:has(.home-immersive) .main-shell {
 
   .home-brand-image {
     width: min(7.5rem, 100%);
+    height: 1.95rem;
   }
 
   .home-nav-actions {

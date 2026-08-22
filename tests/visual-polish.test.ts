@@ -15,7 +15,7 @@ test("dashboard is a single immersive protocol entry", () => {
     "证明漏洞，不泄露利用细节。",
     "进入协议",
     "/images/zkbugbounty-crystal-shield-hero.png",
-    "/images/aleo-gilt-wordmark.png",
+    "/images/aleo-gilt-header-brand.png",
     "ALEO GILT",
   ]) {
     assert.equal(combinedSource.includes(phrase), true, `${phrase} should be present on the dashboard`);

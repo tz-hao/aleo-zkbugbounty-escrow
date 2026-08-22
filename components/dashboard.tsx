@@ -21,10 +21,10 @@ export function Dashboard() {
           <Image
             alt="ALEO GILT"
             className="home-brand-image"
-            height={67}
+            height={576}
             priority
-            src="/images/aleo-gilt-wordmark.png"
-            width={236}
+            src="/images/aleo-gilt-header-brand.png"
+            width={1024}
           />
         </div>
 
