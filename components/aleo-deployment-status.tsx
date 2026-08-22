@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ExternalLink, Radio, ShieldCheck } from "lucide-react";
 
 import { ALEO_TESTNET_DEPLOYMENT, ALEO_TESTNET_EDITION_ONE_UPGRADE } from "@/lib/aleo-program";
+import type { ProtocolV3Capability } from "@/lib/aleo-protocol-v3";
 import { useLocale } from "./locale-provider";
 
 type LiveDeployment = {
@@ -49,15 +50,20 @@ const statusLabels: Record<LiveDeployment["verificationStatus"], string> = {
 export function AleoDeploymentStatus() {
   const { text } = useLocale();
   const [liveState, setLiveState] = useState<LiveState>({ kind: "loading" });
+  const [protocolV3, setProtocolV3] = useState<ProtocolV3Capability | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch("/api/aleo/deployment", {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then(async (response) => {
+    void Promise.all([
+      fetch("/api/aleo/deployment", { cache: "no-store", signal: controller.signal }),
+      fetch("/api/aleo/v3", { cache: "no-store", signal: controller.signal }),
+    ])
+      .then(async ([response, protocolResponse]) => {
         const payload = (await response.json()) as { deployment?: LiveDeployment };
+        const protocolPayload = await protocolResponse.json().catch(() => null) as {
+          protocolV3?: ProtocolV3Capability;
+        } | null;
+        if (protocolPayload?.protocolV3) setProtocolV3(protocolPayload.protocolV3);
         if (!payload.deployment) {
           throw new Error("Deployment is not network confirmed");
         }
@@ -91,7 +97,11 @@ export function AleoDeploymentStatus() {
     liveState.kind === "confirmed" || liveState.kind === "partial" || liveState.kind === "problem"
       ? liveState.deployment.currentEdition ?? liveState.deployment.edition
       : null;
-  const protocolV3Live = currentEdition !== null && currentEdition >= 3;
+  const protocolV3Live = currentEdition === 4 &&
+    protocolV3?.status === "Available" &&
+    protocolV3.walletRequestEnabled &&
+    protocolV3.upgradeEvidenceVerified &&
+    protocolV3.programHashVerified;
   const statusLabel =
     liveState.kind === "confirmed" || liveState.kind === "partial" || liveState.kind === "problem"
       ? statusLabels[liveState.deployment.verificationStatus]
@@ -106,8 +116,8 @@ export function AleoDeploymentStatus() {
     currentEdition === null
       ? "Protocol V3: Awaiting public verification"
       : protocolV3Live
-        ? "Protocol V3 / Edition 4+: Live"
-        : "Protocol V3: Historical edition only";
+        ? "Protocol V3 / Edition 4: Public capability verified"
+        : "Protocol V3: Strict public capability verification pending";
   const editionOne =
     liveState.kind === "confirmed" || liveState.kind === "partial" || liveState.kind === "problem"
       ? liveState.deployment.editionOne

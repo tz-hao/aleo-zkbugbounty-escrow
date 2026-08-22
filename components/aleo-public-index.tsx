@@ -5,10 +5,11 @@ import { ArrowLeft, ArrowRight, ExternalLink, RefreshCw, ShieldCheck } from "luc
 import Link from "next/link";
 
 import { getOnChainBountyOperationalStatus } from "@/lib/aleo-bounty-registry";
-import type { AleoPublicIndexPage, MappingVerificationStatus } from "@/lib/aleo-public-index";
+import type { AleoPublicIndexPage, IndexedBounty, MappingVerificationStatus } from "@/lib/aleo-public-index";
 import { useLocale } from "./locale-provider";
 
 type IndexKind = "bounties" | "claims";
+type BountyFilter = "all" | "active" | "inactive";
 type Localize = (chinese: string, english: string) => string;
 
 const ruleLabels: Record<string, { chinese: string; english: string }> = {
@@ -41,9 +42,18 @@ function labelFor(
   return label ? text(label.chinese, label.english) : value;
 }
 
+function finalizedLabel(finalizedAt: number | null, text: Localize) {
+  if (finalizedAt === null) return text("确认时间未返回", "Finalization time unavailable");
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "short",
+    timeStyle: "medium",
+  }).format(new Date(finalizedAt * 1_000));
+}
+
 export function AleoPublicIndex() {
   const { text } = useLocale();
   const [kind, setKind] = useState<IndexKind>("bounties");
+  const [bountyFilter, setBountyFilter] = useState<BountyFilter>("all");
   const [page, setPage] = useState(0);
   const [registry, setRegistry] = useState<AleoPublicIndexPage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,6 +116,13 @@ export function AleoPublicIndex() {
     setLoading(true);
   }
 
+  function operationalStatus(item: IndexedBounty) {
+    if (!item.bounty) return null;
+    return currentHeight === null
+      ? item.bounty.status
+      : getOnChainBountyOperationalStatus(item.bounty, currentHeight);
+  }
+
   function retry() {
     setRegistry(null);
     setError("");
@@ -114,8 +131,18 @@ export function AleoPublicIndex() {
   }
 
   const items = registry?.kind === kind ? registry.items : [];
+  const visibleBounties = registry?.kind === "bounties"
+    ? registry.items.filter((item) => {
+      if (bountyFilter === "all") return true;
+      const status = operationalStatus(item);
+      return bountyFilter === "active" ? status === "Active" : status !== null && status !== "Active";
+    })
+    : [];
+  const visibleItems = registry?.kind === "bounties" ? visibleBounties : items;
   const emptyMessage = kind === "bounties"
-    ? text("当前页没有发现创建赏金交易。", "This page has no discovered create-bounty transactions.")
+    ? bountyFilter === "active"
+      ? text("当前页没有可参与的进行中赏金；可切换到“全部”查看历史记录。", "This page has no active Bounties; switch to All to view historical records.")
+      : text("当前页没有发现创建赏金交易。", "This page has no discovered create-bounty transactions.")
     : text("当前页没有发现提交声明交易。", "This page has no discovered claim-submission transactions.");
 
   return (
@@ -124,9 +151,6 @@ export function AleoPublicIndex() {
         <div>
           <p className="page-kicker">{text("链上注册表", "On-chain Registry")}</p>
           <h2 className="mt-2 text-xl font-semibold text-white">{text("公开链上索引", "Public on-chain index")}</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-            {text("公开交易索引用于发现链上调用；每条结果都必须再次通过 Aleo 映射验证。交易已确认不等于映射已验证。", "The public transaction index discovers on-chain calls. Every result must be verified again through an Aleo Mapping. Confirmed does not equal Mapping Verified.")}
-          </p>
         </div>
         <div className="inline-flex w-fit rounded-md border border-white/10 bg-black/20 p-1" aria-label={text("注册表视图", "Registry view")}>
           {(["bounties", "claims"] as const).map((item) => (
@@ -144,6 +168,30 @@ export function AleoPublicIndex() {
         </div>
       </div>
 
+      {kind === "bounties" ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2" aria-label={text("赏金状态筛选", "Bounty status filter")}>
+          <span className="text-xs text-slate-500">{text("显示", "Show")}</span>
+          {([
+            ["all", text("全部", "All")],
+            ["active", text("仅进行中", "Active only")],
+            ["inactive", text("暂停、关闭与过期", "Paused, closed, and expired")],
+          ] as const).map(([filter, label]) => (
+            <button
+              className={`focus-ring min-h-9 rounded-md border px-3 text-xs font-semibold ${
+                bountyFilter === filter
+                  ? "border-cyan-300/25 bg-cyan-300/10 text-cyan-100"
+                  : "border-white/10 bg-white/[0.025] text-slate-400 hover:text-white"
+              }`}
+              key={filter}
+              onClick={() => setBountyFilter(filter)}
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <div className="mt-5 border-y border-white/10">
         {loading ? (
           <p className="py-8 text-sm text-slate-400">{text("正在读取 Aleo 测试网公开索引与映射数据…", "Reading the Aleo Testnet public index and mappings...")}</p>
@@ -155,17 +203,19 @@ export function AleoPublicIndex() {
               {text("重试", "Retry")}
             </button>
           </div>
-        ) : items.length === 0 ? (
+        ) : visibleItems.length === 0 ? (
           <p className="py-8 text-sm text-slate-400">{emptyMessage}</p>
         ) : registry?.kind === "bounties" ? (
-          registry.items.map((item) => (
+          visibleBounties.map((item) => (
             <article className="grid gap-4 border-b border-white/10 py-5 last:border-b-0 lg:grid-cols-[1fr_auto]" key={item.transactionId}>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <IndexStatus status={item.mappingStatus} />
                   <span className="text-xs text-slate-500">{text("交易已确认", "Transaction accepted")}</span>
+                  <span className="text-xs text-slate-500">{text("协议", "Protocol")} V{item.protocolVersion}</span>
                 </div>
                 <p className="mt-3 break-all font-mono text-xs text-cyan-100">{item.bountyId}</p>
+                <p className="mt-2 text-xs text-slate-500">{text("确认时间", "Finalized")} {finalizedLabel(item.finalizedAt, text)}</p>
                 {item.bounty ? (
                   <p className="mt-2 text-sm text-slate-400">
                     {labelFor(ruleLabels, item.bounty.ruleId, text)} · {labelFor(
@@ -194,8 +244,10 @@ export function AleoPublicIndex() {
                 <div className="flex flex-wrap items-center gap-2">
                   <IndexStatus status={item.mappingStatus} />
                   <span className="text-xs text-slate-500">{text("交易已确认", "Transaction accepted")}</span>
+                  <span className="text-xs text-slate-500">{text("协议", "Protocol")} V{item.protocolVersion}</span>
                 </div>
                 <p className="mt-3 break-all font-mono text-xs text-cyan-100">{item.claimHash}</p>
+                <p className="mt-2 text-xs text-slate-500">{text("确认时间", "Finalized")} {finalizedLabel(item.finalizedAt, text)}</p>
                 {item.receipt ? (
                   <p className="mt-2 text-sm text-slate-400">
                     {labelFor(ruleLabels, item.receipt.ruleId, text)} · {labelFor(severityLabels, item.receipt.severity, text)} · {text("区块", "Block")} {item.receipt.createdHeight}
@@ -212,11 +264,6 @@ export function AleoPublicIndex() {
                 <Link className="focus-ring secondary-action w-fit" href={`/public-claims/${encodeURIComponent(item.claimHash)}`}>
                   {text("公开收据", "Public receipt")}
                 </Link>
-                {item.mappingStatus === "Verified" && item.receipt?.protocolVersion === 2 ? (
-                  <Link className="focus-ring secondary-action w-fit" href={`/triage?claimHash=${encodeURIComponent(item.claimHash)}`}>
-                    {text("链上分诊", "On-chain triage")}
-                  </Link>
-                ) : null}
                 <ExplorerLink transactionId={item.transactionId} />
               </div>
             </article>

@@ -69,7 +69,7 @@ LEO_BIN=/path/to/leo-4.4.0 npm run leo:build
 
    ```bash
    LEO_BIN=/home/milli/.local/leo-toolchains/4.4.0/bin/leo \
-   npm run preview:testnet-edition-4
+   # 历史记录：Edition 4 已部署；当前仓库不再公开升级命令。
    ```
 
    该命令只读取公开 Testnet 信息；它不会请求、读取或保存管理员私钥，也不会签名或广播。
@@ -79,7 +79,7 @@ LEO_BIN=/path/to/leo-4.4.0 npm run leo:build
 
    ```bash
    LEO_BIN=/home/milli/.local/leo-toolchains/4.4.0/bin/leo \
-   npm run broadcast:testnet-edition-4
+   # 不要重放历史广播；使用 npm run verify:testnet-edition-4 只读核验当前状态。
    ```
 
    管理员私钥仅在该终端的隐藏提示中输入。成功或无法解析交易 ID 时都不要重复广播，应先查询公开链上状态。

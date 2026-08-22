@@ -66,6 +66,7 @@ test("workflow pages avoid duplicated mode and local demo explanations", () => {
   const createForm = readFileSync("components/aleo-create-bounty-form.tsx", "utf8");
   const triagePage = readFileSync("app/triage/page.tsx", "utf8");
   const publicClaims = readFileSync("app/public-claims/page.tsx", "utf8");
+  const publicIndex = readFileSync("components/aleo-public-index.tsx", "utf8");
   const bountyPanel = readFileSync("components/aleo-bounty-registry-panel.tsx", "utf8");
   const receiptPanel = readFileSync("components/aleo-claim-receipt-panel.tsx", "utf8");
 
@@ -82,14 +83,30 @@ test("workflow pages avoid duplicated mode and local demo explanations", () => {
   ]) {
     assert.equal(source.includes(removedCopy), false, `${removedCopy} should not remain in workflow UI`);
   }
+
+  assert.doesNotMatch(triagePage, /OnChainTriageWorkspace/);
+  assert.match(triagePage, /<ProtocolV3Workbench/);
+  assert.doesNotMatch(publicClaims, /privacyFacts/);
+  assert.doesNotMatch(publicClaims, /私有证明数据：从未保存/);
+  assert.doesNotMatch(publicIndex, /公开交易索引用于发现旧版与 V3 创建调用/);
 });
 
 test("wallet diagnostics are available on demand without tiny always-on copy", () => {
   const control = readFileSync("components/wallet-connection-control.tsx", "utf8");
 
   assert.match(control, /<details/);
-  assert.match(control, /Wallet extension unavailable/);
-  assert.match(control, /Connection rejected \/ Wallet locked \/ Wrong network/);
+  assert.match(control, /Shield extension unavailable/);
+  assert.match(control, /Connection rejected \/ wallet locked \/ wrong network/);
   assert.equal(control.includes("text-[10px]"), false);
   assert.equal(control.includes("text-[11px]"), false);
+});
+
+test("public Bounty registry separates verified active items from historical items", () => {
+  const registry = readFileSync("components/aleo-public-index.tsx", "utf8");
+
+  assert.match(registry, /type BountyFilter = "all" \| "active" \| "inactive"/);
+  assert.match(registry, /getOnChainBountyOperationalStatus/);
+  assert.match(registry, /status === "Active"/);
+  assert.match(registry, /status !== null && status !== "Active"/);
+  assert.match(registry, /当前页没有可参与的进行中赏金/);
 });

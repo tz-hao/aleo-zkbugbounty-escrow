@@ -28,7 +28,7 @@ Leo 编译会产生 `build/zkbugbounty_7f3c92/zkbugbounty_7f3c92.aleo` 与 ABI�
 HTTPS_PROXY=http://127.0.0.1:18080 \
 https_proxy=http://127.0.0.1:18080 \
 LEO_BIN=/home/milli/.local/leo-toolchains/4.4.0/bin/leo \
-npm run preview:testnet-edition-3
+# 历史记录：Edition 3 已升级完成；当前仓库不再公开升级命令。
 ~~~
 
 该预演只读取公开链上信息：当前 Edition、Program 管理员公开地址与余额、保留的历史接口，并编译检查 13 个 V3 函数、13 个 V3 Mapping 与三项 SHA-256。它不会请求管理员私钥、不会构造签名、不会广播交易；Leo 4.4.0 当前没有无签名的精确升级费用估算接口，因此费用会明确显示为 `UNAVAILABLE`。

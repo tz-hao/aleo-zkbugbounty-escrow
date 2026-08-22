@@ -4,7 +4,6 @@ import { AlertTriangle, Bot, CheckCircle2, Clock3, FileText, ReceiptText } from 
 import { useState } from "react";
 import { ClaimCard } from "@/components/claim-card";
 import { DemoRolePreview } from "@/components/demo-role-preview";
-import { OnChainTriageWorkspace } from "@/components/on-chain-triage-workspace";
 import { ProtocolV3Workflow } from "@/components/protocol-v3-workflow";
 import { ProtocolV3Workbench } from "@/components/protocol-v3-workbench";
 import { RewardEscrowStatus } from "@/components/reward-escrow-status";
@@ -82,9 +81,7 @@ export default function TriagePage() {
 
       <ProtocolV3Workbench />
 
-      {triageMode === "onchain" ? (
-        <OnChainTriageWorkspace />
-      ) : (
+      {triageMode === "demo" ? (
         <>
       <DemoRolePreview />
 
@@ -307,7 +304,7 @@ export default function TriagePage() {
           : null}
       </section>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

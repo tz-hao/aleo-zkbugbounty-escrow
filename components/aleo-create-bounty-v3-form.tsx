@@ -9,7 +9,7 @@ import {
   UsersRound,
   WalletCards,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import {
   createScopeFieldHash,
@@ -43,8 +43,7 @@ export function AleoCreateBountyV3Form() {
   const { copy, text } = useLocale();
   const wallet = useAleoWallet();
   const [network, setNetwork] = useState<NetworkState>({ kind: "loading" });
-  const [capability, setCapability] =
-    useState<ProtocolV3Capability>(PROTOCOL_V3_CAPABILITY);
+  const [capability, setCapability] = useState<ProtocolV3Capability | null>(null);
   const [scope, setScope] = useState("Vault accounting logic at a pinned target version");
   const [ruleId, setRuleId] = useState<DemoVaultRuleId>("vault-accounting-safety");
   const [bountyId, setBountyId] = useState("");
@@ -71,6 +70,7 @@ export function AleoCreateBountyV3Form() {
   const [preview, setPreview] = useState<ProtocolV3TransactionPreview | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const autoVerifiedCreationTransactionId = useRef<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -105,9 +105,11 @@ export function AleoCreateBountyV3Form() {
             ? { kind: "available", latestHeight: latestHeight! }
             : { kind: "unavailable" },
         );
-        if (capabilityPayload?.protocolV3) {
-          setCapability(capabilityPayload.protocolV3);
-        }
+        setCapability(capabilityPayload?.protocolV3 ?? {
+          ...PROTOCOL_V3_CAPABILITY,
+          status: "ConfigurationError",
+          currentEdition: null,
+        });
       })
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -122,6 +124,47 @@ export function AleoCreateBountyV3Form() {
     return () => controller.abort();
   }, []);
 
+  useEffect(() => {
+    const result = wallet.lastPublicTransactionResult;
+    const submission = wallet.protocolSubmission;
+    if (
+      !result ||
+      result.state !== "confirmed" ||
+      !submission ||
+      submission.functionName !== "create_bounty_v3" ||
+      submission.publicTransactionId !== result.publicTransactionId ||
+      submission.bountyId !== bountyId ||
+      autoVerifiedCreationTransactionId.current === result.publicTransactionId
+    ) {
+      return;
+    }
+    autoVerifiedCreationTransactionId.current = result.publicTransactionId;
+    const controller = new AbortController();
+    void fetch(
+      "/api/aleo/v3/bounties/" + encodeURIComponent(submission.bountyId),
+      { method: "GET", headers: { accept: "application/json" }, cache: "no-store", signal: controller.signal },
+    )
+      .then(async (response) => {
+        const payload = await response.json().catch(() => null) as { bounty?: unknown } | null;
+        if (!response.ok || !payload?.bounty) {
+          throw new Error("Bounty mapping is not indexed yet");
+        }
+        setMessage(text(
+          "公开交易与 Bounty Mapping 均已验证。下一步请切换到白帽钱包并提交 V3 Claim。",
+          "The public transaction and Bounty mapping are verified. Next, switch to the Whitehat wallet and submit a V3 Claim.",
+        ));
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setMessage(text(
+            "公开交易已 Confirmed；Bounty Mapping 尚在索引，页面会保留可查询的 Bounty ID。",
+            "The public transaction is confirmed; the Bounty mapping is still indexing. The Bounty ID remains available for lookup.",
+          ));
+        }
+      });
+    return () => controller.abort();
+  }, [bountyId, text, wallet.lastPublicTransactionResult, wallet.protocolSubmission]);
+
   const deadlineHeight = useMemo(() => {
     if (network.kind !== "available" || !/^[0-9]+$/.test(deadlineBlocks)) {
       return null;
@@ -130,7 +173,7 @@ export function AleoCreateBountyV3Form() {
     return Number.isSafeInteger(height) ? height : null;
   }, [deadlineBlocks, network]);
 
-  const enabled = capability.status === "Available" &&
+  const enabled = capability?.status === "Available" &&
     capability.walletRequestEnabled &&
     capability.upgradeEvidenceVerified &&
     capability.programHashVerified;
@@ -257,7 +300,9 @@ export function AleoCreateBountyV3Form() {
               Protocol V3 · verified Program required
             </span>
             <span className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-xs text-slate-400">
-              {capability.status} · Edition {capability.currentEdition ?? "—"}
+              {capability
+                ? `${capability.status} · Edition ${capability.currentEdition ?? "—"}`
+                : text("正在核验 E4 公开能力…", "Checking E4 public capability…")}
             </span>
           </div>
           <h2 id="create-v3-bounty-title" className="mt-3 text-xl font-semibold text-white">
@@ -418,7 +463,7 @@ export function AleoCreateBountyV3Form() {
           {wallet.connectionState !== "Connected" ? (
             <button className="primary-action" type="button" onClick={() => void wallet.connect()}>
               <WalletCards size={16} aria-hidden="true" />
-              {text("连接 Leo Wallet", "Connect Leo Wallet")}
+              {text("连接 Shield", "Connect Shield")}
             </button>
           ) : null}
           <button

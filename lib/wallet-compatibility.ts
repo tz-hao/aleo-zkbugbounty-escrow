@@ -7,25 +7,24 @@ export type WalletCompatibility = {
   name: string;
   verification: WalletVerificationStatus;
   network: "Aleo Testnet";
-  walletChainId: "testnetbeta";
+  walletChainId: "testnet";
   environments: readonly string[];
   verifiedCapabilities: readonly string[];
 };
 
 export const WALLET_COMPATIBILITY: readonly WalletCompatibility[] = [
   {
-    id: "leo-wallet",
-    name: "Leo Wallet",
-    verification: "Verified",
+    id: "shield-wallet",
+    name: "Shield Wallet",
+    verification: "Experimental",
     network: "Aleo Testnet",
-    walletChainId: "testnetbeta",
+    walletChainId: "testnet",
     environments: ["Desktop browser extension"],
     verifiedCapabilities: [
-      "Connect",
-      "Disconnect",
-      "Public fee transaction request",
-      "create_bounty",
-      "Wallet Request ID classification",
+      "Shield adapter integration",
+      "Minimum-permission Testnet connection",
+      "Public-fee executeTransaction request",
+      "Public transaction ID classification",
     ],
   },
   {
@@ -33,7 +32,7 @@ export const WALLET_COMPATIBILITY: readonly WalletCompatibility[] = [
     name: "Other Aleo wallets",
     verification: "NotVerified",
     network: "Aleo Testnet",
-    walletChainId: "testnetbeta",
+    walletChainId: "testnet",
     environments: [],
     verifiedCapabilities: [],
   },

@@ -6,7 +6,7 @@ import { DEVICE_PROOF_BOUNDARY } from "../lib/device-proof-boundary.ts";
 
 test("Real Mode uses the wallet device boundary with no server or Mock fallback", () => {
   assert.deepEqual(DEVICE_PROOF_BOUNDARY, {
-    mode: "leo-wallet-device",
+    mode: "shield-wallet-device",
     network: "testnet",
     programId: "zkbugbounty_7f3c92.aleo",
     functionName: "submit_claim_v2",

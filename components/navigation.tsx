@@ -27,7 +27,7 @@ export function Navigation() {
   return (
     <header className="site-navigation sticky top-0 z-40 px-3 pt-3">
       <div className="nav-glass mx-auto flex h-[3.75rem] max-w-7xl items-center gap-3 rounded-lg px-3 sm:px-4 lg:px-5">
-        <Link aria-label={text("返回首页", "Back to home")} className="focus-ring inner-brand-link shrink-0" href="/">
+        <Link aria-label={text("返回首页", "Back to home")} className="focus-ring inner-brand-link brand-sticker shrink-0" href="/">
           <Image
             alt="ALEO GILT"
             className="inner-brand-image"
@@ -70,7 +70,7 @@ export function Navigation() {
         <div className="nav-glass mx-auto mt-2 max-w-7xl rounded-lg p-3 shadow-2xl lg:hidden" id="mobile-navigation">
           <div className="mb-3 flex items-center justify-between border-b border-white/[0.08] px-2 pb-3">
             <span className="inline-flex items-center gap-2 text-xs font-semibold text-cyan-100"><span className="network-pulse" aria-hidden="true" />{text("Aleo 测试网", "Aleo Testnet")}</span>
-            <span className="inline-flex items-center gap-1.5 font-mono text-[0.68rem] text-slate-500"><Radio size={12} aria-hidden="true" />testnetbeta</span>
+            <span className="inline-flex items-center gap-1.5 font-mono text-[0.68rem] text-slate-500"><Radio size={12} aria-hidden="true" />testnet</span>
           </div>
           <nav aria-label={text("移动端主导航", "Mobile navigation")} className="grid gap-1">
             {links.map(({ href, label, icon: Icon }) => {

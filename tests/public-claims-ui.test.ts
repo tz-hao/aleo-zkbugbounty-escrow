@@ -21,22 +21,27 @@ test("public claims page source does not render forbidden private exploit terms"
   }
 });
 
-test("public claims page shows only public verification and disclosure guarantees", () => {
+test("public claims page keeps the public registry focused on its actionable readers", () => {
   const source = readFileSync("app/public-claims/page.tsx", "utf8");
   const uiCopySource = readFileSync("lib/i18n/zh.ts", "utf8");
   const combinedSource = `${source}\n${uiCopySource}`;
 
   for (const phrase of [
-    "Exploit Details: Hidden",
-    "Private Proof Data: Never Stored",
-    "Verification Level: Explicit",
-    "Responsible Disclosure:",
     "公开收据不等于公开利用细节",
     "AleoPublicIndex",
     "AleoBountyRegistryPanel",
     "AleoClaimReceiptPanel",
   ]) {
     assert.equal(combinedSource.includes(phrase), true, `${phrase} must be visible on public claims page`);
+  }
+
+  for (const removedPrivacyStrip of [
+    "Exploit Details: Hidden",
+    "Private Proof Data: Never Stored",
+    "Verification Level: Explicit",
+    "Responsible Disclosure:",
+  ]) {
+    assert.equal(source.includes(removedPrivacyStrip), false, `${removedPrivacyStrip} must not be duplicated on the public claims page`);
   }
 
   assert.equal(source.includes("<button"), false, "public claims page must not define action buttons");

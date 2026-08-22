@@ -44,6 +44,6 @@ test("Edition 3 broadcast writes only redacted Leo CLI output", () => {
 test("Edition 4 broadcast command pins the public Edition transition", () => {
   assert.equal(
     packageJson.scripts["broadcast:testnet-edition-4"],
-    "EXPECTED_CURRENT_EDITION=3 EXPECTED_TARGET_EDITION=4 bash scripts/upgrade-aleo-testnet-v3.sh --broadcast",
+    undefined,
   );
 });

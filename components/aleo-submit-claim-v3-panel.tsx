@@ -60,8 +60,7 @@ const initialWitness: WitnessValues = {
 export function AleoSubmitClaimV3Panel() {
   const { text } = useLocale();
   const wallet = useAleoWallet();
-  const [capability, setCapability] =
-    useState<ProtocolV3Capability>(PROTOCOL_V3_CAPABILITY);
+  const [capability, setCapability] = useState<ProtocolV3Capability | null>(null);
   const [latestHeight, setLatestHeight] = useState<number | null>(null);
   const [bountyId, setBountyId] = useState("");
   const [bundle, setBundle] = useState<BountyBundle | null>(null);
@@ -99,9 +98,11 @@ export function AleoSubmitClaimV3Panel() {
             network?: { status?: string; latestHeight?: number };
           } | null>,
         ]);
-        if (capabilityPayload?.protocolV3) {
-          setCapability(capabilityPayload.protocolV3);
-        }
+        setCapability(capabilityPayload?.protocolV3 ?? {
+          ...PROTOCOL_V3_CAPABILITY,
+          status: "ConfigurationError",
+          currentEdition: null,
+        });
         const height = networkPayload?.network?.latestHeight;
         if (
           networkResponse.ok &&
@@ -124,7 +125,7 @@ export function AleoSubmitClaimV3Panel() {
     return () => controller.abort();
   }, []);
 
-  const enabled = capability.status === "Available" &&
+  const enabled = capability?.status === "Available" &&
     capability.walletRequestEnabled &&
     capability.upgradeEvidenceVerified &&
     capability.programHashVerified;
@@ -173,7 +174,7 @@ export function AleoSubmitClaimV3Panel() {
       return;
     }
     if (wallet.connectionState !== "Connected") {
-      setMessage(text("请先连接 Leo Wallet。", "Connect Leo Wallet first."));
+      setMessage(text("请先连接 Shield。", "Connect Shield first."));
       return;
     }
     if (wallet.address === bundle.bounty.owner) {
@@ -248,13 +249,15 @@ export function AleoSubmitClaimV3Panel() {
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">
             {text(
-            "目标系统和代码版本来自链上赏金；白帽补充目标状态、执行和报告承诺。它们把后续证据固定到本次 Claim，但 DemoVault 电路不自动验证外部系统事实。私有 witness 只交给 Leo Wallet，不发送到本站 API。",
-            "The target system and code version come from the on-chain Bounty. The Whitehat adds target-state, execution, and report commitments. They freeze later evidence to this Claim, but the DemoVault circuit does not automatically verify external-system facts. The private witness goes only to Leo Wallet and never to this site's API.",
+            "目标系统和代码版本来自链上赏金；白帽补充目标状态、执行和报告承诺。它们把后续证据固定到本次 Claim，但 DemoVault 电路不自动验证外部系统事实。私有 witness 只交给 Shield，不发送到本站 API。",
+            "The target system and code version come from the on-chain Bounty. The Whitehat adds target-state, execution, and report commitments. They freeze later evidence to this Claim, but the DemoVault circuit does not automatically verify external-system facts. The private witness goes only to Shield and never to this site's API.",
             )}
           </p>
         </div>
         <span className={enabled ? "text-sm text-emerald-200" : "text-sm text-amber-200"}>
-          {capability.status} · Edition {capability.currentEdition ?? "—"}
+          {capability
+            ? `${capability.status} · Edition ${capability.currentEdition ?? "—"}`
+            : text("正在核验 E4 公开能力…", "Checking E4 public capability…")}
         </span>
       </div>
 
@@ -331,7 +334,7 @@ export function AleoSubmitClaimV3Panel() {
             {wallet.connectionState !== "Connected" ? (
               <button className="primary-action" type="button" onClick={() => void wallet.connect()}>
                 <WalletCards size={16} aria-hidden="true" />
-                {text("连接 Leo Wallet", "Connect Leo Wallet")}
+                {text("连接 Shield", "Connect Shield")}
               </button>
             ) : null}
             <button

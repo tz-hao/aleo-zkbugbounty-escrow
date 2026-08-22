@@ -4,7 +4,7 @@
 
 ## 使用前检查
 
-1. 连接 Leo Wallet，并确认网络为 Aleo Testnet / `testnetbeta`。
+1. 连接 Shield，并确认网络为 Aleo Testnet。
 2. 页面必须显示公开 Program 能力已通过：Edition、升级交易、费用交易和 Program Hash 全部匹配。
 3. 区分三个阶段：`Wallet Submitted`、`Transaction Confirmed`、`Mapping Verified`。只有 `Mapping Verified` 才是完成依据。
 4. 私有见证、报告正文、PoC、密钥与解密内容不得进入 Scope、备注、URL、公开承诺输入或截图。
@@ -28,7 +28,7 @@
 
 1. 白帽输入 Bounty ID，读取链上 V3 Bounty 和固定的目标系统/代码承诺。
 2. 在安全的本地证据流程中准备目标状态、可验证执行和报告承诺；下载“公开绑定清单”，用于让双方核对这些 `field` 未被替换。
-3. 私有 DemoVault witness 与 Reporter Secret 仅交给 Leo Wallet；不能把真实漏洞利用细节填入这些输入。
+3. 私有 DemoVault witness 与 Reporter Secret 仅交给 Shield；不能把真实漏洞利用细节填入这些输入。
 4. 钱包确认后，查询 `claim_receipts`、`claim_reporters`、`nullifiers`、`claim_v3_evidence` 与 `claim_v3_states`。
 
 验收：收据代表“审核及锁款资格”，不代表真实目标漏洞、可复现性或修复有效性。
@@ -62,5 +62,6 @@
 ## 当前边界
 
 - 当前证明绑定目标系统、代码、状态、执行和报告承诺，但 DemoVault 电路尚不验证外部目标链状态根或真实执行事实。
+- Shield 官方适配器当前为 alpha：页面只请求最小权限连接和公开交易签名；每笔交易必须在 Shield 内由用户人工核对。尚未完成实际 Shield 签名验收前，不应将适配器集成表述为钱包端 E2E 验证。
 - 密文包的链上承诺确保同一 Claim 使用同一公开字段；项目方仍需本地核验其真实复现材料。
 - Edition 4 的 REMEDIATION 争议若仲裁期无 quorum，会在裁决期到期后回到 `ReproductionConfirmed`；这不会自动支付或解锁奖励。

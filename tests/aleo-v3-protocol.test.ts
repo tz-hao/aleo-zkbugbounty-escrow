@@ -143,6 +143,17 @@ test("V3 browser entry points require verified Program source evidence", () => {
   }
 });
 
+test("V3 entry forms show an E4 verification state instead of a stale fallback edition", () => {
+  const create = readFileSync("components/aleo-create-bounty-v3-form.tsx", "utf8");
+  const submit = readFileSync("components/aleo-submit-claim-v3-panel.tsx", "utf8");
+
+  for (const source of [create, submit]) {
+    assert.match(source, /useState<ProtocolV3Capability \| null>\(null\)/);
+    assert.match(source, /正在核验 E4 公开能力/);
+    assert.equal(source.includes("useState<ProtocolV3Capability>(PROTOCOL_V3_CAPABILITY)"), false);
+  }
+});
+
 test("V3 writes state and replay guards before every Credits Final", () => {
   for (const name of [
     "fund_bounty_v3",

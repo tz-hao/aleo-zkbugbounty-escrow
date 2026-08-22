@@ -1,4 +1,6 @@
-# Edition 1 Production Runbook
+# 历史归档：Edition 1 Production Runbook
+
+> 不得将本运行手册用于当前 Testnet。它记录 Edition 1 的历史恢复流程和当时的 Leo Wallet 约定；当前版请使用 [Protocol V3 操作手册（Edition 4 当前版）](operation-manual-v3.zh.md)。
 
 ## Scope
 

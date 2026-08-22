@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, Check, CircleAlert, Copy, LoaderCircle, ReceiptText } from "lucide-react";
+import { ArrowLeft, Check, CircleAlert, Copy, LoaderCircle, ReceiptText } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { ExecutionStatusBadge } from "@/components/execution-status-badge";
@@ -161,12 +161,6 @@ export default function PublicReceiptPage() {
           <div className="flex flex-wrap gap-2">
             <SeverityBadge severity={receipt.severity} />
             <ProofStatusBadge status={receipt.proofStatus} />
-            {receipt.protocolVersion === 2 ? (
-              <Link className="primary-action" href={`/triage?claimHash=${encodeURIComponent(receipt.claimHash)}`}>
-                {text("进入链上分诊", "Open on-chain triage")}
-                <ArrowRight size={16} aria-hidden="true" />
-              </Link>
-            ) : null}
           </div>
         </div>
       </section>

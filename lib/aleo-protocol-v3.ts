@@ -134,6 +134,15 @@ const SOURCE_FUNCTION_INPUTS: Record<ProtocolV3FunctionName, readonly string[]> 
   refund_bounty_v3: ["field", "u64", "field"],
 };
 
+export const PROTOCOL_V3_PUBLIC_INPUT_COUNTS: Readonly<
+  Record<ProtocolV3PublicFunctionName, number>
+> = Object.fromEntries(
+  PROTOCOL_V3_PUBLIC_TRANSACTION_FUNCTIONS.map((functionName) => [
+    functionName,
+    SOURCE_FUNCTION_INPUTS[functionName].length,
+  ]),
+) as Record<ProtocolV3PublicFunctionName, number>;
+
 const SOURCE_MAPPING_VALUES: Record<ProtocolV3MappingName, string> = {
   bounty_v3_configs: "BountyV3Config",
   claim_v3_evidence: "ClaimV3Evidence",

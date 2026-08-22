@@ -1,6 +1,6 @@
 # 历史归档：zkBugBounty Edition 1 操作手册
 
-> 此文档仅保留 Edition 1 页面与历史截图对应关系，不适用于当前 Testnet。请使用 [Protocol V3 操作手册（Edition 4 当前版）](operation-manual-v3.zh.md)。它同样不要求、收集或保存 Private Key、Seed Phrase、View Key、Private Witness、Exploit、PoC 或触发参数。
+> 此文档仅保留 Edition 1 页面与历史截图对应关系，**不得作为当前 Testnet 操作步骤执行**。其中的 Leo Wallet、V1/V2 入口与命令均为历史事实。当前 Edition 4 / Shield 流程请使用 [Protocol V3 操作手册（Edition 4 当前版）](operation-manual-v3.zh.md)。任何版本都不要求、收集或保存 Private Key、Seed Phrase、View Key、Private Witness、Exploit、PoC 或触发参数。
 
 ## 0. 使用前检查
 

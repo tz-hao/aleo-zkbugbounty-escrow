@@ -8,7 +8,7 @@ import {
   UserRoundCheck,
   WalletCards,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAleoWallet } from "./aleo-wallet-provider";
 import { useLocale } from "./locale-provider";
@@ -61,6 +61,10 @@ type ClaimBundle = {
   disputeMetadata: OnChainClaimV3DisputeMetadata | null;
 };
 
+type LookupClaimOptions = {
+  background?: boolean;
+};
+
 type ActionId =
   | "begin-review"
   | "accept-claim"
@@ -106,6 +110,13 @@ const actionLabels: Record<ActionId, [string, string]> = {
   "finalize-rejection": ["执行驳回裁决", "Finalize rejection"],
 };
 
+const AUTO_MAPPING_REFRESH_ATTEMPTS = 45;
+const AUTO_MAPPING_REFRESH_INTERVAL_MS = 2_000;
+
+function claimBundleFingerprint(bundle: ClaimBundle) {
+  return JSON.stringify(bundle);
+}
+
 export function ProtocolV3Workbench() {
   const { text } = useLocale();
   const wallet = useAleoWallet();
@@ -126,6 +137,7 @@ export function ProtocolV3Workbench() {
     useState<ProtocolV3TransactionPreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const autoRefreshedProtocolTransactionId = useRef<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -164,15 +176,20 @@ export function ProtocolV3Workbench() {
     return () => controller.abort();
   }, []);
 
-  async function lookupClaim() {
+  const lookupClaim = useCallback(async (options: LookupClaimOptions = {}) => {
+    const background = options.background === true;
     const normalized = claimHash.trim();
     if (!/^[0-9]+field$/.test(normalized)) {
-      setMessage(text("请输入有效的 Claim Hash（field）。", "Enter a valid Claim Hash (field)."));
-      return;
+      if (!background) {
+        setMessage(text("请输入有效的 Claim Hash（field）。", "Enter a valid Claim Hash (field)."));
+      }
+      return null;
     }
-    setBusy(true);
-    setMessage(null);
-    setPendingPreview(null);
+    if (!background) {
+      setBusy(true);
+      setMessage(null);
+      setPendingPreview(null);
+    }
     try {
       const response = await fetch(
         "/api/aleo/v3/claims/" + encodeURIComponent(normalized),
@@ -189,16 +206,93 @@ export function ProtocolV3Workbench() {
             : "Protocol-v3 Claim could not be read",
         );
       }
-      setBundle(payload);
-      setAmount(rewardForDecision(payload.bounty, payload.receipt, payload.projectDecision));
-      setMessage(text("已读取并严格解析 V3 公共状态。", "Strictly parsed Protocol-v3 public state."));
+      if (!background) {
+        setBundle(payload);
+        setAmount(rewardForDecision(payload.bounty, payload.receipt, payload.projectDecision));
+        setMessage(text("已读取并严格解析 V3 公共状态。", "Strictly parsed Protocol-v3 public state."));
+      }
+      return payload;
     } catch (error) {
-      setBundle(null);
-      setMessage(error instanceof Error ? error.message : text("读取失败。", "Lookup failed."));
+      if (!background) {
+        setBundle(null);
+        setMessage(error instanceof Error ? error.message : text("读取失败。", "Lookup failed."));
+      }
+      return null;
     } finally {
-      setBusy(false);
+      if (!background) setBusy(false);
     }
-  }
+  }, [claimHash, text]);
+
+  useEffect(() => {
+    const result = wallet.lastPublicTransactionResult;
+    const submission = wallet.protocolSubmission;
+    if (
+      !result ||
+      (result.state !== "confirmed" && result.state !== "rejected" && result.state !== "timeout") ||
+      !submission ||
+      submission.publicTransactionId !== result.publicTransactionId ||
+      !bundle ||
+      submission.bountyId !== bundle.bounty.bountyId ||
+      (submission.claimHash !== null && submission.claimHash !== bundle.receipt.claimHash) ||
+      autoRefreshedProtocolTransactionId.current === result.publicTransactionId
+    ) {
+      return;
+    }
+    const controller = new AbortController();
+    const startingFingerprint = claimBundleFingerprint(bundle);
+    const attemptLimit = result.state === "rejected" ? 1 : AUTO_MAPPING_REFRESH_ATTEMPTS;
+    setMessage(text(
+      result.state === "confirmed"
+        ? "公开交易已 Confirmed，正在等待并自动同步 V3 Mapping。"
+        : result.state === "rejected"
+          ? "公开交易已被拒绝，正在自动重新读取 V3 Mapping 以恢复准确状态。"
+          : "钱包尚未收到最终交易结果；正在通过 V3 Mapping 自动检查实际链上状态。",
+      result.state === "confirmed"
+        ? "The public transaction is confirmed. Waiting for and syncing Protocol-v3 mappings automatically."
+        : result.state === "rejected"
+          ? "The public transaction was rejected. Refreshing Protocol-v3 mappings to restore the accurate state."
+          : "The wallet has not received a final transaction result. Checking Protocol-v3 mappings for the actual on-chain state.",
+    ));
+
+    void (async () => {
+      for (let attempt = 0; attempt < attemptLimit; attempt += 1) {
+        const updated = await lookupClaim({ background: true });
+        if (controller.signal.aborted) return;
+        if (updated && claimBundleFingerprint(updated) !== startingFingerprint) {
+          autoRefreshedProtocolTransactionId.current = result.publicTransactionId;
+          setBundle(updated);
+          setAmount(rewardForDecision(updated.bounty, updated.receipt, updated.projectDecision));
+          setPendingPreview(null);
+          setMessage(text(
+            "链上 Mapping 已自动同步，页面已进入下一状态。",
+            "The on-chain Mapping is synchronized. The page has advanced to the next state.",
+          ));
+          return;
+        }
+        if (attempt + 1 < attemptLimit) {
+          await new Promise<void>((resolve) => {
+            const timeoutId = window.setTimeout(resolve, AUTO_MAPPING_REFRESH_INTERVAL_MS);
+            controller.signal.addEventListener("abort", () => {
+              window.clearTimeout(timeoutId);
+              resolve();
+            }, { once: true });
+          });
+        }
+        if (controller.signal.aborted) return;
+      }
+      autoRefreshedProtocolTransactionId.current = result.publicTransactionId;
+      setMessage(text(
+        result.state === "rejected"
+          ? "交易未被链上接受；页面已保持当前已验证状态。"
+          : "交易结果已收到，但 V3 Mapping 尚未索引出状态变化；系统已自动轮询 90 秒，可稍后再次读取。",
+        result.state === "rejected"
+          ? "The transaction was not accepted on-chain. The page remains on the current verified state."
+          : "A transaction result was received, but the V3 Mapping has not indexed a state change. The page polled automatically for 90 seconds; try reading again shortly.",
+      ));
+    })();
+
+    return () => controller.abort();
+  }, [bundle, lookupClaim, text, wallet.lastPublicTransactionResult, wallet.protocolSubmission]);
 
   const roles = useMemo(() => {
     const address = wallet.address;
@@ -564,7 +658,7 @@ export function ProtocolV3Workbench() {
                 {wallet.connectionState !== "Connected" ? (
                   <button className="primary-action" type="button" onClick={() => void wallet.connect()}>
                     <WalletCards size={16} aria-hidden="true" />
-                    {text("连接 Leo Wallet", "Connect Leo Wallet")}
+                    {text("连接 Shield", "Connect Shield")}
                   </button>
                 ) : null}
                 {actions.map((action) => (

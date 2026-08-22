@@ -19,6 +19,7 @@ import {
   buildTransientSubmitClaimV3Inputs,
   fetchProtocolV3Capability,
   inspectProtocolV3Source,
+  PROTOCOL_V3_PUBLIC_INPUT_COUNTS,
   PROTOCOL_V3_FUNCTIONS,
   PROTOCOL_V3_MAPPINGS,
 } from "../lib/aleo-protocol-v3.ts";
@@ -202,6 +203,10 @@ test("all 12 public V3 transaction builders preserve the Edition 4 ABI", () => {
   );
   const expectedCounts = [9, 3, 6, 4, 5, 5, 7, 4, 7, 7, 6, 3];
   assert.deepEqual(previews.map((preview) => preview.inputs.length), expectedCounts);
+  assert.deepEqual(
+    Object.fromEntries(previews.map((preview) => [preview.functionName, preview.inputs.length])),
+    PROTOCOL_V3_PUBLIC_INPUT_COUNTS,
+  );
   assert.equal(JSON.stringify(previews).includes("reporterSecret"), false);
   assert.throws(
     () => buildCreateBountyV3Transaction({

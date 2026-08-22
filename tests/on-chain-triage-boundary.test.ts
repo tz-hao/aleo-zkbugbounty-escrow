@@ -35,15 +35,13 @@ test("on-chain triage API refuses writes without parsing a request", () => {
   assert.match(status, /Confirmed Transaction/);
 });
 
-test("verified v2 public receipts carry only the public Claim Hash into triage", () => {
+test("historical V2 receipts do not reopen the removed V2 triage workspace", () => {
   const index = readFileSync("components/aleo-public-index.tsx", "utf8");
   const detail = readFileSync("app/public-claims/[registryKey]/page.tsx", "utf8");
-  const workspace = readFileSync("components/on-chain-triage-workspace.tsx", "utf8");
+  const triagePage = readFileSync("app/triage/page.tsx", "utf8");
 
-  assert.match(index, /href=\{`\/triage\?claimHash=\$\{encodeURIComponent\(item\.claimHash\)\}`\}/);
-  assert.match(detail, /href=\{`\/triage\?claimHash=\$\{encodeURIComponent\(receipt\.claimHash\)\}`\}/);
-  assert.match(workspace, /new URLSearchParams\(window\.location\.search\)\.get\("claimHash"\)/);
-  assert.match(workspace, /lookupClaim\(routeClaimHash\)/);
-  assert.equal(workspace.includes("localStorage"), false);
-  assert.equal(workspace.includes("sessionStorage"), false);
+  assert.doesNotMatch(index, /\/triage\?claimHash=/);
+  assert.doesNotMatch(detail, /\/triage\?claimHash=/);
+  assert.doesNotMatch(triagePage, /OnChainTriageWorkspace/);
+  assert.match(triagePage, /ProtocolV3Workbench/);
 });

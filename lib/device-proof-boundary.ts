@@ -1,7 +1,7 @@
 import { CANONICAL_ALEO_PROGRAM_ID } from "./aleo-program.ts";
 
 export const DEVICE_PROOF_BOUNDARY = Object.freeze({
-  mode: "leo-wallet-device" as const,
+  mode: "shield-wallet-device" as const,
   network: "testnet" as const,
   programId: CANONICAL_ALEO_PROGRAM_ID,
   functionName: "submit_claim_v2" as const,

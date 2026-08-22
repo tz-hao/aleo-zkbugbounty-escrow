@@ -83,7 +83,7 @@ V1/V2 历史接口与映射保持兼容；V2 Claim 不会被伪装为 V3 Claim�
 - Exploit Path、PoC、触发参数与漏洞明文；
 - 加密披露包的明文与解密密钥。
 
-`/api/aleo/prove` 在真实模式明确返回 HTTP `410`。服务器不会接收、证明、打印或保存 Private Witness；真实证明与签名仅在 Leo Wallet 的设备端边界完成。
+`/api/aleo/prove` 在真实模式明确返回 HTTP `410`。服务器不会接收、证明、打印或保存 Private Witness；真实证明与签名仅在 Shield 的设备端边界完成。
 
 ### 可公开验证的最小状态
 
@@ -115,7 +115,7 @@ V1/V2 历史接口与映射保持兼容；V2 Claim 不会被伪装为 V3 Claim�
 ```text
 Next.js DApp
   ├─ 公开 Registry 读取 ──────────────> Provable 公共 API
-  ├─ Leo Wallet（用户人工签名） ─────> Aleo Testnet Transaction
+  ├─ Shield（用户人工签名） ─────────> Aleo Testnet Transaction
   └─ Device-side private boundary
        ├─ DemoVault witness
        ├─ Reporter Secret
@@ -136,7 +136,7 @@ Real Mode 从不回退到 Mock、localStorage 或服务端私有证明。Demo Mo
 - Node.js 20+
 - npm
 - Leo 4.4（编译 Leo Program 时需要）
-- Leo Wallet 浏览器扩展（真实 Testnet 钱包操作时需要）
+- Shield 浏览器扩展（真实 Testnet 钱包操作时需要；官方适配器当前为 alpha）
 
 ```bash
 npm install

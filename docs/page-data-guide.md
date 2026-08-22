@@ -4,13 +4,13 @@
 
 Program ID：`zkbugbounty_7f3c92.aleo`
 网络：Aleo Testnet
-钱包：Leo Wallet
+钱包：Shield（官方适配器当前为 alpha）
 
 ## 1. 操作前检查
 
 开始前逐项确认：
 
-1. 在浏览器扩展中解锁 Leo Wallet。
+1. 在浏览器扩展中解锁 Shield。
 2. 将钱包网络切换到 Aleo Testnet。
 3. 钱包有足够的 Testnet Credits 支付交易费用。
 4. 仅使用公开地址和公开 `field` 数据操作网页。
@@ -63,14 +63,14 @@ Program ID：`zkbugbounty_7f3c92.aleo`
 ### 4.2 提交步骤
 
 1. 打开 `/create-bounty`。
-2. 连接 Leo Wallet；确认地址与网络状态正常。
+2. 连接 Shield；确认地址与网络状态正常。
 3. 选择安全规则，填写 Scope 与四档奖励。
 4. 点击“生成公开标识”，确认 `Bounty ID` 与 `Scope Hash` 已生成且均以 `field` 结尾。
 5. 设置有效期和预计手续费。
 6. 点击“生成 Transaction Preview”。
 7. 检查 Preview：Program ID、函数名 `create_bounty`、Bounty ID、Scope Hash、Rule、奖励档位、Deadline、手续费。
 8. 点击请求钱包签名。
-9. 在 Leo Wallet 弹窗中复核网络、函数、公开输入和费用后，由你本人确认或取消。
+9. 在 Shield 弹窗中复核网络、函数、公开输入和费用后，由你本人确认或取消。
 
 ### 4.3 创建结果判断
 
@@ -193,7 +193,7 @@ Real Mode 的 Bug Type、Rule 与 Scope Hash 由已读取的 Bounty 和 Program 
 
 ## 8. Triage `/triage`
 
-当前 Testnet 的 Edition 4 支持经公开能力门核验后的 V3 托管、锁定、支付和退款，以及 REMEDIATION 无 quorum 到期后的确定性恢复。页面只会在公开 Edition、升级证据与 Program 哈希同时通过时请求 Leo Wallet 签名；任何 Endpoint 不可用或证据不匹配都会失败关闭，绝不回退到 Demo。
+当前 Testnet 的 Edition 4 支持经公开能力门核验后的 V3 托管、锁定、支付和退款，以及 REMEDIATION 无 quorum 到期后的确定性恢复。页面只会在公开 Edition、升级证据与 Program 哈希同时通过时请求 Shield 签名；任何 Endpoint 不可用或证据不匹配都会失败关闭，绝不回退到 Demo。
 
 可执行的安全操作：
 
@@ -230,7 +230,7 @@ Real Mode 的 Bug Type、Rule 与 Scope Hash 由已读取的 Bounty 和 Program 
 
 | 页面状态 | 含义 | 操作 |
 | --- | --- | --- |
-| Wallet extension unavailable | 浏览器未检测到 Leo Wallet | 安装或启用扩展后刷新页面 |
+| Wallet extension unavailable | 浏览器未检测到 Shield | 安装或启用扩展后刷新页面 |
 | Wallet locked | 钱包未解锁 | 在扩展内解锁后重新连接 |
 | Wrong network | 钱包不是 Testnet | 切换到 Aleo Testnet 后重新授权 |
 | Connection rejected | 用户拒绝连接授权 | 重新点击连接，并在弹窗中授权 |
@@ -367,7 +367,7 @@ Real Mode 的 Bug Type、Rule 与 Scope Hash 由已读取的 Bounty 和 Program 
 1. 不要在任何字段输入真实漏洞复现步骤、PoC 或私钥。
 2. 确认 Preview 的 Program 为 `zkbugbounty_7f3c92.aleo`，Function 为 `submit_claim`。
 3. 确认 Bounty ID、Scope Hash、Rule 与页面刚读取的 Mapping 一致。
-4. 如只验证表单，在 Leo Wallet 弹窗取消。
+4. 如只验证表单，在 Shield 弹窗取消。
 5. 如确认广播，保留真实 `at1...` Transaction ID，等待链上状态，而不是只看 Wallet Request ID。
 
 ### 12.6 公开 Claims `/public-claims`

@@ -314,7 +314,7 @@ export function AleoCreateBountyForm({ legacy = false }: { legacy?: boolean }) {
             {!submitting ? <ArrowRight size={16} aria-hidden="true" /> : null}
           </button>
           {wallet.connectionState !== "Connected" ? (
-            <p className="text-xs text-slate-500">{text("请先在顶部连接 Leo Wallet，并确认已切换到 Aleo 测试网。", "Connect Leo Wallet in the header and confirm Aleo Testnet first.")}</p>
+            <p className="text-xs text-slate-500">{text("请先在顶部连接 Shield，并确认已切换到 Aleo 测试网。", "Connect Shield in the header and confirm Aleo Testnet first.")}</p>
           ) : null}
         </TransactionPreview>
       ) : null}

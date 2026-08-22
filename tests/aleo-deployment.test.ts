@@ -216,7 +216,11 @@ test("deployment UI exposes live public confirmation without persistence", async
   const component = readFileSync("components/aleo-deployment-status.tsx", "utf8");
   const publicClaims = readFileSync("app/public-claims/page.tsx", "utf8");
   assert.match(component, /\/api\/aleo\/deployment/);
+  assert.match(component, /\/api\/aleo\/v3/);
   assert.match(component, /verificationStatus/);
+  assert.match(component, /currentEdition === 4/);
+  assert.match(component, /programHashVerified/);
+  assert.equal(component.includes("Edition 4+: Live"), false);
   assert.equal(component.includes("localStorage"), false);
   assert.match(publicClaims, /AleoDeploymentStatus/);
 });
